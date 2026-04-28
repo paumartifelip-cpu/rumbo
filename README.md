@@ -71,10 +71,41 @@ Pega tu API key en `/settings` (se guarda solo en tu navegador) o ponla como `GE
 
 ## Deploy en Cloudflare Pages
 
-- Build command: `npm run build`
-- Output directory: `.next`
-- Adaptador recomendado: [`@cloudflare/next-on-pages`](https://github.com/cloudflare/next-on-pages) si necesitas el edge runtime completo.
-- Configura las variables de entorno en el panel de Cloudflare.
+La app está configurada como **static export** (`output: "export"` en `next.config.mjs`). Cloudflare Pages la sirve sin servidor — toda la lógica (store, sync, IA) corre en el navegador.
+
+### Paso a paso
+
+1. Entra en https://dash.cloudflare.com → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**.
+2. Conecta el repo `paumartifelip-cpu/rumbo`. Branch: `main`.
+3. **Build settings**:
+   - Framework preset: **Next.js (Static HTML Export)** (o "None" si no aparece)
+   - Build command: `npm run build`
+   - Build output directory: `out`
+   - Root directory: `/` (vacío)
+4. **Environment variables** (sección "Variables and Secrets"):
+   - `NEXT_PUBLIC_SUPABASE_URL` = `https://rwizskngajpmuisbdsaz.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = (el JWT anon)
+   - Aplica a Production y Preview.
+5. **Save and Deploy**. La primera build tarda ~2 min.
+
+La key de Gemini no la pongas como variable: cada usuario la pega desde [/settings](app/(app)/settings/page.tsx) y se guarda en su navegador.
+
+### Settings de referencia
+
+| Campo | Valor |
+| --- | --- |
+| Framework preset | Next.js (Static HTML Export) |
+| Build command | `npm run build` |
+| Output directory | `out` |
+| Node version | 18 o superior (auto) |
+| Compatibility date | `2026-01-01` (`wrangler.toml`) |
+
+### Test local del build de producción
+
+```bash
+npm run build         # genera ./out
+npx serve out         # sirve en http://localhost:3000
+```
 
 ## Privacidad y avisos
 

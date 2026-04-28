@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { geminiCategorize, geminiPrioritize, heuristicCategorize } from "./gemini";
 import { mockFinances, mockGoals, mockSnapshots, mockTasks, mockUser } from "./mock";
 import { localPrioritize } from "./priority";
 import { findProfile, getCurrentProfileId, Profile, setCurrentProfileId } from "./profiles";
@@ -265,40 +266,25 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         s.onboarding?.current_money) ??
       0;
 
-    const userKey =
-      typeof window !== "undefined"
-        ? localStorage.getItem("rumbo_gemini_key") ?? ""
-        : "";
-
     let source: "gemini" | "fallback" = "fallback";
     let scores: Array<{ task_id: string; score: number; reason: string }> = [];
     let advice = { today_focus: "", financial_advice: "" };
 
     try {
-      const res = await fetch("/api/prioritize", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(userKey ? { "x-gemini-key": userKey } : {}),
-        },
-        body: JSON.stringify({
-          tasks: pending,
-          goals: s.goals,
-          current_money: currentMoney,
-          monthly_target: s.onboarding?.monthly_target,
-        }),
+      const remote = await geminiPrioritize(pending, s.goals, {
+        current_money: currentMoney,
+        monthly_target: s.onboarding?.monthly_target,
       });
-      const json = await res.json();
-      if (json.ok && json.data) {
+      if (remote) {
         source = "gemini";
-        scores = (json.data.ordered_tasks ?? []).map((o: any) => ({
+        scores = (remote.ordered_tasks ?? []).map((o) => ({
           task_id: o.task_id,
           score: o.priority_score,
           reason: o.reason,
         }));
         advice = {
-          today_focus: json.data.today_focus ?? "",
-          financial_advice: json.data.financial_advice ?? "",
+          today_focus: remote.today_focus ?? "",
+          financial_advice: remote.financial_advice ?? "",
         };
       } else {
         const local = localPrioritize(pending, s.goals);
@@ -453,10 +439,6 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
     // AI categorization for expenses without a category.
     if (f.type === "gasto" && !f.category) {
-      const userKey =
-        typeof window !== "undefined"
-          ? localStorage.getItem("rumbo_gemini_key") ?? ""
-          : "";
       const existingCategories = Array.from(
         new Set(
           stateRef.current.finances
@@ -464,31 +446,28 @@ export function RumboProvider({ children }: { children: ReactNode }) {
             .map((x) => x.category as string)
         )
       );
-      fetch("/api/categorize", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(userKey ? { "x-gemini-key": userKey } : {}),
-        },
-        body: JSON.stringify({
-          title: f.title,
-          amount: f.amount,
-          existing_categories: existingCategories,
-        }),
+      geminiCategorize({
+        title: f.title,
+        amount: f.amount,
+        existing_categories: existingCategories,
       })
-        .then((r) => r.json())
-        .then((j) => {
-          if (j?.ok && j.category) {
-            setState((s) => ({
-              ...s,
-              finances: s.finances.map((x) =>
-                x.id === id ? { ...x, category: j.category } : x
-              ),
-            }));
-          }
+        .then((cat) => {
+          const final = cat || heuristicCategorize(f.title);
+          setState((s) => ({
+            ...s,
+            finances: s.finances.map((x) =>
+              x.id === id ? { ...x, category: final } : x
+            ),
+          }));
         })
         .catch(() => {
-          // ignore — keep without category
+          const final = heuristicCategorize(f.title);
+          setState((s) => ({
+            ...s,
+            finances: s.finances.map((x) =>
+              x.id === id ? { ...x, category: final } : x
+            ),
+          }));
         });
     }
   }, []);

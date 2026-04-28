@@ -3,7 +3,7 @@ import { Goal, Task } from "./types";
 const ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
-interface GeminiPriorityResponse {
+export interface GeminiPriorityResponse {
   ordered_tasks: Array<{
     task_id: string;
     priority_score: number;
@@ -16,17 +16,17 @@ interface GeminiPriorityResponse {
   today_focus: string;
 }
 
-export async function geminiPrioritize(
-  tasks: Task[],
-  goals: Goal[],
-  context: { current_money: number; monthly_target?: number },
-  keyOverride?: string
-): Promise<GeminiPriorityResponse | null> {
-  const apiKey = keyOverride || process.env.GEMINI_API_KEY;
+function getKey(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("rumbo_gemini_key") || null;
+}
+
+async function callGemini<T>(
+  prompt: string,
+  temperature = 0.3
+): Promise<T | null> {
+  const apiKey = getKey();
   if (!apiKey) return null;
-
-  const prompt = buildPrompt(tasks, goals, context);
-
   try {
     const res = await fetch(`${ENDPOINT}?key=${apiKey}`, {
       method: "POST",
@@ -35,7 +35,7 @@ export async function geminiPrioritize(
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          temperature: 0.3,
+          temperature,
         },
       }),
     });
@@ -46,18 +46,18 @@ export async function geminiPrioritize(
       data?.candidates?.[0]?.content?.parts?.[0] ??
       null;
     if (!text) return null;
-    const parsed = JSON.parse(typeof text === "string" ? text : JSON.stringify(text));
-    return parsed as GeminiPriorityResponse;
+    return JSON.parse(typeof text === "string" ? text : JSON.stringify(text)) as T;
   } catch {
     return null;
   }
 }
 
-function buildPrompt(
+export async function geminiPrioritize(
   tasks: Task[],
   goals: Goal[],
   context: { current_money: number; monthly_target?: number }
-) {
+): Promise<GeminiPriorityResponse | null> {
+  if (!getKey()) return null;
   const today = new Date().toISOString().slice(0, 10);
 
   const simpleTasks = tasks.map((t) => ({
@@ -66,7 +66,6 @@ function buildPrompt(
     description: t.description ?? null,
     goal_id: t.goal_id ?? null,
   }));
-
   const simpleGoals = goals.map((g) => ({
     id: g.id,
     title: g.title,
@@ -78,7 +77,7 @@ function buildPrompt(
     status: g.status,
   }));
 
-  return `Eres un asistente experto en foco, productividad, negocio y dinero.
+  const prompt = `Eres un asistente experto en foco, productividad, negocio y dinero.
 Las tareas pueden estar escritas o dictadas en lenguaje natural — interprétalas tú.
 Tu trabajo:
 1. Entiende cada tarea aunque esté mal escrita o sea muy corta.
@@ -108,4 +107,48 @@ Devuelve SOLO un JSON válido con esta forma exacta (todas las tareas deben apar
 }
 
 No incluyas texto adicional fuera del JSON.`;
+
+  return callGemini<GeminiPriorityResponse>(prompt, 0.3);
+}
+
+export async function geminiCategorize(input: {
+  title: string;
+  amount?: number;
+  existing_categories?: string[];
+}): Promise<string | null> {
+  if (!getKey()) return null;
+  const prompt = `Eres un clasificador de gastos personales en español.
+Te paso el concepto de un gasto y su importe. Tu trabajo es asignarle UNA categoría corta (1-2 palabras), en singular, en español, que tenga sentido.
+Si la lista de categorías existentes ya contiene una que encaje, REUTILÍZALA tal cual (mismo texto, mismas mayúsculas).
+Si ninguna encaja, inventa una nueva categoría útil y compacta.
+
+Categorías existentes: ${JSON.stringify(input.existing_categories ?? [])}
+Concepto: "${input.title}"
+Importe: ${input.amount ?? "?"} €
+
+Devuelve SOLO un JSON válido con esta forma exacta:
+{ "category": "..." }
+Sin texto adicional.`;
+  const r = await callGemini<{ category: string }>(prompt, 0.2);
+  return r?.category?.trim() || null;
+}
+
+// Heuristic fallback used when there's no API key.
+export function heuristicCategorize(title: string): string {
+  const t = title.toLowerCase();
+  if (/(alquiler|hipoteca|piso|casa|comunidad|ibi|luz|agua|gas|wifi|internet|electric)/.test(t))
+    return "Vivienda";
+  if (/(super|mercadona|carrefour|lidl|comida|supermercado|fruta|carniceria)/.test(t))
+    return "Comida";
+  if (/(restaurante|bar|cena|menu|tapas|bocata)/.test(t)) return "Restaurantes";
+  if (/(uber|cabify|taxi|gasolin|metro|bus|tren|renfe|peaje|park)/.test(t))
+    return "Transporte";
+  if (/(netflix|spotify|hbo|prime|disney|youtube|chatgpt|notion|figma|adobe|github|saas)/.test(t))
+    return "Suscripciones";
+  if (/(medico|farma|gimnasio|gym|dentista|salud|crossfit)/.test(t))
+    return "Salud";
+  if (/(amazon|zalando|ropa|zapat|nike|adidas)/.test(t)) return "Compras";
+  if (/(cine|concierto|viaje|hotel|booking|airbnb|vacacion)/.test(t))
+    return "Ocio";
+  return "Otros";
 }
