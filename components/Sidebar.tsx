@@ -19,7 +19,7 @@ const items = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile, signOut } = useRumbo();
+  const { profile, signOut, syncStatus } = useRumbo();
 
   function handleSignOut() {
     signOut();
@@ -56,8 +56,9 @@ export function Sidebar() {
               {profile.initials}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium truncate">
+              <div className="text-sm font-medium truncate flex items-center gap-1.5">
                 {profile.name}
+                <SyncDot status={syncStatus} />
               </div>
               <button
                 onClick={handleSignOut}
@@ -73,23 +74,47 @@ export function Sidebar() {
   );
 }
 
+function SyncDot({ status }: { status: string }) {
+  const map: Record<string, { color: string; title: string }> = {
+    idle: { color: "bg-slate-300", title: "Inactivo" },
+    syncing: { color: "bg-amber-400 animate-pulse", title: "Sincronizando…" },
+    synced: { color: "bg-emerald-500", title: "Guardado en la nube" },
+    offline: { color: "bg-slate-300", title: "Sin Supabase (solo local)" },
+    error: { color: "bg-rose-500", title: "Error de sincronización" },
+  };
+  const cfg = map[status] ?? map.idle;
+  return (
+    <span
+      title={cfg.title}
+      className={`inline-block w-2 h-2 rounded-full ${cfg.color}`}
+    />
+  );
+}
+
+// Mobile bottom nav shows only the most-used 5 to avoid cramping.
+const MOBILE_ITEMS = ["/today", "/tasks", "/money", "/gastos", "/settings"];
+
 export function MobileNav() {
   const pathname = usePathname();
+  const mobileItems = items.filter((it) => MOBILE_ITEMS.includes(it.href));
   return (
-    <nav className="md:hidden fixed bottom-3 left-3 right-3 bg-white border border-rumbo-line rounded-2xl shadow-card p-1.5 flex justify-between z-50">
-      {items.map((it) => {
+    <nav
+      className="md:hidden fixed left-2 right-2 bg-white border border-rumbo-line rounded-2xl shadow-card p-1 flex justify-between z-50"
+      style={{ bottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
+    >
+      {mobileItems.map((it) => {
         const active = pathname?.startsWith(it.href);
         return (
           <Link
             key={it.href}
             href={it.href}
             className={cn(
-              "flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl text-[10px] transition-colors",
+              "flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl text-[10px] transition-colors min-w-0",
               active ? "bg-rumbo-ink text-white" : "text-rumbo-muted"
             )}
           >
-            <span className="text-base leading-none">{it.icon}</span>
-            <span>{it.label}</span>
+            <span className="text-lg leading-none">{it.icon}</span>
+            <span className="mt-0.5">{it.label}</span>
           </Link>
         );
       })}

@@ -164,17 +164,17 @@ function RadialCard({
           </span>
         </div>
 
-        <div className="mt-2 grid grid-cols-[1fr_auto] gap-4 items-center">
-          <div>
+        <div className="mt-2 grid grid-cols-[1fr_auto] gap-3 md:gap-4 items-center">
+          <div className="min-w-0">
             <motion.div
               key={current}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-4xl md:text-5xl font-semibold tracking-tight tabular-nums"
+              className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight tabular-nums break-words"
             >
               {formatMoney(animatedCurrent)}
             </motion.div>
-            <div className="text-sm text-rumbo-muted mt-1">
+            <div className="text-xs sm:text-sm text-rumbo-muted mt-1">
               de {formatMoney(target)}
             </div>
             <div className="text-sm mt-3">
@@ -183,7 +183,7 @@ function RadialCard({
             </div>
           </div>
 
-          <div className="w-[160px] h-[160px] -mr-2">
+          <div className="w-[120px] h-[120px] sm:w-[140px] sm:h-[140px] md:w-[160px] md:h-[160px] -mr-1 md:-mr-2 shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <RadialBarChart
                 cx="50%"

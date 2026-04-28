@@ -1,5 +1,6 @@
 export interface Profile {
   id: string;
+  user_id: string; // UUID estable usado para Supabase
   name: string;
   initials: string;
   color: string;
@@ -9,6 +10,7 @@ export interface Profile {
 export const PROFILES: Profile[] = [
   {
     id: "pau",
+    user_id: "11111111-1111-1111-1111-111111111111",
     name: "Pau",
     initials: "P",
     color: "from-emerald-200 to-emerald-400",
@@ -16,6 +18,7 @@ export const PROFILES: Profile[] = [
   },
   {
     id: "michelle",
+    user_id: "22222222-2222-2222-2222-222222222222",
     name: "Michelle",
     initials: "M",
     color: "from-violet-200 to-violet-400",

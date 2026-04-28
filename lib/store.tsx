@@ -13,6 +13,8 @@ import {
 import { mockFinances, mockGoals, mockSnapshots, mockTasks, mockUser } from "./mock";
 import { localPrioritize } from "./priority";
 import { findProfile, getCurrentProfileId, Profile, setCurrentProfileId } from "./profiles";
+import { pullFromSupabase, pushToSupabase, SyncSnapshot } from "./sync";
+import { supabaseEnabled } from "./supabase";
 import {
   FinancialEntry,
   Goal,
@@ -34,6 +36,8 @@ interface RumboState {
   aiAdvice?: { today_focus: string; financial_advice: string };
   prioritizing: boolean;
   aiSource: "gemini" | "fallback" | "idle";
+  syncStatus: "idle" | "syncing" | "synced" | "offline" | "error";
+  lastSyncAt?: string;
 }
 
 interface RumboContext extends RumboState {
@@ -69,6 +73,7 @@ const defaultState: RumboState = {
   onboardingDone: false,
   prioritizing: false,
   aiSource: "idle",
+  syncStatus: supabaseEnabled ? "idle" : "offline",
 };
 
 const Ctx = createContext<RumboContext | null>(null);
@@ -86,6 +91,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const p = findProfile(id);
     setProfile(p);
     if (p) {
+      // Local cache first (instant load).
       try {
         const raw = localStorage.getItem(storageKeyFor(p.id));
         if (raw) {
@@ -95,6 +101,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
             ...parsed,
             prioritizing: false,
             aiSource: parsed.aiSource ?? "idle",
+            syncStatus: supabaseEnabled ? "syncing" : "offline",
           });
         } else {
           setState({
@@ -105,17 +112,47 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       } catch {
         setState(defaultState);
       }
+      // Then pull from Supabase to get the latest authoritative state.
+      if (supabaseEnabled) {
+        pullFromSupabase(p.user_id).then((remote) => {
+          if (remote) {
+            applyRemote(p, remote);
+          } else {
+            setState((s) => ({ ...s, syncStatus: "error" }));
+          }
+        });
+      }
     } else {
       setState(defaultState);
     }
     setHydrated(true);
   }, []);
 
-  // Persist state to the active profile bucket.
+  function applyRemote(p: Profile, remote: SyncSnapshot) {
+    setState((s) => ({
+      ...s,
+      goals: remote.goals,
+      tasks: remote.tasks,
+      finances: remote.finances,
+      snapshots: remote.snapshots,
+      onboarding: remote.onboarding ?? s.onboarding,
+      onboardingDone: Boolean(remote.onboarding) || s.onboardingDone,
+      user: {
+        ...mockUser,
+        id: p.user_id,
+        name: remote.onboarding?.name || p.name,
+        email: p.email,
+      },
+      syncStatus: "synced",
+      lastSyncAt: new Date().toISOString(),
+    }));
+  }
+
+  // Persist state to the active profile bucket (local cache).
   useEffect(() => {
     if (!hydrated || !profile) return;
     try {
-      const { prioritizing, ...persisted } = state;
+      const { prioritizing, syncStatus, lastSyncAt, ...persisted } = state;
       localStorage.setItem(
         storageKeyFor(profile.id),
         JSON.stringify(persisted)
@@ -125,11 +162,50 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }
   }, [state, hydrated, profile]);
 
+  // Debounced push to Supabase.
+  const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!hydrated || !profile || !supabaseEnabled) return;
+    // Skip pushing while we're still pulling the initial remote state.
+    if (state.syncStatus === "syncing") return;
+
+    if (pushTimer.current) clearTimeout(pushTimer.current);
+    pushTimer.current = setTimeout(async () => {
+      setState((s) => ({ ...s, syncStatus: "syncing" }));
+      const ok = await pushToSupabase(profile.user_id, {
+        goals: state.goals,
+        tasks: state.tasks,
+        finances: state.finances,
+        snapshots: state.snapshots,
+        onboarding: state.onboarding,
+      });
+      setState((s) => ({
+        ...s,
+        syncStatus: ok ? "synced" : "error",
+        lastSyncAt: ok ? new Date().toISOString() : s.lastSyncAt,
+      }));
+    }, 800);
+
+    return () => {
+      if (pushTimer.current) clearTimeout(pushTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    state.goals,
+    state.tasks,
+    state.finances,
+    state.snapshots,
+    state.onboarding,
+    profile,
+    hydrated,
+  ]);
+
   const signIn = useCallback((profileId: string) => {
     const p = findProfile(profileId);
     if (!p) return;
     setCurrentProfileId(p.id);
     setProfile(p);
+    // Local cache first.
     try {
       const raw = localStorage.getItem(storageKeyFor(p.id));
       if (raw) {
@@ -139,15 +215,30 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           ...parsed,
           prioritizing: false,
           aiSource: parsed.aiSource ?? "idle",
+          syncStatus: supabaseEnabled ? "syncing" : "offline",
         });
       } else {
         setState({
           ...defaultState,
-          user: { ...mockUser, name: p.name, email: p.email },
+          user: { ...mockUser, id: p.user_id, name: p.name, email: p.email },
+          syncStatus: supabaseEnabled ? "syncing" : "offline",
         });
       }
     } catch {
-      setState(defaultState);
+      setState({
+        ...defaultState,
+        user: { ...mockUser, id: p.user_id, name: p.name, email: p.email },
+      });
+    }
+    // Pull authoritative state from Supabase.
+    if (supabaseEnabled) {
+      pullFromSupabase(p.user_id).then((remote) => {
+        if (remote) {
+          applyRemote(p, remote);
+        } else {
+          setState((s) => ({ ...s, syncStatus: "error" }));
+        }
+      });
     }
   }, []);
 

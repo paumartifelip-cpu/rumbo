@@ -189,7 +189,7 @@ function Card({
         key={monthTotal}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-4xl md:text-[40px] font-semibold tracking-tight tabular-nums mt-2"
+        className="text-3xl sm:text-4xl md:text-[40px] font-semibold tracking-tight tabular-nums mt-2 break-words"
       >
         {formatMoney(animated)}
       </motion.div>

@@ -125,9 +125,12 @@ export function BubbleChart({ data }: { data: Bubble[] }) {
     );
   }
 
+  // Cap aspect ratio so the chart doesn't get absurdly tall on narrow screens.
+  const ratio = Math.max(0.6, Math.min(2.4, width / Math.max(height, 1)));
+
   return (
     <div className="w-full">
-      <div className="relative w-full" style={{ aspectRatio: `${width} / ${Math.max(height, 1)}` }}>
+      <div className="relative w-full" style={{ aspectRatio: ratio }}>
         <svg
           viewBox={`0 0 ${width} ${Math.max(height, 1)}`}
           width="100%"
