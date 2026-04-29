@@ -85,6 +85,12 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Set right before applyRemote runs so the next push-effect tick skips
+  // pushing the data we just pulled.
+  const justPulledRef = useRef(false);
+  // True from the moment a local edit happens until the push completes,
+  // so auto-refresh doesn't overwrite a pending local change.
+  const pushPendingRef = useRef(false);
 
   // Load current profile + its data on mount.
   useEffect(() => {
@@ -130,6 +136,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   }, []);
 
   function applyRemote(p: Profile, remote: SyncSnapshot) {
+    justPulledRef.current = true;
     setState((s) => ({
       ...s,
       goals: remote.goals,
@@ -169,7 +176,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     if (!hydrated || !profile || !supabaseEnabled) return;
     // Skip pushing while we're still pulling the initial remote state.
     if (state.syncStatus === "syncing") return;
+    // The state change came from a remote pull — don't echo it back.
+    if (justPulledRef.current) {
+      justPulledRef.current = false;
+      return;
+    }
 
+    pushPendingRef.current = true;
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(async () => {
       setState((s) => ({ ...s, syncStatus: "syncing" }));
@@ -180,6 +193,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         snapshots: state.snapshots,
         onboarding: state.onboarding,
       });
+      pushPendingRef.current = false;
       setState((s) => ({
         ...s,
         syncStatus: ok ? "synced" : "error",
@@ -200,6 +214,53 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     profile,
     hydrated,
   ]);
+
+  // Auto-refresh from Supabase when the tab regains focus, becomes visible,
+  // or every 15s while visible. Skips if a local push is pending so we never
+  // overwrite an in-flight local change.
+  useEffect(() => {
+    if (!profile || !supabaseEnabled) return;
+
+    let cancelled = false;
+
+    async function refresh() {
+      if (cancelled || !profile) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible")
+        return;
+      if (pushPendingRef.current) return;
+      if (stateRef.current.syncStatus === "syncing") return;
+      const remote = await pullFromSupabase(profile.user_id);
+      if (cancelled || !profile) return;
+      if (remote) applyRemote(profile, remote);
+    }
+
+    const onVisibility = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        refresh();
+      }
+    };
+    const onFocus = () => refresh();
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibility);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("focus", onFocus);
+    }
+    const interval = setInterval(refresh, 15000);
+
+    return () => {
+      cancelled = true;
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibility);
+      }
+      if (typeof window !== "undefined") {
+        window.removeEventListener("focus", onFocus);
+      }
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.user_id]);
 
   const signIn = useCallback((profileId: string) => {
     const p = findProfile(profileId);
