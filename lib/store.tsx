@@ -136,6 +136,42 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   }, []);
 
   function applyRemote(p: Profile, remote: SyncSnapshot) {
+    const cur = stateRef.current;
+    const remoteEmpty =
+      remote.goals.length === 0 &&
+      remote.tasks.length === 0 &&
+      remote.finances.length === 0 &&
+      remote.snapshots.length === 0 &&
+      !remote.onboarding;
+    const localHasRealData =
+      cur.onboardingDone &&
+      (cur.goals.length > 0 ||
+        cur.tasks.length > 0 ||
+        cur.finances.length > 0 ||
+        cur.snapshots.length > 0 ||
+        cur.onboarding != null);
+
+    if (remoteEmpty && localHasRealData) {
+      // Server has nothing for this user yet, but we have real local data —
+      // upload it instead of wiping the device. Happens the first time a
+      // device with pre-existing localStorage data hits a fresh Supabase.
+      setState((s) => ({
+        ...s,
+        syncStatus: "synced",
+        lastSyncAt: new Date().toISOString(),
+      }));
+      pushToSupabase(p.user_id, {
+        goals: cur.goals,
+        tasks: cur.tasks,
+        finances: cur.finances,
+        snapshots: cur.snapshots,
+        onboarding: cur.onboarding,
+      }).then((ok) => {
+        if (!ok) setState((s) => ({ ...s, syncStatus: "error" }));
+      });
+      return;
+    }
+
     justPulledRef.current = true;
     setState((s) => ({
       ...s,
