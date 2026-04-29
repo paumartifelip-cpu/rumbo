@@ -137,59 +137,61 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   function applyRemote(p: Profile, remote: SyncSnapshot) {
     const cur = stateRef.current;
-    const remoteEmpty =
-      remote.goals.length === 0 &&
-      remote.tasks.length === 0 &&
-      remote.finances.length === 0 &&
-      remote.snapshots.length === 0 &&
-      !remote.onboarding;
-    const localHasRealData =
-      cur.onboardingDone &&
-      (cur.goals.length > 0 ||
-        cur.tasks.length > 0 ||
-        cur.finances.length > 0 ||
-        cur.snapshots.length > 0 ||
-        cur.onboarding != null);
+    // Merge by id: remote items are authoritative, but any local items not
+    // yet on the server are preserved (so a device with offline-only history
+    // doesn't get wiped the first time it syncs). Edits to the same id keep
+    // the remote version; pure-local items survive.
+    const mergeById = <T extends { id: string }>(local: T[], rem: T[]): T[] => {
+      const map = new Map<string, T>();
+      for (const r of rem) map.set(r.id, r);
+      for (const l of local) if (!map.has(l.id)) map.set(l.id, l);
+      return Array.from(map.values());
+    };
 
-    if (remoteEmpty && localHasRealData) {
-      // Server has nothing for this user yet, but we have real local data —
-      // upload it instead of wiping the device. Happens the first time a
-      // device with pre-existing localStorage data hits a fresh Supabase.
-      setState((s) => ({
-        ...s,
-        syncStatus: "synced",
-        lastSyncAt: new Date().toISOString(),
-      }));
-      pushToSupabase(p.user_id, {
-        goals: cur.goals,
-        tasks: cur.tasks,
-        finances: cur.finances,
-        snapshots: cur.snapshots,
-        onboarding: cur.onboarding,
-      }).then((ok) => {
-        if (!ok) setState((s) => ({ ...s, syncStatus: "error" }));
-      });
-      return;
-    }
+    const mergedGoals = mergeById(cur.goals, remote.goals);
+    const mergedTasks = mergeById(cur.tasks, remote.tasks);
+    const mergedFinances = mergeById(cur.finances, remote.finances);
+    const mergedSnapshots = mergeById(cur.snapshots, remote.snapshots);
+    const mergedOnboarding = remote.onboarding ?? cur.onboarding;
+
+    // If the merge added anything the server didn't have, push it back so
+    // the next device that pulls sees the same union.
+    const localAddedItems =
+      mergedGoals.length > remote.goals.length ||
+      mergedTasks.length > remote.tasks.length ||
+      mergedFinances.length > remote.finances.length ||
+      mergedSnapshots.length > remote.snapshots.length;
 
     justPulledRef.current = true;
     setState((s) => ({
       ...s,
-      goals: remote.goals,
-      tasks: remote.tasks,
-      finances: remote.finances,
-      snapshots: remote.snapshots,
-      onboarding: remote.onboarding ?? s.onboarding,
-      onboardingDone: Boolean(remote.onboarding) || s.onboardingDone,
+      goals: mergedGoals,
+      tasks: mergedTasks,
+      finances: mergedFinances,
+      snapshots: mergedSnapshots,
+      onboarding: mergedOnboarding,
+      onboardingDone: Boolean(mergedOnboarding) || s.onboardingDone,
       user: {
         ...mockUser,
         id: p.user_id,
-        name: remote.onboarding?.name || p.name,
+        name: mergedOnboarding?.name || p.name,
         email: p.email,
       },
       syncStatus: "synced",
       lastSyncAt: new Date().toISOString(),
     }));
+
+    if (localAddedItems) {
+      pushToSupabase(p.user_id, {
+        goals: mergedGoals,
+        tasks: mergedTasks,
+        finances: mergedFinances,
+        snapshots: mergedSnapshots,
+        onboarding: mergedOnboarding,
+      }).then((ok) => {
+        if (!ok) setState((s) => ({ ...s, syncStatus: "error" }));
+      });
+    }
   }
 
   // Persist state to the active profile bucket (local cache).
