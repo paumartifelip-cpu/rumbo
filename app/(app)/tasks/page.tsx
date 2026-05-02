@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { MoneyMetrics } from "@/components/MoneyMetrics";
 import { TaskComposer } from "@/components/TaskComposer";
@@ -17,6 +17,17 @@ export default function TasksPage() {
     prioritizing,
     aiSource,
   } = useRumbo();
+
+  const [configuredAi, setConfiguredAi] = useState<"openai" | "gemini" | null>(null);
+  
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      if (localStorage.getItem("rumbo_gpt_key")) setConfiguredAi("openai");
+      else if (localStorage.getItem("rumbo_gemini_key")) setConfiguredAi("gemini");
+    }
+  }, []);
+
+  const displayAiSource = aiSource !== "idle" ? aiSource : configuredAi || "fallback";
 
   const ordered = useMemo(
     () =>
@@ -59,25 +70,25 @@ export default function TasksPage() {
         <TaskComposer />
       </div>
 
-      <div className={`mb-6 p-4 rounded-xl border ${aiSource === 'gemini' ? 'bg-indigo-50 border-indigo-100 text-indigo-900' : aiSource === 'openai' ? 'bg-emerald-50 border-emerald-100 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-800'} flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
+      <div className={`mb-6 p-4 rounded-xl border ${displayAiSource === 'gemini' ? 'bg-indigo-50 border-indigo-100 text-indigo-900' : displayAiSource === 'openai' ? 'bg-emerald-50 border-emerald-100 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-800'} flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
         <div>
           <div className="text-sm font-bold flex items-center gap-2">
-            {aiSource === "gemini" ? "✨ IA Activa (Gemini)" : aiSource === "openai" ? "✨ IA Activa (OpenAI)" : "⚙️ Orden Básico Local"}
+            {displayAiSource === "gemini" ? "✨ IA Activa (Gemini)" : displayAiSource === "openai" ? "✨ IA Activa (OpenAI)" : "⚙️ Orden Básico Local"}
           </div>
           <div className="text-xs mt-1 opacity-80">
-            {aiSource === "gemini" || aiSource === "openai"
+            {displayAiSource === "gemini" || displayAiSource === "openai"
               ? "Tus tareas se están ordenando inteligentemente por impacto."
-              : aiSource === "fallback"
+              : displayAiSource === "fallback"
               ? "Añade tu API Key en Ajustes para activar el motor de Inteligencia Artificial."
               : "Añade una tarea para comenzar la evaluación."}
           </div>
         </div>
-        <div className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-2 ${aiSource === 'gemini' ? 'bg-indigo-600 text-white' : aiSource === 'openai' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
+        <div className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-2 ${displayAiSource === 'gemini' ? 'bg-indigo-600 text-white' : displayAiSource === 'openai' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
           {prioritizing ? (
             <>
               <span className="animate-pulse">●</span> Evaluando...
             </>
-          ) : aiSource === "gemini" || aiSource === "openai" ? (
+          ) : displayAiSource === "gemini" || displayAiSource === "openai" ? (
             "Conectado"
           ) : (
             "IA Inactiva"
