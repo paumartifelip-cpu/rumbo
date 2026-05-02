@@ -76,7 +76,6 @@ export default function LoginPage() {
     setProfiles(getAllProfiles());
     setNewName("");
     setShowCreate(false);
-    // Drop straight into PIN creation for the new user.
     setPendingProfile(created);
     setPinMode("create");
   }
@@ -90,8 +89,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="px-6 md:px-10 py-6 flex items-center justify-between">
+    <div className="min-h-screen flex flex-col bg-white">
+      <header className="px-6 md:px-10 py-6">
         <Logo size="md" />
       </header>
 
@@ -99,80 +98,35 @@ export default function LoginPage() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-10"
+          className="text-center mb-12"
         >
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">
             ¿Quién eres?
           </h1>
-          <p className="text-rumbo-muted mt-2">
-            Elige tu sesión para continuar.
+          <p className="text-rumbo-muted mt-3">
+            Elige tu perfil para continuar.
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 md:gap-8 w-full max-w-4xl">
           {profiles.map((p, i) => (
-            <motion.button
+            <ProfileCard
               key={p.id}
-              onClick={() => pick(p)}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + i * 0.05 }}
-              whileHover={{ y: -3 }}
-              whileTap={{ scale: 0.98 }}
-              className="card p-6 text-left hover:shadow-soft transition-shadow group relative"
-            >
-              <div
-                className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${p.color} flex items-center justify-center text-2xl font-semibold text-white shadow-soft`}
-              >
-                {p.initials}
-              </div>
-              <div className="mt-4 text-xl font-semibold flex items-center gap-2">
-                {p.name}
-                {isPinSet(p.id) && (
-                  <span title="Protegido con PIN" className="text-rumbo-muted text-base">
-                    🔒
-                  </span>
-                )}
-              </div>
-              {p.email && (
-                <div className="text-sm text-rumbo-muted">{p.email}</div>
-              )}
-              <div className="mt-4 text-sm text-rumbo-ink/70">
-                Entrar como {p.name} →
-              </div>
-              {p.custom && (
-                <button
-                  onClick={(e) => deleteUser(p, e)}
-                  className="absolute top-3 right-3 w-7 h-7 rounded-full bg-white border border-rumbo-line text-rumbo-muted hover:text-rose-600 hover:border-rose-200 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-sm"
-                  aria-label="Borrar usuario"
-                >
-                  ✕
-                </button>
-              )}
-            </motion.button>
+              profile={p}
+              index={i}
+              onPick={() => pick(p)}
+              onDelete={(e) => deleteUser(p, e)}
+            />
           ))}
 
-          <motion.button
+          <CreateCard
+            index={profiles.length}
             onClick={() => setShowCreate(true)}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + profiles.length * 0.05 }}
-            whileHover={{ y: -3 }}
-            whileTap={{ scale: 0.98 }}
-            className="card p-6 text-left border-2 border-dashed border-rumbo-line hover:border-rumbo-ink/30 hover:shadow-soft transition-all flex flex-col items-start justify-center min-h-[200px]"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-rumbo-ink/5 border border-rumbo-line flex items-center justify-center text-3xl text-rumbo-muted">
-              +
-            </div>
-            <div className="mt-4 text-xl font-semibold">Nuevo usuario</div>
-            <div className="text-sm text-rumbo-muted mt-1">
-              Crea tu propio perfil con nombre y PIN.
-            </div>
-          </motion.button>
+          />
         </div>
 
-        <p className="text-xs text-rumbo-muted mt-10 max-w-md text-center">
-          Cada sesión tiene su PIN. Si pasan 7 días sin entrar te lo pediremos
+        <p className="text-xs text-rumbo-muted mt-12 max-w-md text-center">
+          Cada perfil tiene su PIN. Si pasan 7 días sin entrar te lo pediremos
           de nuevo. Mientras lo uses a menudo, entrarás directo.
         </p>
       </main>
@@ -204,7 +158,7 @@ export default function LoginPage() {
               className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-sm"
             >
               <h2 className="text-xl font-semibold tracking-tight">
-                Crea tu usuario
+                Crea tu perfil
               </h2>
               <p className="text-sm text-rumbo-muted mt-1">
                 Solo tu nombre. Después elegirás un PIN de 4 dígitos.
@@ -241,5 +195,107 @@ export default function LoginPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+function ProfileCard({
+  profile,
+  index,
+  onPick,
+  onDelete,
+}: {
+  profile: Profile;
+  index: number;
+  onPick: () => void;
+  onDelete: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.08 + index * 0.05 }}
+      className="flex flex-col items-center group"
+    >
+      <motion.button
+        onClick={onPick}
+        whileHover={{ scale: 1.08, y: -6 }}
+        whileTap={{ scale: 0.96 }}
+        transition={{ type: "spring", stiffness: 280, damping: 18 }}
+        className={`relative w-32 h-32 md:w-40 md:h-40 rounded-3xl bg-gradient-to-br ${profile.color}
+          flex items-center justify-center shadow-soft
+          group-hover:shadow-card group-hover:ring-4 group-hover:ring-rumbo-ink/10
+          transition-shadow ring-0 cursor-pointer`}
+        aria-label={`Entrar como ${profile.name}`}
+      >
+        <span className="text-6xl md:text-7xl select-none drop-shadow-sm">
+          {profile.emoji ?? profile.initials}
+        </span>
+        {isPinSet(profile.id) && (
+          <span
+            title="Protegido con PIN"
+            className="absolute bottom-2 right-2 bg-white/95 rounded-full w-8 h-8 flex items-center justify-center text-sm shadow-card"
+          >
+            🔒
+          </span>
+        )}
+        {profile.custom && (
+          <button
+            onClick={onDelete}
+            className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white border border-rumbo-line text-rumbo-muted hover:text-rose-600 hover:border-rose-200 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-sm shadow-card"
+            aria-label="Borrar perfil"
+          >
+            ✕
+          </button>
+        )}
+      </motion.button>
+      <div className="mt-4 text-lg font-semibold text-rumbo-ink">
+        {profile.name}
+      </div>
+      <button
+        onClick={onPick}
+        className="mt-2 px-5 py-1.5 rounded-full bg-rumbo-ink text-white text-sm font-medium opacity-90 hover:opacity-100 group-hover:bg-rumbo-green transition-colors"
+      >
+        Entrar →
+      </button>
+    </motion.div>
+  );
+}
+
+function CreateCard({
+  index,
+  onClick,
+}: {
+  index: number;
+  onClick: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.08 + index * 0.05 }}
+      className="flex flex-col items-center group"
+    >
+      <motion.button
+        onClick={onClick}
+        whileHover={{ scale: 1.08, y: -6 }}
+        whileTap={{ scale: 0.96 }}
+        transition={{ type: "spring", stiffness: 280, damping: 18 }}
+        className="relative w-32 h-32 md:w-40 md:h-40 rounded-3xl border-2 border-dashed border-rumbo-line bg-rumbo-greenSoft/30 flex items-center justify-center cursor-pointer group-hover:border-rumbo-green/50 group-hover:bg-rumbo-greenSoft/60 transition-colors"
+        aria-label="Crear nuevo perfil"
+      >
+        <span className="text-6xl md:text-7xl text-rumbo-muted group-hover:text-rumbo-green transition-colors">
+          +
+        </span>
+      </motion.button>
+      <div className="mt-4 text-lg font-semibold text-rumbo-ink">
+        Nuevo perfil
+      </div>
+      <button
+        onClick={onClick}
+        className="mt-2 px-5 py-1.5 rounded-full border border-rumbo-line text-rumbo-ink text-sm font-medium hover:bg-rumbo-ink hover:text-white transition-colors"
+      >
+        Crear →
+      </button>
+    </motion.div>
   );
 }

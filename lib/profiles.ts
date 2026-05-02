@@ -4,6 +4,7 @@ export interface Profile {
   name: string;
   initials: string;
   color: string;
+  emoji?: string;
   email?: string;
   custom?: boolean;
 }
@@ -14,16 +15,16 @@ export const DEFAULT_PROFILES: Profile[] = [
     user_id: "11111111-1111-1111-1111-111111111111",
     name: "Pau",
     initials: "P",
+    emoji: "🌱",
     color: "from-emerald-200 to-emerald-400",
-    email: "pau@rumbo.app",
   },
   {
     id: "michelle",
     user_id: "22222222-2222-2222-2222-222222222222",
     name: "Michelle",
     initials: "M",
+    emoji: "💜",
     color: "from-violet-200 to-violet-400",
-    email: "michelle@rumbo.app",
   },
 ];
 
@@ -41,6 +42,13 @@ const CUSTOM_COLORS = [
   "from-orange-200 to-orange-400",
   "from-teal-200 to-teal-400",
   "from-pink-200 to-pink-400",
+];
+
+const CUSTOM_EMOJIS = [
+  "🚀", "⭐", "🔥", "✨", "🎯", "🌈", "⚡", "💎",
+  "🦊", "🐻", "🦁", "🐯", "🐼", "🦄", "🐙", "🦋",
+  "🌺", "🌸", "🍀", "🌻", "🍉", "🍑", "🥑", "🍍",
+  "🎨", "🎵", "🏆", "🎮", "🛸", "🌙", "☀️", "🌊",
 ];
 
 export const SESSION_KEY = "rumbo_current_profile";
@@ -94,12 +102,15 @@ function uuid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
-  // Fallback (very old browsers): pseudo-uuid v4
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
 export function addCustomProfile(name: string): Profile {
@@ -120,6 +131,7 @@ export function addCustomProfile(name: string): Profile {
     name: trimmed,
     initials: trimmed.charAt(0).toUpperCase(),
     color: CUSTOM_COLORS[existing.length % CUSTOM_COLORS.length],
+    emoji: pick(CUSTOM_EMOJIS),
     custom: true,
   };
   writeCustomProfiles([...existing, profile]);
