@@ -52,6 +52,8 @@ export interface Task {
   ai_priority_score?: number;
   ai_reason?: string;
   status: TaskStatus;
+  recurrence?: "diaria" | "semanal" | "mensual";
+  last_generated_date?: string; // ISO date of last duplication
   created_at: string;
 }
 
@@ -63,6 +65,8 @@ export interface FinancialEntry {
   amount: number;
   date: string;
   category?: string;
+  recurrence?: "mensual" | "anual";
+  last_generated_date?: string; // ISO date of last duplication
   created_at: string;
 }
 

@@ -7,6 +7,7 @@ import { useRumbo } from "@/lib/store";
 export function TaskComposer() {
   const { addTask } = useRumbo();
   const [text, setText] = useState("");
+  const [recurrence, setRecurrence] = useState<"" | "diaria" | "semanal" | "mensual">("");
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
   const recRef = useRef<any>(null);
@@ -62,8 +63,9 @@ export function TaskComposer() {
   function submit() {
     const t = text.trim();
     if (!t) return;
-    addTask({ title: t });
+    addTask({ title: t, ...(recurrence ? { recurrence } : {}) });
     setText("");
+    setRecurrence("");
     inputRef.current?.focus();
   }
 
@@ -87,6 +89,17 @@ export function TaskComposer() {
           onKeyDown={onKeyDown}
           style={{ minHeight: 44, maxHeight: 200 }}
         />
+        <select
+          className="bg-slate-100 text-xs text-rumbo-ink rounded-lg px-2 h-10 outline-none border-0"
+          value={recurrence}
+          onChange={(e) => setRecurrence(e.target.value as any)}
+          title="Hábito recurrente"
+        >
+          <option value="">Una vez</option>
+          <option value="diaria">Diaria</option>
+          <option value="semanal">Semanal</option>
+          <option value="mensual">Mensual</option>
+        </select>
         {supported && (
           <button
             onClick={toggleMic}

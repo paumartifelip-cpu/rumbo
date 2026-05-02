@@ -27,6 +27,7 @@ export default function GastosPage() {
   const [form, setForm] = useState({
     title: "",
     amount: "" as number | "",
+    recurrence: "" as "" | "mensual",
   });
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
@@ -62,8 +63,9 @@ export default function GastosPage() {
       title: form.title,
       amount: form.amount,
       date: new Date().toISOString(),
+      ...(form.recurrence ? { recurrence: form.recurrence } : {}),
     });
-    setForm({ title: "", amount: "" });
+    setForm({ title: "", amount: "", recurrence: "" });
   }
 
   return (
@@ -122,6 +124,16 @@ export default function GastosPage() {
           <button className="btn-primary" onClick={submit}>
             Añadir gasto
           </button>
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-sm text-rumbo-muted">
+          <input
+            type="checkbox"
+            id="rec-check"
+            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-600"
+            checked={form.recurrence === "mensual"}
+            onChange={(e) => setForm({ ...form, recurrence: e.target.checked ? "mensual" : "" })}
+          />
+          <label htmlFor="rec-check" className="cursor-pointer select-none">🔁 Es una suscripción o gasto fijo mensual</label>
         </div>
       </Card>
       </Reveal>
@@ -211,7 +223,12 @@ export default function GastosPage() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="min-w-0">
-                      <div className="font-medium truncate">{f.title}</div>
+                      <div className="font-medium truncate flex items-center gap-1.5">
+                        {f.title}
+                        {f.recurrence && (
+                          <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
+                        )}
+                      </div>
                       <div className="text-xs text-rumbo-muted">
                         {formatDate(f.date)}
                         {" · "}

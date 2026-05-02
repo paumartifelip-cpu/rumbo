@@ -194,6 +194,83 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Auto-generate recurring tasks and finances
+  useEffect(() => {
+    if (!hydrated) return;
+
+    setState((s) => {
+      const newTasks = [...s.tasks];
+      const newFinances = [...s.finances];
+      let hasNew = false;
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const thisMonthStr = todayStr.slice(0, 7);
+
+      s.tasks.forEach((t) => {
+        if (!t.recurrence) return;
+        const lastGen = t.last_generated_date ? t.last_generated_date.slice(0, 10) : t.created_at.slice(0, 10);
+        let shouldGenerate = false;
+        
+        if (t.recurrence === "diaria" && lastGen < todayStr) {
+          shouldGenerate = true;
+        } else if (t.recurrence === "semanal") {
+           const diff = now.getTime() - new Date(t.last_generated_date || t.created_at).getTime();
+           if (diff >= 7 * 24 * 60 * 60 * 1000) shouldGenerate = true;
+        } else if (t.recurrence === "mensual" && lastGen.slice(0, 7) < thisMonthStr) {
+          shouldGenerate = true;
+        }
+
+        if (shouldGenerate) {
+          const idx = newTasks.findIndex(x => x.id === t.id);
+          if (idx >= 0) {
+            newTasks[idx] = { ...newTasks[idx], last_generated_date: now.toISOString() };
+          }
+          newTasks.push({
+            ...t,
+            id: uid(),
+            created_at: now.toISOString(),
+            status: "pendiente",
+            last_generated_date: now.toISOString(),
+          });
+          hasNew = true;
+        }
+      });
+
+      s.finances.forEach((f) => {
+        if (!f.recurrence) return;
+        const lastGen = f.last_generated_date ? f.last_generated_date.slice(0, 7) : f.created_at.slice(0, 7);
+        let shouldGenerate = false;
+        
+        if (f.recurrence === "mensual" && lastGen < thisMonthStr) {
+          shouldGenerate = true;
+        } else if (f.recurrence === "anual") {
+          const lastYear = f.last_generated_date ? f.last_generated_date.slice(0, 4) : f.created_at.slice(0, 4);
+          if (lastYear < todayStr.slice(0, 4)) shouldGenerate = true;
+        }
+
+        if (shouldGenerate) {
+          const idx = newFinances.findIndex(x => x.id === f.id);
+          if (idx >= 0) {
+            newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
+          }
+          newFinances.push({
+            ...f,
+            id: uid(),
+            date: now.toISOString(),
+            created_at: now.toISOString(),
+            last_generated_date: now.toISOString(),
+          });
+          hasNew = true;
+        }
+      });
+
+      if (hasNew) {
+        return { ...s, tasks: newTasks, finances: newFinances };
+      }
+      return s;
+    });
+  }, [hydrated]);
+
   // Persist state to the active profile bucket (local cache).
   useEffect(() => {
     if (!hydrated || !profile) return;
