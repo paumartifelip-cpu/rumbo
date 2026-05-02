@@ -116,8 +116,8 @@ Las tareas pueden estar escritas o dictadas en lenguaje natural — interprétal
 Tu trabajo:
 1. Entiende cada tarea aunque esté mal escrita o sea muy corta.
 2. Estima su impacto real (0-100) en los objetivos del usuario. Sé riguroso, coherente y NADA aleatorio.
-3. Penaliza tareas que parecen productivas pero no acercan al usuario a sus metas (puntuación baja).
-4. Premia las que generan dinero, clientes, aprendizaje aplicado o desbloquean objetivos importantes.
+3. Penaliza fuertemente las tareas que parecen productivas pero no acercan al usuario a sus metas.
+4. El MAYOR POTENCIAL y la máxima puntuación (85-100) DEBEN ser exclusivamente para tareas que generen ingresos económicos directos o que lleven a alcanzar de forma clave los objetivos principales.
 5. Da una razón más detallada (2-3 frases) explicando claramente por qué merece esa puntuación, cómo impacta en sus objetivos a corto/largo plazo, y qué pasaría si no se hace. Sé persuasivo y claro.
 
 Fecha actual: ${today}
