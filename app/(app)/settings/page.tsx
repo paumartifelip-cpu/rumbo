@@ -118,17 +118,20 @@ export default function SettingsPage() {
               )}
             </div>
 
-            <div className="text-sm">
-              Estado actual:{" "}
-              {savedKey ? (
-                <span className="text-emerald-600 font-medium">
-                  Conectado (Gemini activo)
-                </span>
-              ) : (
-                <span className="text-rumbo-muted">
-                  Sin clave — usando heurística local
-                </span>
-              )}
+            <div className={`mt-2 p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${savedKey ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+              <div>
+                <div className="font-bold flex items-center gap-2 text-sm">
+                  {savedKey ? "✅ IA Activa y Conectada" : "⚠️ IA Inactiva"}
+                </div>
+                <div className="text-xs mt-1 opacity-80">
+                  {savedKey 
+                    ? "Tu clave está guardada. La aplicación priorizará tus tareas y categorizará tus gastos inteligentemente." 
+                    : "Pega una API Key de Gemini válida arriba y pulsa Guardar para activar las funciones inteligentes."}
+                </div>
+              </div>
+              <div className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${savedKey ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'}`}>
+                {savedKey ? "Conectado" : "Desconectado"}
+              </div>
             </div>
           </div>
         </Card>

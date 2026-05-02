@@ -31,7 +31,7 @@ export default function TasksPage() {
 
   const completed = tasks.filter((t) => t.status === "completada");
   const distractions = ordered.filter((t) => (t.ai_priority_score ?? 100) < 30);
-  const main = ordered.filter((t) => (t.ai_priority_score ?? 0) >= 30);
+  const main = ordered.filter((t) => (t.ai_priority_score ?? 100) >= 30);
 
   return (
     <div>
@@ -59,16 +59,30 @@ export default function TasksPage() {
         <TaskComposer />
       </div>
 
-      <div className="text-xs text-rumbo-muted mb-3">
-        Fuente IA:{" "}
-        <span className="font-medium text-rumbo-ink">
-          {aiSource === "gemini"
-            ? "Gemini 2.5 Flash"
-            : aiSource === "fallback"
-            ? "Heurística local"
-            : "Esperando datos"}
-        </span>
-        {prioritizing && <span className="ml-2 text-rumbo-muted">· evaluando…</span>}
+      <div className={`mb-6 p-4 rounded-xl border ${aiSource === 'gemini' ? 'bg-indigo-50 border-indigo-100 text-indigo-900' : 'bg-slate-50 border-slate-200 text-slate-800'} flex flex-col sm:flex-row sm:items-center justify-between gap-3`}>
+        <div>
+          <div className="text-sm font-bold flex items-center gap-2">
+            {aiSource === "gemini" ? "✨ IA Activa (Gemini 2.5 Flash)" : "⚙️ Orden Básico Local"}
+          </div>
+          <div className="text-xs mt-1 opacity-80">
+            {aiSource === "gemini"
+              ? "Tus tareas se están ordenando inteligentemente por impacto."
+              : aiSource === "fallback"
+              ? "Añade tu API Key en Ajustes para activar el motor de Inteligencia Artificial."
+              : "Añade una tarea para comenzar la evaluación."}
+          </div>
+        </div>
+        <div className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap flex items-center gap-2 ${aiSource === 'gemini' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'}`}>
+          {prioritizing ? (
+            <>
+              <span className="animate-pulse">●</span> Evaluando...
+            </>
+          ) : aiSource === "gemini" ? (
+            "Conectado"
+          ) : (
+            "IA Inactiva"
+          )}
+        </div>
       </div>
 
       {ordered.length === 0 ? (
