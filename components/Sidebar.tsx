@@ -29,7 +29,9 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex md:flex-col w-60 shrink-0 border-r border-rumbo-line bg-white px-4 py-5 sticky top-0 h-screen">
       <div className="px-2 mb-6">
-        <Logo size="md" />
+        <Link href="/dashboard">
+          <Logo size="md" />
+        </Link>
       </div>
       <nav className="flex flex-col gap-0.5">
         {items.map((it) => {
@@ -92,7 +94,7 @@ function SyncDot({ status }: { status: string }) {
 }
 
 // Mobile bottom nav shows only the most-used 5 to avoid cramping.
-const MOBILE_ITEMS = ["/today", "/tasks", "/money", "/gastos", "/settings"];
+const MOBILE_ITEMS = ["/dashboard", "/today", "/tasks", "/money", "/settings"];
 
 export function MobileNav() {
   const pathname = usePathname();
