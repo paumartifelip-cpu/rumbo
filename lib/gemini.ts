@@ -81,7 +81,7 @@ export async function geminiPrioritize(
 Las tareas pueden estar escritas o dictadas en lenguaje natural — interprétalas tú.
 Tu trabajo:
 1. Entiende cada tarea aunque esté mal escrita o sea muy corta.
-2. Estima su impacto real (0-100) en los objetivos del usuario.
+2. Estima su impacto real (0-100) en los objetivos del usuario. Sé riguroso, coherente y NADA aleatorio.
 3. Penaliza tareas que parecen productivas pero no acercan al usuario a sus metas (puntuación baja).
 4. Premia las que generan dinero, clientes, aprendizaje aplicado o desbloquean objetivos importantes.
 5. Da una razón más detallada (2-3 frases) explicando claramente por qué merece esa puntuación, cómo impacta en sus objetivos a corto/largo plazo, y qué pasaría si no se hace. Sé persuasivo y claro.
@@ -96,10 +96,10 @@ ${JSON.stringify(simpleGoals, null, 2)}
 Tareas a evaluar:
 ${JSON.stringify(simpleTasks, null, 2)}
 
-Devuelve SOLO un JSON válido con esta forma exacta (todas las tareas deben aparecer en ordered_tasks):
+Devuelve SOLO un JSON válido con esta forma exacta. CRÍTICO: debes devolver EXACTAMENTE una entrada en "ordered_tasks" por cada tarea que se te pasa, usando su "id" original. No omitas ninguna.
 {
   "ordered_tasks": [
-    { "task_id": "id", "priority_score": 0-100, "reason": "frase corta", "next_action": "primer micro-paso", "risk_if_skipped": "qué pasa si no se hace" }
+    { "task_id": "id", "priority_score": 0-100, "reason": "razonamiento detallado", "next_action": "primer micro-paso", "risk_if_skipped": "qué pasa si no se hace" }
   ],
   "distractions": [ { "task_id": "id", "reason": "por qué es distracción" } ],
   "financial_advice": "consejo concreto sobre el dinero del usuario",
