@@ -14,30 +14,6 @@ import {
   setPin,
 } from "@/lib/pin";
 
-const PLANS = [
-  {
-    name: "Free",
-    price: "0 €",
-    perks: ["3 objetivos", "20 tareas", "Gráficos básicos"],
-    current: true,
-  },
-  {
-    name: "Pro",
-    price: "19 €/mes",
-    perks: ["Objetivos ilimitados", "Gemini IA", "Gráficos avanzados"],
-  },
-  {
-    name: "Business",
-    price: "49 €/mes",
-    perks: ["Equipos", "Objetivos compartidos", "Reportes"],
-  },
-  {
-    name: "Mentor IA",
-    price: "99 €/mes",
-    perks: ["Recomendaciones avanzadas", "Planificación semanal automática"],
-  },
-];
-
 const KEY_STORAGE = "rumbo_gemini_key";
 
 export default function SettingsPage() {
@@ -290,37 +266,6 @@ export default function SettingsPage() {
             </div>
           </div>
         </Card>
-      </div>
-
-      <div className="mt-8">
-        <SectionTitle
-          title="Planes"
-          hint="Estructura preparada para añadir Stripe más adelante."
-        />
-        <div className="grid md:grid-cols-4 gap-3">
-          {PLANS.map((p) => (
-            <Card
-              key={p.name}
-              className={p.current ? "ring-2 ring-rumbo-ink/10" : ""}
-            >
-              <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">
-                {p.name}
-              </div>
-              <div className="text-2xl font-semibold mt-1">{p.price}</div>
-              <ul className="mt-3 space-y-1 text-sm">
-                {p.perks.map((x) => (
-                  <li key={x}>• {x}</li>
-                ))}
-              </ul>
-              <button
-                disabled={p.current}
-                className="btn-primary mt-4 w-full disabled:bg-slate-200 disabled:text-rumbo-muted"
-              >
-                {p.current ? "Plan actual" : "Elegir"}
-              </button>
-            </Card>
-          ))}
-        </div>
       </div>
 
       {pinModal && profile && (
