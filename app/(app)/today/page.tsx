@@ -43,8 +43,23 @@ export default function TodayPage() {
     return "Buenas noches";
   }, []);
 
+  const todayLabel = useMemo(() => {
+    const now = new Date();
+    return now.toLocaleDateString("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }, []);
+
   return (
     <div>
+      <div className="mb-5">
+        <div className="text-3xl md:text-4xl font-semibold tracking-tight capitalize">
+          {todayLabel}
+        </div>
+      </div>
       <PageHeader
         title={`${greeting}${user.name ? `, ${user.name}` : ""}`}
         subtitle="Una sola tarea importa hoy. Empieza por ella."

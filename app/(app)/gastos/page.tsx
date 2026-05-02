@@ -69,13 +69,11 @@ export default function GastosPage() {
     <div>
       <PageHeader
         title="Gastos"
-        subtitle={`Apunta lo que has gastado. Todo lo que añadas cuenta para ${month}.`}
-        action={
-          <span className="chip bg-blue-50 text-blue-700 capitalize">
-            📅 {today}
-          </span>
-        }
+        subtitle={`Todo lo que añadas cuenta para ${month}.`}
       />
+      <div className="text-2xl md:text-3xl font-semibold capitalize tracking-tight -mt-2 mb-6">
+        📅 {today}
+      </div>
 
       <div className="mb-6">
         <CashflowHero />

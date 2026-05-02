@@ -19,8 +19,18 @@ import { MonthlyIncome } from "@/components/MonthlyIncome";
 import { useRumbo } from "@/lib/store";
 import { formatDate, formatMoney } from "@/lib/utils";
 
+function useTodayLabel() {
+  return new Date().toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export default function MoneyPage() {
   const { snapshots, addSnapshot, removeSnapshot, onboarding } = useRumbo();
+  const todayLabel = useTodayLabel();
 
   const sorted = useMemo(
     () => [...snapshots].sort((a, b) => +new Date(a.date) - +new Date(b.date)),
@@ -47,6 +57,9 @@ export default function MoneyPage() {
         title="Dinero"
         subtitle="Cuatro cifras claras: lo que tienes, lo que quieres tener, lo que ganas y lo que quieres ganar."
       />
+      <div className="text-2xl md:text-3xl font-semibold capitalize tracking-tight -mt-2 mb-6">
+        📅 {todayLabel}
+      </div>
 
       <div className="mb-6">
         <MoneyHero />
