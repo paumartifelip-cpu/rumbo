@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MobileNav, Sidebar } from "@/components/Sidebar";
 import { useRumbo } from "@/lib/store";
-import { getCurrentProfileId } from "@/lib/profiles";
+import { getCurrentProfileId, setCurrentProfileId } from "@/lib/profiles";
+import { needsPinPrompt } from "@/lib/pin";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -13,13 +14,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Wait until store has hydrated. profile === null after mount and no
-    // saved id means redirect to login.
+    // saved id means redirect to login. Also boot back to login if the PIN
+    // hasn't been verified for a while.
     const id = getCurrentProfileId();
     if (!id) {
       router.replace("/login");
-    } else {
-      setChecked(true);
+      return;
     }
+    if (needsPinPrompt(id)) {
+      // Drop the session so the login page doesn't bounce us back. Local
+      // data buckets stay intact — the user re-enters via PIN.
+      setCurrentProfileId(null);
+      window.location.replace("/login");
+      return;
+    }
+    setChecked(true);
   }, [router]);
 
   if (!checked || !profile) {

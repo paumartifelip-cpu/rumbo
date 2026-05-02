@@ -3,8 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, PageHeader, SectionTitle } from "@/components/Card";
+import { PinModal } from "@/components/PinModal";
 import { useRumbo } from "@/lib/store";
 import { supabaseEnabled } from "@/lib/supabase";
+import {
+  PIN_THRESHOLD_DAYS,
+  checkPin,
+  clearPin,
+  isPinSet,
+  setPin,
+} from "@/lib/pin";
 
 const PLANS = [
   {
@@ -39,6 +47,9 @@ export default function SettingsPage() {
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [savedHint, setSavedHint] = useState<string | null>(null);
+  const [pinModal, setPinModal] = useState<null | "create" | "change">(null);
+  const [pinHasValue, setPinHasValue] = useState(false);
+  const [pinHint, setPinHint] = useState<string | null>(null);
 
   useEffect(() => {
     const k = localStorage.getItem(KEY_STORAGE);
@@ -46,7 +57,26 @@ export default function SettingsPage() {
       setSavedKey(k);
       setApiKey(k);
     }
-  }, []);
+    if (profile) setPinHasValue(isPinSet(profile.id));
+  }, [profile]);
+
+  function handleSetPin(pin: string) {
+    if (!profile) return;
+    setPin(profile.id, pin);
+    setPinHasValue(true);
+    setPinModal(null);
+    setPinHint("PIN guardado");
+    setTimeout(() => setPinHint(null), 2500);
+  }
+
+  function handleRemovePin() {
+    if (!profile) return;
+    if (!confirm("¿Quitar el PIN de esta cuenta? Cualquiera podrá entrar.")) return;
+    clearPin(profile.id);
+    setPinHasValue(false);
+    setPinHint("PIN eliminado");
+    setTimeout(() => setPinHint(null), 2500);
+  }
 
   function saveKey() {
     const trimmed = apiKey.trim();
@@ -189,6 +219,53 @@ export default function SettingsPage() {
         </Card>
 
         <Card>
+          <SectionTitle
+            title="Seguridad"
+            hint={`PIN de 4 dígitos para entrar a esta cuenta. Si no entras durante ${PIN_THRESHOLD_DAYS} días, te lo pediremos otra vez.`}
+          />
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="text-sm">
+              <div className="font-medium flex items-center gap-2">
+                {pinHasValue ? "PIN activado 🔒" : "Sin PIN"}
+              </div>
+              <div className="text-rumbo-muted text-xs mt-0.5">
+                {pinHasValue
+                  ? "Tendrás que escribirlo después de 7 días sin entrar."
+                  : "Crea uno para que nadie más pueda abrir tu cuenta."}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {pinHasValue ? (
+                <>
+                  <button
+                    className="btn-soft"
+                    onClick={() => setPinModal("change")}
+                  >
+                    Cambiar PIN
+                  </button>
+                  <button
+                    className="btn-ghost text-rose-600"
+                    onClick={handleRemovePin}
+                  >
+                    Quitar PIN
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="btn-primary"
+                  onClick={() => setPinModal("create")}
+                >
+                  Crear PIN
+                </button>
+              )}
+            </div>
+          </div>
+          {pinHint && (
+            <div className="text-emerald-600 text-sm mt-3">{pinHint}</div>
+          )}
+        </Card>
+
+        <Card>
           <SectionTitle title="Integraciones" />
           <div className="grid gap-2 text-sm">
             <div className="flex justify-between">
@@ -245,6 +322,16 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+
+      {pinModal && profile && (
+        <PinModal
+          profile={profile}
+          mode="create"
+          onSuccess={handleSetPin}
+          onCancel={() => setPinModal(null)}
+          verify={(pin) => checkPin(profile.id, pin)}
+        />
+      )}
     </div>
   );
 }

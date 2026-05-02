@@ -2,22 +2,58 @@
 
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
+import { PinModal } from "@/components/PinModal";
 import { useRumbo } from "@/lib/store";
-import { PROFILES } from "@/lib/profiles";
+import { PROFILES, Profile } from "@/lib/profiles";
+import {
+  checkPin,
+  isPinSet,
+  markVerified,
+  needsPinPrompt,
+  setPin,
+} from "@/lib/pin";
 
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, profile } = useRumbo();
+  const [pendingProfile, setPendingProfile] = useState<Profile | null>(null);
+  const [pinMode, setPinMode] = useState<"enter" | "create">("enter");
 
   useEffect(() => {
     if (profile) router.replace("/today");
   }, [profile, router]);
 
-  function pick(id: string) {
-    signIn(id);
+  function pick(p: Profile) {
+    if (!isPinSet(p.id)) {
+      setPendingProfile(p);
+      setPinMode("create");
+      return;
+    }
+    if (needsPinPrompt(p.id)) {
+      setPendingProfile(p);
+      setPinMode("enter");
+      return;
+    }
+    enter(p);
+  }
+
+  function enter(p: Profile) {
+    markVerified(p.id);
+    signIn(p.id);
     router.push("/today");
+  }
+
+  function handlePinSuccess(pin: string) {
+    if (!pendingProfile) return;
+    if (pinMode === "create") {
+      setPin(pendingProfile.id, pin);
+    } else {
+      markVerified(pendingProfile.id);
+    }
+    enter(pendingProfile);
+    setPendingProfile(null);
   }
 
   return (
@@ -44,7 +80,7 @@ export default function LoginPage() {
           {PROFILES.map((p, i) => (
             <motion.button
               key={p.id}
-              onClick={() => pick(p.id)}
+              onClick={() => pick(p)}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 + i * 0.05 }}
@@ -57,7 +93,14 @@ export default function LoginPage() {
               >
                 {p.initials}
               </div>
-              <div className="mt-4 text-xl font-semibold">{p.name}</div>
+              <div className="mt-4 text-xl font-semibold flex items-center gap-2">
+                {p.name}
+                {isPinSet(p.id) && (
+                  <span title="Protegido con PIN" className="text-rumbo-muted text-base">
+                    🔒
+                  </span>
+                )}
+              </div>
               <div className="text-sm text-rumbo-muted">{p.email}</div>
               <div className="mt-4 text-sm text-rumbo-ink/70">
                 Entrar como {p.name} →
@@ -67,10 +110,20 @@ export default function LoginPage() {
         </div>
 
         <p className="text-xs text-rumbo-muted mt-10 max-w-md text-center">
-          Cada sesión guarda sus propios objetivos, tareas e ingresos. Cambia de
-          usuario cuando quieras desde la barra lateral.
+          Cada sesión tiene su PIN. Si pasan 7 días sin entrar te lo pediremos
+          de nuevo. Mientras lo uses a menudo, entrarás directo.
         </p>
       </main>
+
+      {pendingProfile && (
+        <PinModal
+          profile={pendingProfile}
+          mode={pinMode}
+          onSuccess={handlePinSuccess}
+          onCancel={() => setPendingProfile(null)}
+          verify={(pin) => checkPin(pendingProfile.id, pin)}
+        />
+      )}
     </div>
   );
 }
