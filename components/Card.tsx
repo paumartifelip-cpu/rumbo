@@ -5,12 +5,20 @@ export function Card({
   children,
   className,
   as: As = "div",
+  interactive = false,
 }: {
   children: ReactNode;
   className?: string;
   as?: any;
+  interactive?: boolean;
 }) {
-  return <As className={cn("card p-5", className)}>{children}</As>;
+  return (
+    <As
+      className={cn("card p-5", interactive && "card-hover", className)}
+    >
+      {children}
+    </As>
+  );
 }
 
 export function SectionTitle({
@@ -77,11 +85,11 @@ export function Stat({
     danger: "text-rose-600",
   }[tone];
   return (
-    <div className="card p-4">
+    <div className="card card-hover p-4">
       <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">
         {label}
       </div>
-      <div className={cn("text-2xl font-semibold mt-1.5", toneClass)}>
+      <div className={cn("text-2xl font-semibold mt-1.5 tabular-nums", toneClass)}>
         {value}
       </div>
       {hint && <div className="text-xs text-rumbo-muted mt-1">{hint}</div>}

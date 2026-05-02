@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { MoneyMetrics } from "@/components/MoneyMetrics";
+import { Reveal } from "@/components/Reveal";
 import { useRumbo } from "@/lib/store";
 import { formatMoney } from "@/lib/utils";
 
@@ -66,25 +67,30 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="mb-6">
-        <MoneyMetrics />
-      </div>
+      <Reveal>
+        <div className="mb-6">
+          <MoneyMetrics />
+        </div>
+      </Reveal>
 
       <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-2">
-          <SectionTitle title="Foco de hoy" />
-          <p className="text-rumbo-ink">
-            {aiAdvice?.today_focus ??
-              "Cuando crees objetivos y tareas, aquí verás qué hacer primero."}
-          </p>
-          {aiAdvice?.financial_advice && (
-            <p className="text-rumbo-muted mt-3 text-sm">
-              {aiAdvice.financial_advice}
+        <Reveal className="lg:col-span-2">
+          <Card className="card-hover h-full">
+            <SectionTitle title="Foco de hoy" />
+            <p className="text-rumbo-ink">
+              {aiAdvice?.today_focus ??
+                "Cuando crees objetivos y tareas, aquí verás qué hacer primero."}
             </p>
-          )}
-        </Card>
+            {aiAdvice?.financial_advice && (
+              <p className="text-rumbo-muted mt-3 text-sm">
+                {aiAdvice.financial_advice}
+              </p>
+            )}
+          </Card>
+        </Reveal>
 
-        <Card>
+        <Reveal delay={0.06}>
+        <Card className="card-hover">
           <SectionTitle title="Resumen" />
           <ul className="text-sm space-y-2">
             <li className="flex justify-between">
@@ -109,8 +115,10 @@ export default function DashboardPage() {
             </li>
           </ul>
         </Card>
+        </Reveal>
 
-        <Card className="lg:col-span-2">
+        <Reveal delay={0.12} className="lg:col-span-2">
+        <Card className="card-hover">
           <SectionTitle title="Evolución de tu dinero total" />
           {moneyEvolution.length === 0 ? (
             <EmptyState
@@ -155,8 +163,10 @@ export default function DashboardPage() {
             </div>
           )}
         </Card>
+        </Reveal>
 
-        <Card>
+        <Reveal delay={0.18}>
+        <Card className="card-hover">
           <SectionTitle title="Completadas (semana)" />
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
@@ -175,6 +185,7 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </div>
         </Card>
+        </Reveal>
       </div>
     </div>
   );

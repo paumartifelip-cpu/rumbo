@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { MoneyHero } from "@/components/MoneyHero";
 import { TaskRow } from "@/components/TaskRow";
+import { Reveal } from "@/components/Reveal";
 import { useRumbo } from "@/lib/store";
 
 export default function TodayPage() {
@@ -72,9 +73,11 @@ export default function TodayPage() {
         }
       />
 
-      <div className="mb-6">
-        <MoneyHero />
-      </div>
+      <Reveal>
+        <div className="mb-6">
+          <MoneyHero />
+        </div>
+      </Reveal>
 
       {!onboardingDone && (
         <div className="mb-6">
@@ -95,7 +98,8 @@ export default function TodayPage() {
         </div>
       )}
 
-      <Card className="mb-6">
+      <Reveal delay={0.06}>
+      <Card className="mb-6 card-hover">
         <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">
           Tarea #1 de hoy
         </div>
@@ -138,9 +142,11 @@ export default function TodayPage() {
           </div>
         )}
       </Card>
+      </Reveal>
 
       <div className="grid md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
+        <Reveal delay={0.1} className="md:col-span-2">
+        <div>
           <SectionTitle title="Las 3 más importantes" />
           {top3.length === 0 ? (
             <EmptyState
@@ -168,10 +174,12 @@ export default function TodayPage() {
             </div>
           )}
         </div>
+        </Reveal>
 
+        <Reveal delay={0.14}>
         <div>
           <SectionTitle title="Consejo del día" />
-          <Card>
+          <Card className="card-hover">
             <motion.p
               key={aiAdvice?.today_focus}
               initial={{ opacity: 0, y: 4 }}
@@ -208,6 +216,7 @@ export default function TodayPage() {
             </div>
           )}
         </div>
+        </Reveal>
       </div>
     </div>
   );

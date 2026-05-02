@@ -16,6 +16,7 @@ import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { MoneyHero } from "@/components/MoneyHero";
 import { MoneyGoalsEditor } from "@/components/MoneyGoalsEditor";
 import { MonthlyIncome } from "@/components/MonthlyIncome";
+import { Reveal } from "@/components/Reveal";
 import { useRumbo } from "@/lib/store";
 import { formatDate, formatMoney } from "@/lib/utils";
 
@@ -61,19 +62,26 @@ export default function MoneyPage() {
         📅 {todayLabel}
       </div>
 
-      <div className="mb-6">
-        <MoneyHero />
-      </div>
+      <Reveal>
+        <div className="mb-6">
+          <MoneyHero />
+        </div>
+      </Reveal>
 
-      <div className="mb-6">
-        <MonthlyIncome />
-      </div>
+      <Reveal delay={0.05}>
+        <div className="mb-6">
+          <MonthlyIncome />
+        </div>
+      </Reveal>
 
-      <div className="mb-6">
-        <MoneyGoalsEditor />
-      </div>
+      <Reveal delay={0.08}>
+        <div className="mb-6">
+          <MoneyGoalsEditor />
+        </div>
+      </Reveal>
 
-      <Card className="mb-6">
+      <Reveal delay={0.1}>
+      <Card className="mb-6 card-hover">
         <SectionTitle
           title="Evolución de tu dinero total"
           hint="Marca la fecha y cuánto tienes ahora. Cada actualización queda guardada."
@@ -142,8 +150,10 @@ export default function MoneyPage() {
           </div>
         )}
       </Card>
+      </Reveal>
 
-      <Card>
+      <Reveal delay={0.12}>
+      <Card className="card-hover">
         <SectionTitle title="Tus mediciones" />
         {sorted.length === 0 ? (
           <EmptyState
@@ -197,6 +207,7 @@ export default function MoneyPage() {
           </div>
         )}
       </Card>
+      </Reveal>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { CashflowHero } from "@/components/CashflowHero";
 import { BubbleChart } from "@/components/BubbleChart";
+import { Reveal } from "@/components/Reveal";
 import { useRumbo } from "@/lib/store";
 import { formatDate, formatMoney } from "@/lib/utils";
 
@@ -75,14 +76,17 @@ export default function GastosPage() {
         📅 {today}
       </div>
 
-      <div className="mb-6">
-        <CashflowHero />
-      </div>
+      <Reveal>
+        <div className="mb-6">
+          <CashflowHero />
+        </div>
+      </Reveal>
 
-      <Card className="mb-6">
+      <Reveal delay={0.06}>
+      <Card className="mb-6 card-hover">
         <SectionTitle
           title="Añadir gasto"
-          hint="Solo el concepto, la cantidad y la fecha. Gemini elige la categoría."
+          hint="Solo el concepto y la cantidad. Gemini elige la categoría."
         />
         <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2">
           <input
@@ -120,9 +124,11 @@ export default function GastosPage() {
           </button>
         </div>
       </Card>
+      </Reveal>
 
       <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <Card className="lg:col-span-2">
+        <Reveal delay={0.1} className="lg:col-span-2">
+        <Card className="card-hover">
           <SectionTitle
             title="Tus categorías de este mes"
             hint="Tamaño = cuánto. La IA agrupa los gastos similares."
@@ -137,8 +143,10 @@ export default function GastosPage() {
             <BubbleChart data={expensesByCategory} />
           )}
         </Card>
+        </Reveal>
 
-        <Card>
+        <Reveal delay={0.14}>
+        <Card className="card-hover">
           <SectionTitle title="Resumen por categoría" />
           {expensesByCategory.length === 0 ? (
             <div className="text-sm text-rumbo-muted py-6 text-center">
@@ -172,9 +180,11 @@ export default function GastosPage() {
             </div>
           )}
         </Card>
+        </Reveal>
       </div>
 
-      <Card>
+      <Reveal delay={0.18}>
+      <Card className="card-hover">
         <SectionTitle
           title="Movimientos del mes"
           hint={`${thisMonth.length} gastos en ${now.toLocaleDateString(
@@ -236,6 +246,7 @@ export default function GastosPage() {
           </div>
         )}
       </Card>
+      </Reveal>
     </div>
   );
 }

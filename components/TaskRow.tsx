@@ -36,8 +36,9 @@ export function TaskRow({
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2, transition: { duration: 0.15 } }}
       className={cn(
-        "card p-4 flex items-start gap-3",
+        "card p-4 flex items-start gap-3 hover:shadow-soft transition-shadow",
         highlight && "ring-2 ring-emerald-200"
       )}
     >

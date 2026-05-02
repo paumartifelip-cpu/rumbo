@@ -40,9 +40,14 @@ export function Sidebar() {
             <Link
               key={it.href}
               href={it.href}
-              className={cn("nav-item", active && "nav-item-active")}
+              className={cn(
+                "nav-item group relative",
+                active && "nav-item-active"
+              )}
             >
-              <span className="text-base leading-none">{it.icon}</span>
+              <span className="text-base leading-none transition-transform duration-200 group-hover:scale-110">
+                {it.icon}
+              </span>
               <span className="font-medium">{it.label}</span>
             </Link>
           );
@@ -111,8 +116,10 @@ export function MobileNav() {
             key={it.href}
             href={it.href}
             className={cn(
-              "flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl text-[10px] transition-colors min-w-0",
-              active ? "bg-rumbo-ink text-white" : "text-rumbo-muted"
+              "flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl text-[10px] transition-all duration-200 min-w-0 active:scale-95",
+              active
+                ? "bg-rumbo-ink text-white shadow-soft scale-105"
+                : "text-rumbo-muted hover:text-rumbo-ink"
             )}
           >
             <span className="text-lg leading-none">{it.icon}</span>
