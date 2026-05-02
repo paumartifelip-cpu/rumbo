@@ -15,6 +15,7 @@ import {
 } from "@/lib/pin";
 
 const KEY_STORAGE = "rumbo_gemini_key";
+const KEY_STORAGE_GPT = "rumbo_gpt_key";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -23,6 +24,11 @@ export default function SettingsPage() {
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
   const [savedHint, setSavedHint] = useState<string | null>(null);
+
+  const [gptKey, setGptKey] = useState("");
+  const [savedGptKey, setSavedGptKey] = useState<string | null>(null);
+  const [showGptKey, setShowGptKey] = useState(false);
+  const [savedGptHint, setSavedGptHint] = useState<string | null>(null);
   const [pinModal, setPinModal] = useState<null | "create" | "change">(null);
   const [pinHasValue, setPinHasValue] = useState(false);
   const [pinHint, setPinHint] = useState<string | null>(null);
@@ -32,6 +38,11 @@ export default function SettingsPage() {
     if (k) {
       setSavedKey(k);
       setApiKey(k);
+    }
+    const gpt_k = localStorage.getItem(KEY_STORAGE_GPT);
+    if (gpt_k) {
+      setSavedGptKey(gpt_k);
+      setGptKey(gpt_k);
     }
     if (profile) setPinHasValue(isPinSet(profile.id));
   }, [profile]);
@@ -66,6 +77,20 @@ export default function SettingsPage() {
       setSavedHint("Clave guardada en este navegador");
     }
     setTimeout(() => setSavedHint(null), 2500);
+  }
+
+  function saveGptKey() {
+    const trimmed = gptKey.trim();
+    if (!trimmed) {
+      localStorage.removeItem(KEY_STORAGE_GPT);
+      setSavedGptKey(null);
+      setSavedGptHint("Clave OpenAI eliminada");
+    } else {
+      localStorage.setItem(KEY_STORAGE_GPT, trimmed);
+      setSavedGptKey(trimmed);
+      setSavedGptHint("Clave OpenAI guardada en este navegador");
+    }
+    setTimeout(() => setSavedGptHint(null), 2500);
   }
 
   return (
@@ -131,6 +156,59 @@ export default function SettingsPage() {
               </div>
               <div className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${savedKey ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'}`}>
                 {savedKey ? "Conectado" : "Desconectado"}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4 mt-2">
+              <label className="label">API key de OpenAI (ChatGPT)</label>
+              <div className="flex gap-2 mt-1">
+                <input
+                  type={showGptKey ? "text" : "password"}
+                  className="input flex-1 font-mono text-sm"
+                  placeholder="sk-..."
+                  value={gptKey}
+                  onChange={(e) => setGptKey(e.target.value)}
+                />
+                <button
+                  className="btn-soft"
+                  onClick={() => setShowGptKey((s) => !s)}
+                >
+                  {showGptKey ? "Ocultar" : "Mostrar"}
+                </button>
+                <button className="btn-primary" onClick={saveGptKey}>
+                  Guardar
+                </button>
+              </div>
+              <div className="text-xs text-rumbo-muted mt-2">
+                Opcional. Se guarda solo en tu navegador. Si añades esta clave, la app podrá usar los modelos de OpenAI para funciones compatibles. Consigue tu clave en{" "}
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  platform.openai.com/api-keys
+                </a>
+                .
+              </div>
+              {savedGptHint && (
+                <div className="text-xs text-emerald-600 mt-1">{savedGptHint}</div>
+              )}
+            </div>
+
+            <div className={`mt-2 p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${savedGptKey ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
+              <div>
+                <div className="font-bold flex items-center gap-2 text-sm">
+                  {savedGptKey ? "✅ OpenAI Configurado" : "⚪️ OpenAI Opcional"}
+                </div>
+                <div className="text-xs mt-1 opacity-80">
+                  {savedGptKey 
+                    ? "Tu clave de OpenAI está lista para usarse." 
+                    : "No has configurado OpenAI (puedes seguir usando Gemini como motor principal)."}
+                </div>
+              </div>
+              <div className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${savedGptKey ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-200 text-slate-800'}`}>
+                {savedGptKey ? "Configurado" : "Sin configurar"}
               </div>
             </div>
           </div>
@@ -265,6 +343,16 @@ export default function SettingsPage() {
                 }
               >
                 {savedKey ? "Conectado" : "Pega tu API key arriba"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>OpenAI (ChatGPT)</span>
+              <span
+                className={
+                  savedGptKey ? "text-emerald-600" : "text-rumbo-muted"
+                }
+              >
+                {savedGptKey ? "Conectado" : "Opcional"}
               </span>
             </div>
           </div>
