@@ -84,7 +84,7 @@ Tu trabajo:
 2. Estima su impacto real (0-100) en los objetivos del usuario.
 3. Penaliza tareas que parecen productivas pero no acercan al usuario a sus metas (puntuación baja).
 4. Premia las que generan dinero, clientes, aprendizaje aplicado o desbloquean objetivos importantes.
-5. Da una razón corta y concreta (máx 1 frase) por la que merece esa puntuación.
+5. Da una razón más detallada (2-3 frases) explicando claramente por qué merece esa puntuación, cómo impacta en sus objetivos a corto/largo plazo, y qué pasaría si no se hace. Sé persuasivo y claro.
 
 Fecha actual: ${today}
 Dinero actual del usuario: ${context.current_money} €

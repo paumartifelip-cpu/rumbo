@@ -24,7 +24,7 @@ export default function TasksPage() {
         .filter((t) => t.status !== "completada" && t.status !== "descartada")
         .sort(
           (a, b) =>
-            (b.ai_priority_score ?? 0) - (a.ai_priority_score ?? 0)
+            (b.ai_priority_score ?? 100) - (a.ai_priority_score ?? 100)
         ),
     [tasks]
   );

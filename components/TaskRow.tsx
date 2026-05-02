@@ -20,14 +20,23 @@ export function TaskRow({
   highlight?: boolean;
 }) {
   const score = task.ai_priority_score;
-  const tone =
+  const borderTone =
     score === undefined
-      ? "bg-slate-100 text-slate-500"
+      ? "border-slate-200"
       : score >= 70
-      ? "bg-emerald-100 text-emerald-700"
+      ? "border-emerald-500 bg-emerald-50/30"
       : score >= 40
-      ? "bg-amber-100 text-amber-700"
-      : "bg-rose-100 text-rose-700";
+      ? "border-amber-400 bg-amber-50/30"
+      : "border-rose-400 bg-rose-50/30";
+
+  const badgeTone =
+    score === undefined
+      ? "bg-slate-200 text-slate-600"
+      : score >= 70
+      ? "bg-emerald-500 text-white"
+      : score >= 40
+      ? "bg-amber-400 text-amber-950"
+      : "bg-rose-500 text-white";
 
   const done = task.status === "completada";
 
@@ -38,7 +47,8 @@ export function TaskRow({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2, transition: { duration: 0.15 } }}
       className={cn(
-        "card p-4 flex items-start gap-3 hover:shadow-soft transition-shadow",
+        "card p-4 flex items-start gap-3 hover:shadow-soft transition-all border-l-[6px]",
+        borderTone,
         highlight && "ring-2 ring-emerald-200"
       )}
     >
@@ -74,26 +84,24 @@ export function TaskRow({
           )}
           <h3
             className={cn(
-              "font-medium leading-snug",
+              "font-semibold text-lg leading-snug text-rumbo-ink",
               done && "line-through text-rumbo-muted"
             )}
           >
             {task.title}
           </h3>
-          {score !== undefined ? (
-            <span className={cn("chip", tone)}>{score}/100</span>
-          ) : (
+          {score === undefined && (
             <motion.span
-              className="chip bg-slate-100 text-rumbo-muted"
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-500"
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.4, repeat: Infinity }}
             >
-              Evaluando…
+              Evaluando...
             </motion.span>
           )}
         </div>
         {task.ai_reason && (
-          <p className="text-sm text-rumbo-muted mt-1.5 leading-relaxed">
+          <p className="text-sm text-rumbo-muted/90 mt-2 leading-relaxed">
             {task.ai_reason}
           </p>
         )}
@@ -102,10 +110,21 @@ export function TaskRow({
         )}
       </div>
 
+      {score !== undefined && (
+        <div className="flex flex-col items-center justify-center shrink-0 ml-2">
+          <div className={cn("text-xl font-black px-3 py-1.5 rounded-xl shadow-sm min-w-[3rem] text-center", badgeTone)}>
+            {score}
+          </div>
+          <div className="text-[9px] font-bold text-rumbo-muted uppercase tracking-widest mt-1.5">
+            Impacto
+          </div>
+        </div>
+      )}
+
       {onRemove && (
         <button
           onClick={() => onRemove(task.id)}
-          className="text-rumbo-muted hover:text-rose-600 text-sm shrink-0"
+          className="text-rumbo-muted hover:text-rose-600 text-sm shrink-0 ml-2 self-start p-1"
           aria-label="Eliminar tarea"
         >
           ✕
