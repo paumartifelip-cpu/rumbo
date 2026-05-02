@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { geminiCategorize, geminiPrioritize, heuristicCategorize } from "./gemini";
+import { aiCategorize, aiPrioritize, heuristicCategorize } from "./gemini";
 import { mockFinances, mockGoals, mockSnapshots, mockTasks, mockUser } from "./mock";
 import { localPrioritize } from "./priority";
 import { findProfile, getCurrentProfileId, Profile, setCurrentProfileId } from "./profiles";
@@ -36,7 +36,7 @@ interface RumboState {
   onboardingDone: boolean;
   aiAdvice?: { today_focus: string; financial_advice: string };
   prioritizing: boolean;
-  aiSource: "gemini" | "fallback" | "idle";
+  aiSource: "openai" | "gemini" | "fallback" | "idle";
   syncStatus: "idle" | "syncing" | "synced" | "offline" | "error";
   lastSyncAt?: string;
 }
@@ -365,25 +365,25 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         s.onboarding?.current_money) ??
       0;
 
-    let source: "gemini" | "fallback" = "fallback";
+    let source: "openai" | "gemini" | "fallback" = "fallback";
     let scores: Array<{ task_id: string; score: number; reason: string }> = [];
     let advice = { today_focus: "", financial_advice: "" };
 
     try {
-      const remote = await geminiPrioritize(pending, s.goals, {
+      const remote = await aiPrioritize(pending, s.goals, {
         current_money: currentMoney,
         monthly_target: s.onboarding?.monthly_target,
       });
       if (remote) {
-        source = "gemini";
-        scores = (remote.ordered_tasks ?? []).map((o) => ({
+        source = remote.source;
+        scores = (remote.data.ordered_tasks ?? []).map((o) => ({
           task_id: o.task_id,
           score: o.priority_score,
           reason: o.reason,
         }));
         advice = {
-          today_focus: remote.today_focus ?? "",
-          financial_advice: remote.financial_advice ?? "",
+          today_focus: remote.data.today_focus ?? "",
+          financial_advice: remote.data.financial_advice ?? "",
         };
       } else {
         const local = localPrioritize(pending, s.goals);
@@ -545,7 +545,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
             .map((x) => x.category as string)
         )
       );
-      geminiCategorize({
+      aiCategorize({
         title: f.title,
         amount: f.amount,
         existing_categories: existingCategories,

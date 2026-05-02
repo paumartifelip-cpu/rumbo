@@ -16,6 +16,11 @@ export interface GeminiPriorityResponse {
   today_focus: string;
 }
 
+function getOpenAIKey(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("rumbo_gpt_key") || null;
+}
+
 function getKey(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("rumbo_gemini_key") || null;
@@ -52,12 +57,41 @@ async function callGemini<T>(
   }
 }
 
-export async function geminiPrioritize(
+async function callOpenAI<T>(prompt: string, temperature = 0.3): Promise<T | null> {
+  const apiKey = getOpenAIKey();
+  if (!apiKey) return null;
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", "content": prompt }],
+        temperature,
+        response_format: { type: "json_object" }
+      })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content;
+    if (!text) return null;
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function aiPrioritize(
   tasks: Task[],
   goals: Goal[],
   context: { current_money: number; monthly_target?: number }
-): Promise<GeminiPriorityResponse | null> {
-  if (!getKey()) return null;
+): Promise<{ source: "openai" | "gemini"; data: GeminiPriorityResponse } | null> {
+  const hasOpenAI = !!getOpenAIKey();
+  const hasGemini = !!getKey();
+  if (!hasOpenAI && !hasGemini) return null;
   const today = new Date().toISOString().slice(0, 10);
 
   const simpleTasks = tasks.map((t) => ({
@@ -108,15 +142,27 @@ Devuelve SOLO un JSON válido con esta forma exacta. CRÍTICO: debes devolver EX
 
 No incluyas texto adicional fuera del JSON.`;
 
-  return callGemini<GeminiPriorityResponse>(prompt, 0.3);
+  if (hasOpenAI) {
+    const data = await callOpenAI<GeminiPriorityResponse>(prompt, 0.3);
+    if (data) return { source: "openai", data };
+  }
+  
+  if (hasGemini) {
+    const data = await callGemini<GeminiPriorityResponse>(prompt, 0.3);
+    if (data) return { source: "gemini", data };
+  }
+
+  return null;
 }
 
-export async function geminiCategorize(input: {
+export async function aiCategorize(input: {
   title: string;
   amount?: number;
   existing_categories?: string[];
 }): Promise<string | null> {
-  if (!getKey()) return null;
+  const hasOpenAI = !!getOpenAIKey();
+  const hasGemini = !!getKey();
+  if (!hasOpenAI && !hasGemini) return null;
   const prompt = `Eres un clasificador de gastos personales en español.
 Te paso el concepto de un gasto y su importe. Tu trabajo es asignarle UNA categoría corta (1-2 palabras), en singular, en español, que tenga sentido.
 Si la lista de categorías existentes ya contiene una que encaje, REUTILÍZALA tal cual (mismo texto, mismas mayúsculas).
@@ -129,8 +175,17 @@ Importe: ${input.amount ?? "?"} €
 Devuelve SOLO un JSON válido con esta forma exacta:
 { "category": "..." }
 Sin texto adicional.`;
-  const r = await callGemini<{ category: string }>(prompt, 0.2);
-  return r?.category?.trim() || null;
+  if (hasOpenAI) {
+    const r = await callOpenAI<{ category: string }>(prompt, 0.2);
+    if (r?.category) return r.category.trim();
+  }
+  
+  if (hasGemini) {
+    const r = await callGemini<{ category: string }>(prompt, 0.2);
+    if (r?.category) return r.category.trim();
+  }
+  
+  return null;
 }
 
 // Heuristic fallback used when there's no API key.
