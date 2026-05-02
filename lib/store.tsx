@@ -113,7 +113,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         } else {
           setState({
             ...defaultState,
-            user: { ...mockUser, name: p.name, email: p.email },
+            user: { ...mockUser, name: p.name, email: p.email ?? "" },
           });
         }
       } catch {
@@ -175,7 +175,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         ...mockUser,
         id: p.user_id,
         name: mergedOnboarding?.name || p.name,
-        email: p.email,
+        email: p.email ?? "",
       },
       syncStatus: "synced",
       lastSyncAt: new Date().toISOString(),
@@ -320,14 +320,14 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       } else {
         setState({
           ...defaultState,
-          user: { ...mockUser, id: p.user_id, name: p.name, email: p.email },
+          user: { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" },
           syncStatus: supabaseEnabled ? "syncing" : "offline",
         });
       }
     } catch {
       setState({
         ...defaultState,
-        user: { ...mockUser, id: p.user_id, name: p.name, email: p.email },
+        user: { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" },
       });
     }
     // Pull authoritative state from Supabase.
@@ -648,7 +648,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     setState((s) => ({
       ...defaultState,
       user: profile
-        ? { ...mockUser, name: profile.name, email: profile.email }
+        ? { ...mockUser, name: profile.name, email: profile.email ?? "" }
         : s.user,
     }));
     try {
