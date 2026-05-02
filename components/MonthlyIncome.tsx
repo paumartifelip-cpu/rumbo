@@ -19,6 +19,7 @@ export function MonthlyIncome() {
   const { finances, addFinance, removeFinance, onboarding } = useRumbo();
 
   const now = new Date();
+  const monthLabel = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
   const currentKey = monthKey(now);
 
@@ -74,7 +75,6 @@ export function MonthlyIncome() {
   const [form, setForm] = useState({
     title: "",
     amount: "" as number | "",
-    date: new Date().toISOString().slice(0, 10),
   });
 
   function submit() {
@@ -84,19 +84,15 @@ export function MonthlyIncome() {
       type: "ingreso",
       title: form.title,
       amount: form.amount,
-      date: new Date(form.date).toISOString(),
+      date: new Date().toISOString(),
     });
-    setForm({
-      title: "",
-      amount: "",
-      date: new Date().toISOString().slice(0, 10),
-    });
+    setForm({ title: "", amount: "" });
   }
 
   return (
     <Card>
       <SectionTitle
-        title="Ingresos de este mes"
+        title={`Ingresos de ${monthLabel}`}
         hint="Apunta cada cobro o ingreso. Tu contador se actualiza al instante."
       />
 
@@ -169,12 +165,13 @@ export function MonthlyIncome() {
       </div>
 
       {/* Form */}
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-[1fr_180px_160px_auto] gap-2">
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2">
         <input
           className="input"
           placeholder="Concepto (ej: Cliente A, factura mayo)"
           value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
+          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
         />
         <div className="relative">
           <input
@@ -189,17 +186,12 @@ export function MonthlyIncome() {
                 amount: e.target.value === "" ? "" : Number(e.target.value),
               })
             }
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted text-sm">
             €
           </span>
         </div>
-        <input
-          type="date"
-          className="input"
-          value={form.date}
-          onChange={(e) => setForm({ ...form, date: e.target.value })}
-        />
         <button className="btn-primary" onClick={submit}>
           + Añadir ingreso
         </button>

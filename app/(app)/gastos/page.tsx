@@ -8,12 +8,24 @@ import { BubbleChart } from "@/components/BubbleChart";
 import { useRumbo } from "@/lib/store";
 import { formatDate, formatMoney } from "@/lib/utils";
 
+function useDateLabels() {
+  const now = new Date();
+  const today = now.toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const month = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  return { today, month };
+}
+
 export default function GastosPage() {
   const { finances, addFinance, removeFinance } = useRumbo();
+  const { today, month } = useDateLabels();
   const [form, setForm] = useState({
     title: "",
     amount: "" as number | "",
-    date: new Date().toISOString().slice(0, 10),
   });
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
@@ -48,21 +60,21 @@ export default function GastosPage() {
       type: "gasto",
       title: form.title,
       amount: form.amount,
-      date: new Date(form.date).toISOString(),
-      // Sin categoría: la IA la asigna automáticamente.
+      date: new Date().toISOString(),
     });
-    setForm({
-      title: "",
-      amount: "",
-      date: new Date().toISOString().slice(0, 10),
-    });
+    setForm({ title: "", amount: "" });
   }
 
   return (
     <div>
       <PageHeader
         title="Gastos"
-        subtitle="Apunta lo que has gastado. La IA lo clasifica sola y calcula tu ahorro real."
+        subtitle={`Apunta lo que has gastado. Todo lo que añadas cuenta para ${month}.`}
+        action={
+          <span className="chip bg-blue-50 text-blue-700 capitalize">
+            📅 {today}
+          </span>
+        }
       />
 
       <div className="mb-6">
@@ -74,7 +86,7 @@ export default function GastosPage() {
           title="Añadir gasto"
           hint="Solo el concepto, la cantidad y la fecha. Gemini elige la categoría."
         />
-        <div className="grid grid-cols-1 md:grid-cols-[1.4fr_180px_180px_auto] gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2">
           <input
             className="input"
             placeholder="Concepto (ej: Mercadona, Netflix, alquiler)"
@@ -105,12 +117,6 @@ export default function GastosPage() {
               €
             </span>
           </div>
-          <input
-            type="date"
-            className="input"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-          />
           <button className="btn-primary" onClick={submit}>
             Añadir gasto
           </button>
