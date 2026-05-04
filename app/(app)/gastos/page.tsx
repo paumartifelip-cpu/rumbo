@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { CashflowHero } from "@/components/CashflowHero";
 import { BubbleChart } from "@/components/BubbleChart";
+import { SpendingTrend } from "@/components/SpendingTrend";
 import { Reveal } from "@/components/Reveal";
 import { useRumbo } from "@/lib/store";
 import { formatDate, formatMoney } from "@/lib/utils";
@@ -54,6 +55,29 @@ export default function GastosPage() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [thisMonth]);
+
+  // Deduplicated active subscriptions (most recent entry per title)
+  const subscriptions = useMemo(() => {
+    const seen = new Map<string, typeof finances[0]>();
+    finances
+      .filter((f) => f.type === "gasto" && f.recurrence)
+      .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+      .forEach((f) => {
+        const key = f.title.toLowerCase().trim();
+        if (!seen.has(key)) seen.set(key, f);
+      });
+    return Array.from(seen.values()).sort((a, b) => b.amount - a.amount);
+  }, [finances]);
+
+  const totalMonthlySubscriptions = useMemo(
+    () =>
+      subscriptions.reduce((acc, f) => {
+        if (f.recurrence === "mensual") return acc + f.amount;
+        if (f.recurrence === "anual") return acc + f.amount / 12;
+        return acc;
+      }, 0),
+    [subscriptions]
+  );
 
   function submit() {
     if (!form.title || typeof form.amount !== "number" || form.amount <= 0)
@@ -137,6 +161,86 @@ export default function GastosPage() {
         </div>
       </Card>
       </Reveal>
+
+      {/* Tendencia + Suscripciones */}
+      <div className="grid lg:grid-cols-3 gap-4 mb-6">
+        <Reveal delay={0.08} className="lg:col-span-2">
+          <Card className="card-hover h-full">
+            <SectionTitle
+              title="Tendencia mensual"
+              hint="Últimos 6 meses. Barra oscura = mes actual."
+            />
+            <SpendingTrend />
+          </Card>
+        </Reveal>
+
+        <Reveal delay={0.12}>
+          <Card className="card-hover h-full">
+            <SectionTitle
+              title="Suscripciones activas"
+              hint={
+                subscriptions.length > 0
+                  ? `${formatMoney(totalMonthlySubscriptions)}/mes en fijos`
+                  : "Marca un gasto como 🔁 para verlo aquí"
+              }
+            />
+            {subscriptions.length === 0 ? (
+              <EmptyState
+                icon="🔁"
+                title="Sin suscripciones"
+                description="Al añadir un gasto, marca 'Es una suscripción' para que aparezca aquí."
+              />
+            ) : (
+              <div>
+                <div className="text-2xl font-semibold tabular-nums mb-4">
+                  {formatMoney(totalMonthlySubscriptions)}
+                  <span className="text-sm font-normal text-rumbo-muted ml-1">/mes</span>
+                </div>
+                <div className="grid gap-2">
+                  <AnimatePresence>
+                    {subscriptions.map((s) => (
+                      <motion.div
+                        key={s.id}
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                            <span className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
+                            {s.title}
+                          </div>
+                          {s.category && (
+                            <div className="text-[11px] text-rumbo-muted mt-0.5">
+                              {s.category}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <span className="font-medium text-sm text-rose-600">
+                            {formatMoney(s.amount)}
+                            {s.recurrence === "anual" && (
+                              <span className="text-[10px] text-rumbo-muted ml-1">/año</span>
+                            )}
+                          </span>
+                          <button
+                            onClick={() => removeFinance(s.id)}
+                            className="text-rumbo-muted hover:text-rose-600 text-xs p-1"
+                            aria-label="Eliminar suscripción"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
+          </Card>
+        </Reveal>
+      </div>
 
       <div className="grid lg:grid-cols-3 gap-4 mb-6">
         <Reveal delay={0.1} className="lg:col-span-2">
