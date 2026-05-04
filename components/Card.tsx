@@ -80,9 +80,9 @@ export function Stat({
 }) {
   const toneClass = {
     default: "text-rumbo-ink",
-    good: "text-emerald-600",
+    good: "text-green-900 font-bold",
     warn: "text-amber-600",
-    danger: "text-rose-600",
+    danger: "text-red-600 font-black",
   }[tone];
   return (
     <div className="card card-hover p-4">

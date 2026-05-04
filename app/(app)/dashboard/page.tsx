@@ -137,8 +137,8 @@ export default function DashboardPage() {
                 <AreaChart data={moneyEvolution}>
                   <defs>
                     <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#16A34A" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#16A34A" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#064E3B" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#064E3B" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke="#EEF0F4" vertical={false} />
@@ -153,10 +153,10 @@ export default function DashboardPage() {
                   />
                   <Area
                     dataKey="total"
-                    stroke="#16A34A"
+                    stroke="#064E3B"
                     fill="url(#dg)"
                     strokeWidth={2.5}
-                    dot={{ fill: "#16A34A", r: 3 }}
+                    dot={{ fill: "#064E3B", r: 3 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>

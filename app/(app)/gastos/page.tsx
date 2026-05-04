@@ -350,9 +350,9 @@ export default function GastosPage() {
                   // Use a nice array of colors for the bars
                   const colors = [
                     "bg-indigo-500",
-                    "bg-emerald-500",
+                    "bg-green-900",
                     "bg-amber-500",
-                    "bg-rose-500",
+                    "bg-red-600",
                     "bg-blue-500",
                     "bg-purple-500",
                     "bg-teal-500"

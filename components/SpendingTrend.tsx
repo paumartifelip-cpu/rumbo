@@ -76,8 +76,8 @@ export function SpendingTrend() {
           <span
             className={`chip text-xs ${
               deltaAbs > 0
-                ? "bg-rose-100 text-rose-700"
-                : "bg-emerald-100 text-emerald-700"
+                ? "bg-red-100 text-red-600 font-bold"
+                : "bg-green-100 text-green-900 font-bold"
             }`}
           >
             {deltaAbs >= 0 ? "+" : ""}
@@ -96,12 +96,12 @@ export function SpendingTrend() {
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
             <defs>
               <linearGradient id="st-current" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#FB7185" stopOpacity={1} />
-                <stop offset="100%" stopColor="#E11D48" stopOpacity={0.9} />
+                <stop offset="0%" stopColor="#FF4D4D" stopOpacity={1} />
+                <stop offset="100%" stopColor="#FF0000" stopOpacity={0.9} />
               </linearGradient>
               <linearGradient id="st-past" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#FCA5A5" stopOpacity={0.55} />
-                <stop offset="100%" stopColor="#F87171" stopOpacity={0.45} />
+                <stop offset="0%" stopColor="#FFCCCC" stopOpacity={0.55} />
+                <stop offset="100%" stopColor="#FF8888" stopOpacity={0.45} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke="rgba(0,0,0,0.04)" vertical={false} />

@@ -54,9 +54,9 @@ export function MoneyHero() {
         current={total}
         target={totalTarget}
         progress={totalProgress}
-        from="#22C55E"
-        to="#0EA5E9"
-        accent="emerald"
+        from="#064E3B"
+        to="#059669"
+        accent="green"
         footer={
           monthDelta !== null
             ? `${monthDelta >= 0 ? "+" : ""}${formatMoney(monthDelta)} desde la última medición`
@@ -120,7 +120,7 @@ function RadialCard({
   progress: number;
   from: string;
   to: string;
-  accent: "emerald" | "violet";
+  accent: "green" | "violet";
   footer?: string;
 }) {
   const formatMoney = useFormatMoney();
@@ -142,7 +142,7 @@ function RadialCard({
     >
       <div
         className={`absolute -top-16 -right-16 w-56 h-56 rounded-full blur-3xl opacity-20 transition-opacity group-hover:opacity-30 ${
-          accent === "emerald" ? "bg-emerald-300" : "bg-violet-300"
+          accent === "green" ? "bg-green-300" : "bg-violet-300"
         }`}
       />
 
@@ -156,8 +156,8 @@ function RadialCard({
           </div>
           <span
             className={`chip ${
-              accent === "emerald"
-                ? "bg-emerald-100 text-emerald-700"
+              accent === "green"
+                ? "bg-green-100 text-green-900 font-bold"
                 : "bg-violet-100 text-violet-700"
             }`}
           >
