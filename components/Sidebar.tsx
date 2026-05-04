@@ -8,8 +8,7 @@ import { cn } from "@/lib/utils";
 import { useRumbo } from "@/lib/store";
 
 const items = [
-  { href: "/today", label: "Hoy", icon: "🎯" },
-  { href: "/dashboard", label: "Dashboard", icon: "🏠" },
+  { href: "/dashboard", label: "Inicio", icon: "🏠" },
   { href: "/goals", label: "Objetivos", icon: "🚩" },
   { href: "/tasks", label: "Tareas", icon: "✅" },
   { href: "/money", label: "Dinero", icon: "💸" },
@@ -118,7 +117,7 @@ function SyncDot({ status }: { status: string }) {
 }
 
 // Mobile bottom nav shows only the most-used 5 to avoid cramping.
-const MOBILE_ITEMS = ["/dashboard", "/today", "/tasks", "/money", "/settings"];
+const MOBILE_ITEMS = ["/dashboard", "/tasks", "/money", "/settings"];
 
 export function MobileNav() {
   const pathname = usePathname();
