@@ -172,62 +172,79 @@ export function MonthlyIncome() {
         </div>
       </div>
 
-      {/* Form */}
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-[1fr_180px_120px_auto] gap-2">
-        <input
-          className="input"
-          placeholder="Concepto (ej: Cliente A, factura mayo)"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-        />
-        <div className="relative">
-          <input
-            type="number"
-            inputMode="numeric"
-            className="input pr-10"
-            placeholder="Cantidad"
-            value={form.amount}
-            onChange={(e) =>
-              setForm({
-                ...form,
-                amount: e.target.value === "" ? "" : Number(e.target.value),
-              })
-            }
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted text-sm">
-            {CURRENCIES[form.currency].symbol}
-          </span>
+      {/* Entry Form Section */}
+      <div className="mt-12 bg-slate-50/50 rounded-3xl p-6 border border-rumbo-line shadow-inner">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-xl shadow-lg">
+            💰
+          </div>
+          <div>
+            <h3 className="text-lg font-black tracking-tight">¿Has recibido dinero?</h3>
+            <p className="text-xs text-rumbo-muted font-medium italic">Anota cualquier entrada para que tu balance sea real.</p>
+          </div>
         </div>
-        <select
-          className="input"
-          value={form.currency}
-          onChange={(e) =>
-            setForm({ ...form, currency: e.target.value as Currency })
-          }
-          aria-label="Moneda"
-        >
-          {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
-            <option key={c} value={c}>
-              {CURRENCIES[c].flag} {c}
-            </option>
-          ))}
-        </select>
-        <button className="btn-primary" onClick={submit}>
-          + Añadir ingreso
-        </button>
-      </div>
 
-      <div className="mt-3 flex items-center gap-2 text-sm text-rumbo-muted">
-        <input
-          type="checkbox"
-          id="inc-rec-check"
-          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-600"
-          checked={form.recurrence === "mensual"}
-          onChange={(e) => setForm({ ...form, recurrence: e.target.checked ? "mensual" : "" })}
-        />
-        <label htmlFor="inc-rec-check" className="cursor-pointer select-none">🔁 Es un ingreso recurrente (mensual)</label>
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_120px_auto] gap-3">
+          <div className="relative group">
+            <input
+              className="input bg-white group-hover:border-emerald-400 transition-colors pl-10"
+              placeholder="Concepto (ej: Pago cliente, venta Wallapop...)"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg opacity-50 group-focus-within:opacity-100 transition-opacity">📝</span>
+          </div>
+          <div className="relative group">
+            <input
+              type="number"
+              inputMode="numeric"
+              className="input bg-white pr-10 group-hover:border-emerald-400 transition-colors"
+              placeholder="Cantidad"
+              value={form.amount}
+              onChange={(e) =>
+                setForm({
+                  ...form,
+                  amount: e.target.value === "" ? "" : Number(e.target.value),
+                })
+              }
+              onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted text-sm font-bold">
+              {CURRENCIES[form.currency].symbol}
+            </span>
+          </div>
+          <select
+            className="input bg-white cursor-pointer hover:border-emerald-400 transition-colors font-medium"
+            value={form.currency}
+            onChange={(e) =>
+              setForm({ ...form, currency: e.target.value as Currency })
+            }
+            aria-label="Moneda"
+          >
+            {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
+              <option key={c} value={c}>
+                {CURRENCIES[c].flag} {c}
+              </option>
+            ))}
+          </select>
+          <button className="btn-primary bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200 px-8" onClick={submit}>
+            + Guardar ingreso
+          </button>
+        </div>
+
+        <div className="mt-4 flex items-center gap-3 text-sm text-rumbo-muted">
+          <label className="flex items-center gap-2 cursor-pointer group bg-white px-3 py-1.5 rounded-full border border-rumbo-line hover:border-emerald-400 transition-colors">
+            <input
+              type="checkbox"
+              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 cursor-pointer"
+              checked={form.recurrence === "mensual"}
+              onChange={(e) => setForm({ ...form, recurrence: e.target.checked ? "mensual" : "" })}
+            />
+            <span className="font-bold text-[11px] uppercase tracking-wider group-hover:text-emerald-700">🔁 Es un ingreso recurrente</span>
+          </label>
+          <span className="text-[10px] opacity-60">Ideal para nóminas o alquileres</span>
+        </div>
       </div>
 
       {/* Recurring Incomes Section */}
