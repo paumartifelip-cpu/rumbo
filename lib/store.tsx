@@ -67,6 +67,7 @@ interface RumboContext extends RumboState {
   removeTask: (id: string) => void;
   toggleTask: (id: string) => void;
   addFinance: (f: Omit<FinancialEntry, "id" | "user_id" | "created_at">) => void;
+  updateFinance: (id: string, patch: Partial<FinancialEntry>) => void;
   removeFinance: (id: string) => void;
   addSnapshot: (s: Omit<MoneySnapshot, "id" | "user_id" | "created_at">) => void;
   removeSnapshot: (id: string) => void;
@@ -728,6 +729,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateFinance: RumboContext["updateFinance"] = useCallback((id, patch) => {
+    setState((s) => ({
+      ...s,
+      finances: s.finances.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+    }));
+  }, []);
+
   const removeFinance: RumboContext["removeFinance"] = useCallback((id) => {
     setState((s) => ({
       ...s,
@@ -829,6 +837,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       removeTask,
       toggleTask,
       addFinance,
+      updateFinance,
       removeFinance,
       addSnapshot,
       removeSnapshot,
@@ -852,6 +861,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       removeTask,
       toggleTask,
       addFinance,
+      updateFinance,
       removeFinance,
       addSnapshot,
       removeSnapshot,
