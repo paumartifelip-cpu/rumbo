@@ -16,6 +16,7 @@ import {
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { DashboardHero } from "@/components/DashboardHero";
 import { SpendingTrend } from "@/components/SpendingTrend";
+import { SpendingDonut } from "@/components/SpendingDonut";
 import { IncomeVsExpensesChart } from "@/components/IncomeVsExpensesChart";
 import { TaskRow } from "@/components/TaskRow";
 import { Reveal } from "@/components/Reveal";
@@ -195,6 +196,13 @@ export default function DashboardPage() {
           <Card className="card-hover">
             <SectionTitle title="Tendencia de gastos" />
             <SpendingTrend />
+          </Card>
+        </Reveal>
+
+        <Reveal delay={0.28}>
+          <Card className="card-hover">
+            <SectionTitle title="Reparto por categorías" />
+            <SpendingDonut />
           </Card>
         </Reveal>
 
