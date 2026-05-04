@@ -47,6 +47,21 @@ export function MonthlyIncome() {
     [finances, currentKey]
   );
 
+  // Recurring incomes logic (similar to subscriptions)
+  const recurringIncomes = useMemo(() => {
+    const seen = new Map<string, typeof finances[0]>();
+    finances
+      .filter((f) => f.type === "ingreso" && f.recurrence === "mensual")
+      .sort((a, b) => +new Date(b.date) - +new Date(a.date))
+      .forEach((f) => {
+        const key = f.title.toLowerCase().trim();
+        if (!seen.has(key)) seen.set(key, f);
+      });
+    return Array.from(seen.values()).sort(
+      (a, b) => amountInPrimary(b) - amountInPrimary(a)
+    );
+  }, [finances, amountInPrimary]);
+
   const earnedThisMonth =
     baseSalary +
     thisMonthEntries.reduce((a, b) => a + amountInPrimary(b), 0);
@@ -86,10 +101,12 @@ export function MonthlyIncome() {
     title: string;
     amount: number | "";
     currency: Currency;
+    recurrence: "" | "mensual";
   }>({
     title: "",
     amount: "",
     currency: primaryCurrency,
+    recurrence: "",
   });
 
   useEffect(() => {
@@ -105,8 +122,9 @@ export function MonthlyIncome() {
       amount: form.amount,
       currency: form.currency,
       date: new Date().toISOString(),
+      ...(form.recurrence ? { recurrence: form.recurrence } : {}),
     });
-    setForm({ title: "", amount: "", currency: primaryCurrency });
+    setForm({ title: "", amount: "", currency: primaryCurrency, recurrence: "" });
   }
 
   return (
@@ -231,8 +249,74 @@ export function MonthlyIncome() {
         </button>
       </div>
 
+      <div className="mt-3 flex items-center gap-2 text-sm text-rumbo-muted">
+        <input
+          type="checkbox"
+          id="inc-rec-check"
+          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-600"
+          checked={form.recurrence === "mensual"}
+          onChange={(e) => setForm({ ...form, recurrence: e.target.checked ? "mensual" : "" })}
+        />
+        <label htmlFor="inc-rec-check" className="cursor-pointer select-none">🔁 Es un ingreso recurrente (mensual)</label>
+      </div>
+
+      {/* Recurring Incomes Section */}
+      {recurringIncomes.length > 0 && (
+        <div className="mt-8 border-t border-rumbo-line pt-5">
+          <SectionTitle 
+            title="Ingresos recurrentes activos" 
+            hint="Estos ingresos se repiten cada mes automáticamente."
+          />
+          <div className="grid gap-2">
+            <AnimatePresence>
+              {recurringIncomes.map((s) => {
+                const entryCurrency = s.currency ?? primaryCurrency;
+                const isForeign = entryCurrency !== primaryCurrency;
+                return (
+                  <motion.div
+                    key={s.id}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                        <span className="text-[10px] bg-emerald-100 text-emerald-900 px-1 rounded font-bold">🔁</span>
+                        {s.title}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0 ml-2">
+                      <div className="text-right">
+                        <div className="font-medium text-sm text-emerald-600">
+                          +{formatCurrency(s.amount, entryCurrency)}
+                          <span className="text-[10px] text-rumbo-muted ml-1">/mes</span>
+                        </div>
+                        {isForeign && (
+                          <div className="text-[10px] text-rumbo-muted">
+                            ≈ +{format(amountInPrimary(s))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeFinance(s.id)}
+                        className="text-rumbo-muted hover:text-rose-600 text-xs p-1"
+                        aria-label="Eliminar ingreso recurrente"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
       {/* Entries this month */}
-      <div className="mt-4">
+      <div className="mt-8 border-t border-rumbo-line pt-5">
+        <SectionTitle title="Movimientos de este mes" />
         <AnimatePresence>
           {thisMonthEntries.length === 0 ? (
             <div className="text-sm text-rumbo-muted py-3">
