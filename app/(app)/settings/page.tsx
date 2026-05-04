@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, PageHeader, SectionTitle } from "@/components/Card";
 import { PinModal } from "@/components/PinModal";
-import { useRumbo } from "@/lib/store";
+import { useFormatMoney, useRumbo } from "@/lib/store";
 import { supabaseEnabled } from "@/lib/supabase";
 import { CURRENCIES, Currency } from "@/lib/currency";
 import {
@@ -24,11 +24,18 @@ export default function SettingsPage() {
     user,
     resetDemo,
     onboarding,
+    snapshots,
     profile,
     signOut,
     primaryCurrency,
     setPrimaryCurrency,
   } = useRumbo();
+
+  // Latest snapshot total = the same figure shown in the money evolution chart
+  const latestTotal = snapshots.length
+    ? [...snapshots].sort((a, b) => +new Date(b.date) - +new Date(a.date))[0].total
+    : onboarding?.current_money ?? null;
+  const formatMoney = useFormatMoney();
   const [apiKey, setApiKey] = useState("");
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
@@ -265,24 +272,20 @@ export default function SettingsPage() {
             <div>
               <span className="text-rumbo-muted">Tienes en total:</span>{" "}
               <span className="font-medium">
-                {onboarding?.current_money
-                  ? `${onboarding.current_money} €`
-                  : "—"}
+                {latestTotal != null ? formatMoney(latestTotal) : "—"}
               </span>
             </div>
             <div>
               <span className="text-rumbo-muted">Objetivo total:</span>{" "}
               <span className="font-medium">
-                {onboarding?.total_target
-                  ? `${onboarding.total_target} €`
-                  : "—"}
+                {onboarding?.total_target ? formatMoney(onboarding.total_target) : "—"}
               </span>
             </div>
             <div>
               <span className="text-rumbo-muted">Cobras al mes:</span>{" "}
               <span className="font-medium">
                 {onboarding?.current_monthly_income
-                  ? `${onboarding.current_monthly_income} €/mes`
+                  ? `${formatMoney(onboarding.current_monthly_income)}/mes`
                   : "—"}
               </span>
             </div>
@@ -290,7 +293,7 @@ export default function SettingsPage() {
               <span className="text-rumbo-muted">Objetivo mensual:</span>{" "}
               <span className="font-medium">
                 {onboarding?.monthly_target
-                  ? `${onboarding.monthly_target} €/mes`
+                  ? `${formatMoney(onboarding.monthly_target)}/mes`
                   : "—"}
               </span>
             </div>
