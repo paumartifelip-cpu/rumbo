@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { CashflowHero } from "@/components/CashflowHero";
-import { BubbleChart } from "@/components/BubbleChart";
 import { SpendingTrend } from "@/components/SpendingTrend";
 import { Reveal } from "@/components/Reveal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
@@ -312,60 +311,63 @@ export default function GastosPage() {
         </Reveal>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <Reveal delay={0.1} className="lg:col-span-2">
-        <Card className="card-hover">
-          <SectionTitle
-            title="Tus categorías de este mes"
-            hint="Tamaño = cuánto. La IA agrupa los gastos similares."
-          />
-          {expensesByCategory.length === 0 ? (
-            <EmptyState
-              icon="💭"
-              title="Aún sin gastos"
-              description="Añade tu primer gasto y verás cómo se ordena solo."
+      <div className="mb-6">
+        <Reveal delay={0.1}>
+          <Card className="card-hover">
+            <SectionTitle
+              title="Tus categorías de este mes"
+              hint="La IA agrupa los gastos automáticamente."
             />
-          ) : (
-            <BubbleChart data={expensesByCategory} />
-          )}
-        </Card>
-        </Reveal>
+            {expensesByCategory.length === 0 ? (
+              <EmptyState
+                icon="📊"
+                title="Aún sin gastos"
+                description="Añade tu primer gasto y verás cómo se ordena solo."
+              />
+            ) : (
+              <div className="mt-4 flex flex-col gap-5">
+                {expensesByCategory.map((c, i) => {
+                  const maxVal = Math.max(...expensesByCategory.map(x => x.value), 1);
+                  const total = expensesByCategory.reduce((a, b) => a + b.value, 0);
+                  const pct = total ? (c.value / total) * 100 : 0;
+                  const barPct = (c.value / maxVal) * 100;
+                  // Use a nice array of colors for the bars
+                  const colors = [
+                    "bg-indigo-500",
+                    "bg-emerald-500",
+                    "bg-amber-500",
+                    "bg-rose-500",
+                    "bg-blue-500",
+                    "bg-purple-500",
+                    "bg-teal-500"
+                  ];
+                  const colorClass = colors[i % colors.length];
 
-        <Reveal delay={0.14}>
-        <Card className="card-hover">
-          <SectionTitle title="Resumen por categoría" />
-          {expensesByCategory.length === 0 ? (
-            <div className="text-sm text-rumbo-muted py-6 text-center">
-              Sin datos.
-            </div>
-          ) : (
-            <div className="grid gap-1.5 text-sm">
-              {expensesByCategory.map((c) => {
-                const total = expensesByCategory.reduce(
-                  (a, b) => a + b.value,
-                  0
-                );
-                const pct = total ? (c.value / total) * 100 : 0;
-                return (
-                  <div
-                    key={c.name}
-                    className="flex items-center justify-between"
-                  >
-                    <span className="truncate">{c.name}</span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-rumbo-muted text-xs">
-                        {Math.round(pct)}%
-                      </span>
-                      <span className="font-medium">
-                        {format(c.value)}
-                      </span>
+                  return (
+                    <div key={c.name} className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-rumbo-ink capitalize">{c.name}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-rumbo-muted text-xs font-medium w-8 text-right">{Math.round(pct)}%</span>
+                          <span className="font-bold text-rumbo-ink min-w-[4rem] text-right">
+                            {format(c.value)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${barPct}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut", delay: i * 0.05 }}
+                          className={`h-full rounded-full ${colorClass}`}
+                        />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
         </Reveal>
       </div>
 
@@ -402,7 +404,7 @@ export default function GastosPage() {
                       <div className="min-w-0">
                         <div className="font-medium truncate flex items-center gap-1.5">
                           {f.title}
-                          {f.recurrence && (
+                          {(f.recurrence || subscriptions.some(s => s.title.toLowerCase().trim() === f.title.toLowerCase().trim())) && (
                             <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
                           )}
                         </div>

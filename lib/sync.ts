@@ -162,6 +162,8 @@ const stripTask = (userId: string) => (t: Task) => ({
   ai_priority_score: t.ai_priority_score ?? null,
   ai_reason: t.ai_reason ?? null,
   status: t.status,
+  recurrence: t.recurrence ?? null,
+  last_generated_date: t.last_generated_date ?? null,
   created_at: t.created_at,
 });
 
@@ -171,8 +173,12 @@ const stripFinance = (userId: string) => (f: FinancialEntry) => ({
   type: f.type,
   title: f.title,
   amount: f.amount,
+  currency: f.currency ?? null,
+  amount_in_primary: f.amount_in_primary ?? null,
   date: f.date,
   category: f.category ?? null,
+  recurrence: f.recurrence ?? null,
+  last_generated_date: f.last_generated_date ?? null,
   created_at: f.created_at,
 });
 
@@ -224,6 +230,8 @@ function normalizeTask(r: any): Task {
       r.ai_priority_score != null ? Number(r.ai_priority_score) : undefined,
     ai_reason: r.ai_reason ?? undefined,
     status: r.status ?? "pendiente",
+    recurrence: r.recurrence ?? undefined,
+    last_generated_date: r.last_generated_date ?? undefined,
     created_at: r.created_at,
   };
 }
@@ -235,8 +243,12 @@ function normalizeFinance(r: any): FinancialEntry {
     type: r.type,
     title: r.title,
     amount: Number(r.amount),
+    currency: r.currency ?? undefined,
+    amount_in_primary: r.amount_in_primary != null ? Number(r.amount_in_primary) : undefined,
     date: r.date,
     category: r.category ?? undefined,
+    recurrence: r.recurrence ?? undefined,
+    last_generated_date: r.last_generated_date ?? undefined,
     created_at: r.created_at,
   };
 }

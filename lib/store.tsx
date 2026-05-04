@@ -248,12 +248,12 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           if (idx >= 0) {
             newTasks[idx] = { ...newTasks[idx], last_generated_date: now.toISOString() };
           }
+          const { recurrence, last_generated_date, ...taskWithoutRecurrence } = t;
           newTasks.push({
-            ...t,
+            ...taskWithoutRecurrence,
             id: uid(),
             created_at: now.toISOString(),
             status: "pendiente",
-            last_generated_date: now.toISOString(),
           });
           hasNew = true;
         }
@@ -278,13 +278,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           }
           const entryCurrency = f.currency ?? s.primaryCurrency;
           const currentPrimaryAmt = convertAmount(f.amount, entryCurrency, s.primaryCurrency);
+          const { recurrence, last_generated_date, ...financeWithoutRecurrence } = f;
           newFinances.push({
-            ...f,
+            ...financeWithoutRecurrence,
             id: uid(),
             date: now.toISOString(),
             amount_in_primary: currentPrimaryAmt,
             created_at: now.toISOString(),
-            last_generated_date: now.toISOString(),
           });
           hasNew = true;
         }
