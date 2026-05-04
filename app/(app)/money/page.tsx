@@ -16,6 +16,7 @@ import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { MoneyHero } from "@/components/MoneyHero";
 import { MoneyGoalsEditor } from "@/components/MoneyGoalsEditor";
 import { MonthlyIncome } from "@/components/MonthlyIncome";
+import { IncomeVsExpensesChart } from "@/components/IncomeVsExpensesChart";
 import { Reveal } from "@/components/Reveal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES } from "@/lib/currency";
@@ -71,6 +72,12 @@ export default function MoneyPage() {
       </Reveal>
 
       <Reveal delay={0.08}>
+        <div className="mb-6">
+          <IncomeVsExpensesChart />
+        </div>
+      </Reveal>
+
+      <Reveal delay={0.1}>
         <div className="mb-6">
           <MonthlyIncome />
         </div>

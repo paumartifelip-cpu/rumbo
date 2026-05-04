@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { CashflowHero } from "@/components/CashflowHero";
 import { SpendingTrend } from "@/components/SpendingTrend";
+import { SpendingDonut } from "@/components/SpendingDonut";
 import { Reveal } from "@/components/Reveal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
@@ -245,6 +246,13 @@ export default function GastosPage() {
               hint="Últimos 6 meses. Barra oscura = mes actual."
             />
             <SpendingTrend />
+          </Card>
+        </Reveal>
+
+        <Reveal delay={0.1}>
+          <Card className="card-hover h-full">
+            <SectionTitle title="Reparto por categorías" />
+            <SpendingDonut />
           </Card>
         </Reveal>
 

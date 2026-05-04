@@ -150,19 +150,19 @@ function HeroMetric({
   }[tone];
 
   return (
-    <Card className="p-5 flex flex-col justify-between hover:shadow-soft transition-all duration-300 relative overflow-hidden">
+    <Card className="p-8 flex flex-col justify-between hover:shadow-soft transition-all duration-300 relative overflow-hidden min-h-[160px]">
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] uppercase tracking-wider text-rumbo-muted font-bold">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-xs uppercase tracking-widest text-rumbo-muted font-bold">
             {label}
           </span>
           {progress !== undefined ? (
             <RadialProgress progress={progress} tone={tone} />
           ) : (
-            <span className="text-xl">{icon}</span>
+            <span className="text-3xl">{icon}</span>
           )}
         </div>
-        <div className={`text-xl md:text-2xl font-bold tracking-tight leading-tight ${colors} ${isTask ? 'line-clamp-2' : ''}`}>
+        <div className={`text-3xl md:text-4xl font-bold tracking-tight leading-tight ${colors} ${isTask ? 'line-clamp-2' : ''}`}>
           {value}
         </div>
       </div>
