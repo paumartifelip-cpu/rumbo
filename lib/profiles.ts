@@ -7,6 +7,7 @@ export interface Profile {
   emoji?: string;
   email?: string;
   custom?: boolean;
+  primary_currency?: "EUR" | "USD" | "MXN" | "ARS";
 }
 
 export const DEFAULT_PROFILES: Profile[] = [
@@ -113,7 +114,10 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-export function addCustomProfile(name: string): Profile {
+export function addCustomProfile(
+  name: string,
+  primary_currency: "EUR" | "USD" | "MXN" | "ARS" = "EUR"
+): Profile {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Nombre vacío");
   const existing = getCustomProfiles();
@@ -133,6 +137,7 @@ export function addCustomProfile(name: string): Profile {
     color: CUSTOM_COLORS[existing.length % CUSTOM_COLORS.length],
     emoji: pick(CUSTOM_EMOJIS),
     custom: true,
+    primary_currency,
   };
   writeCustomProfiles([...existing, profile]);
   return profile;
@@ -140,6 +145,47 @@ export function addCustomProfile(name: string): Profile {
 
 export function removeCustomProfile(id: string) {
   writeCustomProfiles(getCustomProfiles().filter((p) => p.id !== id));
+}
+
+export function updateProfileCurrency(
+  id: string,
+  currency: "EUR" | "USD" | "MXN" | "ARS"
+) {
+  if (typeof window === "undefined") return;
+  // Custom profiles: persist on the profile itself.
+  const customs = getCustomProfiles();
+  const idx = customs.findIndex((p) => p.id === id);
+  if (idx >= 0) {
+    customs[idx] = { ...customs[idx], primary_currency: currency };
+    writeCustomProfiles(customs);
+    return;
+  }
+  // Default profiles (Pau, Michelle): persist per-profile in a separate map.
+  try {
+    const raw = localStorage.getItem(DEFAULT_CURRENCY_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[id] = currency;
+    localStorage.setItem(DEFAULT_CURRENCY_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+const DEFAULT_CURRENCY_KEY = "rumbo_default_profile_currencies";
+
+export function getProfileCurrency(
+  id: string
+): "EUR" | "USD" | "MXN" | "ARS" {
+  if (typeof window === "undefined") return "EUR";
+  const customs = getCustomProfiles();
+  const custom = customs.find((p) => p.id === id);
+  if (custom?.primary_currency) return custom.primary_currency;
+  try {
+    const raw = localStorage.getItem(DEFAULT_CURRENCY_KEY);
+    if (raw) {
+      const map = JSON.parse(raw);
+      if (map[id]) return map[id];
+    }
+  } catch {}
+  return "EUR";
 }
 
 export function findProfile(id: string | null): Profile | null {

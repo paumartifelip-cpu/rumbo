@@ -4,9 +4,10 @@ import { useState } from "react";
 import { Card, EmptyState, PageHeader, ProgressBar } from "@/components/Card";
 import { MoneyMetrics } from "@/components/MoneyMetrics";
 import { CircularProgress } from "@/components/CircularProgress";
-import { useRumbo } from "@/lib/store";
+import { useFormatMoney, useRumbo } from "@/lib/store";
 import { GoalCategory } from "@/lib/types";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { CURRENCIES } from "@/lib/currency";
 
 const CATEGORIES: GoalCategory[] = [
   "dinero",
@@ -19,7 +20,10 @@ const CATEGORIES: GoalCategory[] = [
 ];
 
 export default function GoalsPage() {
-  const { goals, addGoal, updateGoal, removeGoal, tasks } = useRumbo();
+  const { goals, addGoal, updateGoal, removeGoal, tasks, primaryCurrency } =
+    useRumbo();
+  const formatMoney = useFormatMoney();
+  const symbol = CURRENCIES[primaryCurrency].symbol;
   const [open, setOpen] = useState(false);
 
   return (
@@ -131,7 +135,13 @@ export default function GoalsPage() {
         )}
       </div>
 
-      {open && <GoalForm onClose={() => setOpen(false)} onSave={addGoal} />}
+      {open && (
+        <GoalForm
+          onClose={() => setOpen(false)}
+          onSave={addGoal}
+          currencySymbol={symbol}
+        />
+      )}
     </div>
   );
 }
@@ -139,9 +149,11 @@ export default function GoalsPage() {
 function GoalForm({
   onClose,
   onSave,
+  currencySymbol,
 }: {
   onClose: () => void;
   onSave: ReturnType<typeof useRumbo>["addGoal"];
+  currencySymbol: string;
 }) {
   const [form, setForm] = useState({
     title: "",
@@ -168,7 +180,7 @@ function GoalForm({
             <label className="label">Título</label>
             <input
               className="input"
-              placeholder="Ej: Ganar 5.000 €/mes"
+              placeholder={`Ej: Ganar 5.000 ${currencySymbol}/mes`}
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
             />
@@ -223,7 +235,7 @@ function GoalForm({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Cantidad objetivo (€)</label>
+              <label className="label">Cantidad objetivo ({currencySymbol})</label>
               <input
                 type="number"
                 className="input"
@@ -237,7 +249,7 @@ function GoalForm({
               />
             </div>
             <div>
-              <label className="label">Cantidad actual (€)</label>
+              <label className="label">Cantidad actual ({currencySymbol})</label>
               <input
                 type="number"
                 className="input"

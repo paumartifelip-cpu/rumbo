@@ -63,6 +63,7 @@ export interface FinancialEntry {
   type: FinancialType;
   title: string;
   amount: number;
+  currency?: "EUR" | "USD" | "MXN" | "ARS"; // if absent, treat as primary
   date: string;
   category?: string;
   recurrence?: "mensual" | "anual";

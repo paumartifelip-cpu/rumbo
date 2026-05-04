@@ -8,11 +8,11 @@ import {
   ResponsiveContainer,
   PolarAngleAxis,
 } from "recharts";
-import { useRumbo } from "@/lib/store";
-import { formatMoney } from "@/lib/utils";
+import { useFormatMoney, useRumbo } from "@/lib/store";
 
 export function MoneyHero() {
-  const { snapshots, onboarding, finances } = useRumbo();
+  const { snapshots, onboarding, finances, amountInPrimary } = useRumbo();
+  const formatMoney = useFormatMoney();
 
   const sortedSnaps = [...snapshots].sort(
     (a, b) => +new Date(a.date) - +new Date(b.date)
@@ -33,7 +33,7 @@ export function MoneyHero() {
           new Date(f.date).getMonth() === now.getMonth() &&
           new Date(f.date).getFullYear() === now.getFullYear()
       )
-      .reduce((a, b) => a + b.amount, 0);
+      .reduce((a, b) => a + amountInPrimary(b), 0);
   const monthTarget = onboarding?.monthly_target ?? 0;
 
   const totalProgress = totalTarget
@@ -123,6 +123,7 @@ function RadialCard({
   accent: "emerald" | "violet";
   footer?: string;
 }) {
+  const formatMoney = useFormatMoney();
   const animatedCurrent = useCounter(current);
   const animatedProgress = useCounter(progress);
   const gradientId = useMemo(

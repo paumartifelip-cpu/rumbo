@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { CashflowHero } from "@/components/CashflowHero";
 import { BubbleChart } from "@/components/BubbleChart";
 import { SpendingTrend } from "@/components/SpendingTrend";
 import { Reveal } from "@/components/Reveal";
-import { useRumbo } from "@/lib/store";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { useFormatMoney, useRumbo } from "@/lib/store";
+import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
+import { formatDate } from "@/lib/utils";
 
 function useDateLabels() {
   const now = new Date();
@@ -23,13 +24,31 @@ function useDateLabels() {
 }
 
 export default function GastosPage() {
-  const { finances, addFinance, removeFinance } = useRumbo();
+  const {
+    finances,
+    addFinance,
+    removeFinance,
+    primaryCurrency,
+    amountInPrimary,
+  } = useRumbo();
+  const format = useFormatMoney();
   const { today, month } = useDateLabels();
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    title: string;
+    amount: number | "";
+    recurrence: "" | "mensual";
+    currency: Currency;
+  }>({
     title: "",
-    amount: "" as number | "",
-    recurrence: "" as "" | "mensual",
+    amount: "",
+    recurrence: "",
+    currency: primaryCurrency,
   });
+
+  // Sync form currency to primary when it changes (until user picks one).
+  useEffect(() => {
+    setForm((f) => ({ ...f, currency: primaryCurrency }));
+  }, [primaryCurrency]);
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
   const now = new Date();
@@ -49,12 +68,12 @@ export default function GastosPage() {
     const map = new Map<string, number>();
     thisMonth.forEach((f) => {
       const k = f.category || "Pendiente…";
-      map.set(k, (map.get(k) ?? 0) + f.amount);
+      map.set(k, (map.get(k) ?? 0) + amountInPrimary(f));
     });
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-  }, [thisMonth]);
+  }, [thisMonth, amountInPrimary]);
 
   // Deduplicated active subscriptions (most recent entry per title)
   const subscriptions = useMemo(() => {
@@ -66,17 +85,20 @@ export default function GastosPage() {
         const key = f.title.toLowerCase().trim();
         if (!seen.has(key)) seen.set(key, f);
       });
-    return Array.from(seen.values()).sort((a, b) => b.amount - a.amount);
-  }, [finances]);
+    return Array.from(seen.values()).sort(
+      (a, b) => amountInPrimary(b) - amountInPrimary(a)
+    );
+  }, [finances, amountInPrimary]);
 
   const totalMonthlySubscriptions = useMemo(
     () =>
       subscriptions.reduce((acc, f) => {
-        if (f.recurrence === "mensual") return acc + f.amount;
-        if (f.recurrence === "anual") return acc + f.amount / 12;
+        const amt = amountInPrimary(f);
+        if (f.recurrence === "mensual") return acc + amt;
+        if (f.recurrence === "anual") return acc + amt / 12;
         return acc;
       }, 0),
-    [subscriptions]
+    [subscriptions, amountInPrimary]
   );
 
   function submit() {
@@ -86,10 +108,16 @@ export default function GastosPage() {
       type: "gasto",
       title: form.title,
       amount: form.amount,
+      currency: form.currency,
       date: new Date().toISOString(),
       ...(form.recurrence ? { recurrence: form.recurrence } : {}),
     });
-    setForm({ title: "", amount: "", recurrence: "" });
+    setForm({
+      title: "",
+      amount: "",
+      recurrence: "",
+      currency: primaryCurrency,
+    });
   }
 
   return (
@@ -112,9 +140,9 @@ export default function GastosPage() {
       <Card className="mb-6 card-hover">
         <SectionTitle
           title="Añadir gasto"
-          hint="Solo el concepto y la cantidad. Gemini elige la categoría."
+          hint="Concepto, cantidad y moneda. La IA elige la categoría."
         />
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_120px_auto] gap-2">
           <input
             className="input"
             placeholder="Concepto (ej: Mercadona, Netflix, alquiler)"
@@ -128,7 +156,7 @@ export default function GastosPage() {
             <input
               type="number"
               inputMode="numeric"
-              className="input pr-8"
+              className="input pr-10"
               placeholder="Cantidad"
               value={form.amount}
               onChange={(e) =>
@@ -142,13 +170,44 @@ export default function GastosPage() {
               }}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted text-sm">
-              €
+              {CURRENCIES[form.currency].symbol}
             </span>
           </div>
+          <select
+            className="input"
+            value={form.currency}
+            onChange={(e) =>
+              setForm({ ...form, currency: e.target.value as Currency })
+            }
+            aria-label="Moneda"
+          >
+            {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
+              <option key={c} value={c}>
+                {CURRENCIES[c].flag} {c}
+              </option>
+            ))}
+          </select>
           <button className="btn-primary" onClick={submit}>
             Añadir gasto
           </button>
         </div>
+        {form.currency !== primaryCurrency && typeof form.amount === "number" && form.amount > 0 && (
+          <div className="mt-2 text-xs text-rumbo-muted">
+            ≈ {format(
+              amountInPrimary({
+                id: "_",
+                user_id: "_",
+                type: "gasto",
+                title: "_",
+                amount: form.amount,
+                currency: form.currency,
+                date: new Date().toISOString(),
+                created_at: new Date().toISOString(),
+              })
+            )}{" "}
+            en tu moneda principal
+          </div>
+        )}
         <div className="mt-3 flex items-center gap-2 text-sm text-rumbo-muted">
           <input
             type="checkbox"
@@ -180,7 +239,7 @@ export default function GastosPage() {
               title="Suscripciones activas"
               hint={
                 subscriptions.length > 0
-                  ? `${formatMoney(totalMonthlySubscriptions)}/mes en fijos`
+                  ? `${format(totalMonthlySubscriptions)}/mes en fijos`
                   : "Marca un gasto como 🔁 para verlo aquí"
               }
             />
@@ -193,47 +252,58 @@ export default function GastosPage() {
             ) : (
               <div>
                 <div className="text-2xl font-semibold tabular-nums mb-4">
-                  {formatMoney(totalMonthlySubscriptions)}
+                  {format(totalMonthlySubscriptions)}
                   <span className="text-sm font-normal text-rumbo-muted ml-1">/mes</span>
                 </div>
                 <div className="grid gap-2">
                   <AnimatePresence>
-                    {subscriptions.map((s) => (
-                      <motion.div
-                        key={s.id}
-                        initial={{ opacity: 0, x: -6 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line"
-                      >
-                        <div className="min-w-0">
-                          <div className="font-medium text-sm truncate flex items-center gap-1.5">
-                            <span className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
-                            {s.title}
-                          </div>
-                          {s.category && (
-                            <div className="text-[11px] text-rumbo-muted mt-0.5">
-                              {s.category}
+                    {subscriptions.map((s) => {
+                      const entryCurrency = s.currency ?? primaryCurrency;
+                      const isForeign = entryCurrency !== primaryCurrency;
+                      return (
+                        <motion.div
+                          key={s.id}
+                          initial={{ opacity: 0, x: -6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0 }}
+                          className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                              <span className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
+                              {s.title}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className="font-medium text-sm text-rose-600">
-                            {formatMoney(s.amount)}
-                            {s.recurrence === "anual" && (
-                              <span className="text-[10px] text-rumbo-muted ml-1">/año</span>
+                            {s.category && (
+                              <div className="text-[11px] text-rumbo-muted mt-0.5">
+                                {s.category}
+                              </div>
                             )}
-                          </span>
-                          <button
-                            onClick={() => removeFinance(s.id)}
-                            className="text-rumbo-muted hover:text-rose-600 text-xs p-1"
-                            aria-label="Eliminar suscripción"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <div className="text-right">
+                              <div className="font-medium text-sm text-rose-600">
+                                {formatCurrency(s.amount, entryCurrency)}
+                                {s.recurrence === "anual" && (
+                                  <span className="text-[10px] text-rumbo-muted ml-1">/año</span>
+                                )}
+                              </div>
+                              {isForeign && (
+                                <div className="text-[10px] text-rumbo-muted">
+                                  ≈ {format(amountInPrimary(s))}
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => removeFinance(s.id)}
+                              className="text-rumbo-muted hover:text-rose-600 text-xs p-1"
+                              aria-label="Eliminar suscripción"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
                   </AnimatePresence>
                 </div>
               </div>
@@ -287,7 +357,7 @@ export default function GastosPage() {
                         {Math.round(pct)}%
                       </span>
                       <span className="font-medium">
-                        {formatMoney(c.value)}
+                        {format(c.value)}
                       </span>
                     </div>
                   </div>
@@ -317,52 +387,63 @@ export default function GastosPage() {
         ) : (
           <div>
             <AnimatePresence>
-              {thisMonth.map((f) => (
-                <motion.div
-                  key={f.id}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center justify-between py-3 border-b last:border-0 border-rumbo-line"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="min-w-0">
-                      <div className="font-medium truncate flex items-center gap-1.5">
-                        {f.title}
-                        {f.recurrence && (
-                          <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
-                        )}
-                      </div>
-                      <div className="text-xs text-rumbo-muted">
-                        {formatDate(f.date)}
-                        {" · "}
-                        {f.category ? (
-                          <span>{f.category}</span>
-                        ) : (
-                          <motion.span
-                            animate={{ opacity: [0.4, 1, 0.4] }}
-                            transition={{ duration: 1.2, repeat: Infinity }}
-                          >
-                            clasificando…
-                          </motion.span>
-                        )}
+              {thisMonth.map((f) => {
+                const entryCurrency = f.currency ?? primaryCurrency;
+                const isForeign = entryCurrency !== primaryCurrency;
+                return (
+                  <motion.div
+                    key={f.id}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center justify-between py-3 border-b last:border-0 border-rumbo-line"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate flex items-center gap-1.5">
+                          {f.title}
+                          {f.recurrence && (
+                            <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-rumbo-muted">
+                          {formatDate(f.date)}
+                          {" · "}
+                          {f.category ? (
+                            <span>{f.category}</span>
+                          ) : (
+                            <motion.span
+                              animate={{ opacity: [0.4, 1, 0.4] }}
+                              transition={{ duration: 1.2, repeat: Infinity }}
+                            >
+                              clasificando…
+                            </motion.span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="text-rose-600 font-medium">
-                      -{formatMoney(f.amount)}
-                    </span>
-                    <button
-                      onClick={() => removeFinance(f.id)}
-                      className="text-rumbo-muted hover:text-rose-600"
-                      aria-label="Eliminar"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <span className="text-rose-600 font-medium">
+                          -{formatCurrency(f.amount, entryCurrency)}
+                        </span>
+                        {isForeign && (
+                          <div className="text-[10px] text-rumbo-muted">
+                            ≈ -{format(amountInPrimary(f))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeFinance(f.id)}
+                        className="text-rumbo-muted hover:text-rose-600"
+                        aria-label="Eliminar"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
         )}

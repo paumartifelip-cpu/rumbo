@@ -12,6 +12,7 @@ import {
   getAllProfiles,
   removeCustomProfile,
 } from "@/lib/profiles";
+import { CURRENCIES, Currency } from "@/lib/currency";
 import {
   checkPin,
   clearPin,
@@ -29,6 +30,7 @@ export default function LoginPage() {
   const [pinMode, setPinMode] = useState<"enter" | "create">("enter");
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newCurrency, setNewCurrency] = useState<Currency>("EUR");
 
   useEffect(() => {
     if (profile) router.replace("/today");
@@ -72,9 +74,10 @@ export default function LoginPage() {
   function createUser() {
     const name = newName.trim();
     if (!name) return;
-    const created = addCustomProfile(name);
+    const created = addCustomProfile(name, newCurrency);
     setProfiles(getAllProfiles());
     setNewName("");
+    setNewCurrency("EUR");
     setShowCreate(false);
     setPendingProfile(created);
     setPinMode("create");
@@ -161,7 +164,8 @@ export default function LoginPage() {
                 Crea tu perfil
               </h2>
               <p className="text-sm text-rumbo-muted mt-1">
-                Solo tu nombre. Después elegirás un PIN de 4 dígitos.
+                Tu nombre y la moneda con la que manejas tu dinero. Después
+                elegirás un PIN.
               </p>
               <input
                 autoFocus
@@ -175,6 +179,38 @@ export default function LoginPage() {
                 }}
                 maxLength={24}
               />
+              <div className="mt-4">
+                <div className="text-xs uppercase tracking-wider text-rumbo-muted mb-2">
+                  Moneda principal
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(Object.keys(CURRENCIES) as Currency[]).map((c) => {
+                    const meta = CURRENCIES[c];
+                    const active = newCurrency === c;
+                    return (
+                      <button
+                        key={c}
+                        onClick={() => setNewCurrency(c)}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-left text-sm ${
+                          active
+                            ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                      >
+                        <span className="text-xl">{meta.flag}</span>
+                        <div className="min-w-0">
+                          <div className="font-semibold leading-tight">
+                            {meta.code}
+                          </div>
+                          <div className="text-[10px] text-rumbo-muted truncate">
+                            {meta.name}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex gap-2 mt-5 justify-end">
                 <button
                   className="btn-ghost"

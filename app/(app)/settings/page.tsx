@@ -6,6 +6,7 @@ import { Card, PageHeader, SectionTitle } from "@/components/Card";
 import { PinModal } from "@/components/PinModal";
 import { useRumbo } from "@/lib/store";
 import { supabaseEnabled } from "@/lib/supabase";
+import { CURRENCIES, Currency } from "@/lib/currency";
 import {
   PIN_THRESHOLD_DAYS,
   checkPin,
@@ -19,7 +20,15 @@ const KEY_STORAGE_GPT = "rumbo_gpt_key";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, resetDemo, onboarding, profile, signOut } = useRumbo();
+  const {
+    user,
+    resetDemo,
+    onboarding,
+    profile,
+    signOut,
+    primaryCurrency,
+    setPrimaryCurrency,
+  } = useRumbo();
   const [apiKey, setApiKey] = useState("");
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [showKey, setShowKey] = useState(false);
@@ -98,6 +107,38 @@ export default function SettingsPage() {
       <PageHeader title="Ajustes" subtitle="Tu cuenta, IA y plan." />
 
       <div className="grid gap-4">
+        <Card>
+          <SectionTitle
+            title="Moneda principal"
+            hint="Todos los totales se mostrarán en esta moneda. Puedes elegir otra al añadir un gasto o ingreso."
+          />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(Object.keys(CURRENCIES) as Currency[]).map((c) => {
+              const meta = CURRENCIES[c];
+              const active = primaryCurrency === c;
+              return (
+                <button
+                  key={c}
+                  onClick={() => setPrimaryCurrency(c)}
+                  className={`flex flex-col items-center gap-1 px-3 py-3 rounded-xl border transition-all ${
+                    active
+                      ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                      : "border-slate-200 bg-white hover:border-slate-300 hover:-translate-y-0.5"
+                  }`}
+                >
+                  <span className="text-2xl">{meta.flag}</span>
+                  <span className="text-xs font-semibold">
+                    {meta.code}
+                  </span>
+                  <span className="text-[10px] text-rumbo-muted text-center leading-tight">
+                    {meta.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+
         <Card>
           <SectionTitle
             title="Inteligencia artificial"

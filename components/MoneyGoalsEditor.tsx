@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { Card, SectionTitle } from "./Card";
-import { useRumbo } from "@/lib/store";
+import { useFormatMoney, useRumbo } from "@/lib/store";
 import { OnboardingData } from "@/lib/types";
-import { formatMoney } from "@/lib/utils";
+import { CURRENCIES } from "@/lib/currency";
 
 export function MoneyGoalsEditor() {
   const { onboarding, updateOnboarding } = useRumbo();
@@ -131,6 +131,7 @@ function ReadRow({
   value: number;
   suffix?: string;
 }) {
+  const formatMoney = useFormatMoney();
   return (
     <div>
       <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">
@@ -153,6 +154,7 @@ function Field({
   value: number;
   onChange: (v: number) => void;
 }) {
+  const { primaryCurrency } = useRumbo();
   return (
     <div>
       <label className="label">{label}</label>
@@ -165,7 +167,7 @@ function Field({
           onChange={(e) => onChange(Number(e.target.value) || 0)}
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted text-sm">
-          €
+          {CURRENCIES[primaryCurrency].symbol}
         </span>
       </div>
     </div>

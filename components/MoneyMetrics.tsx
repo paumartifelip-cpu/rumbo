@@ -1,11 +1,11 @@
 "use client";
 
-import { useRumbo } from "@/lib/store";
+import { useFormatMoney, useRumbo } from "@/lib/store";
 import { ProgressBar } from "./Card";
-import { formatMoney } from "@/lib/utils";
 
 export function MoneyMetrics({ compact = false }: { compact?: boolean }) {
-  const { snapshots, onboarding, finances } = useRumbo();
+  const { snapshots, onboarding, finances, amountInPrimary } = useRumbo();
+  const formatMoney = useFormatMoney();
 
   const sortedSnaps = [...snapshots].sort(
     (a, b) => +new Date(a.date) - +new Date(b.date)
@@ -26,7 +26,7 @@ export function MoneyMetrics({ compact = false }: { compact?: boolean }) {
           new Date(f.date).getMonth() === now.getMonth() &&
           new Date(f.date).getFullYear() === now.getFullYear()
       )
-      .reduce((a, b) => a + b.amount, 0);
+      .reduce((a, b) => a + amountInPrimary(b), 0);
   const monthTarget = onboarding?.monthly_target ?? 0;
 
   const totalProgress = totalTarget
@@ -90,6 +90,7 @@ function Metric({
   muted?: boolean;
   suffix?: string;
 }) {
+  const formatMoney = useFormatMoney();
   return (
     <div className="card p-4">
       <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">

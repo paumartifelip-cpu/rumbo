@@ -2,16 +2,15 @@ export function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-export function formatMoney(value: number, currency = "EUR") {
-  try {
-    return new Intl.NumberFormat("es-ES", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch {
-    return `${value.toFixed(0)} €`;
-  }
+import { Currency, formatCurrency } from "./currency";
+
+/**
+ * Backwards-compatible money formatter. Defaults to EUR but accepts any
+ * supported currency. Prefer using `useFormatMoney` from the store when
+ * you need formatting tied to the user's primary currency.
+ */
+export function formatMoney(value: number, currency: Currency = "EUR") {
+  return formatCurrency(value, currency);
 }
 
 export function formatDate(value?: string) {

@@ -11,9 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useRumbo } from "@/lib/store";
+import { useFormatMoney, useRumbo } from "@/lib/store";
 import { FinancialType } from "@/lib/types";
-import { formatMoney } from "@/lib/utils";
 
 interface Spec {
   kind: "ingreso" | "gasto" | "ahorro";
@@ -66,7 +65,7 @@ const SPECS: Spec[] = [
 ];
 
 export function CashflowHero() {
-  const { finances, onboarding } = useRumbo();
+  const { finances, onboarding, amountInPrimary } = useRumbo();
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
   const now = new Date();
@@ -85,7 +84,7 @@ export function CashflowHero() {
             .filter(
               (f) => f.type === type && monthKey(new Date(f.date)) === key
             )
-            .reduce((a, b) => a + b.amount, 0);
+            .reduce((a, b) => a + amountInPrimary(b), 0);
 
         const monthTotal =
           spec.kind === "ahorro"
@@ -121,7 +120,7 @@ export function CashflowHero() {
         return { spec, monthTotal, last6, delta };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [finances, onboarding, currentKey]
+    [finances, onboarding, currentKey, amountInPrimary]
   );
 
   return (
@@ -150,6 +149,7 @@ function Card({
   last6: Array<{ label: string; total: number }>;
   delta: number;
 }) {
+  const formatMoney = useFormatMoney();
   const animated = useCounter(monthTotal);
   const gradId = `g-${spec.kind}`;
   const isCurrentMonth = (i: number) => i === last6.length - 1;

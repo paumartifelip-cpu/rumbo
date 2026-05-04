@@ -11,9 +11,22 @@ import {
   useState,
 } from "react";
 import { aiCategorize, aiPrioritize, heuristicCategorize } from "./gemini";
+import {
+  convertAmount,
+  Currency,
+  fetchRates,
+  formatCurrency,
+} from "./currency";
 import { mockFinances, mockGoals, mockSnapshots, mockTasks, mockUser } from "./mock";
 import { localPrioritize } from "./priority";
-import { findProfile, getCurrentProfileId, Profile, setCurrentProfileId } from "./profiles";
+import {
+  findProfile,
+  getCurrentProfileId,
+  getProfileCurrency,
+  Profile,
+  setCurrentProfileId,
+  updateProfileCurrency,
+} from "./profiles";
 import { pullFromSupabase, pushToSupabase, SyncSnapshot } from "./sync";
 import { supabaseEnabled } from "./supabase";
 import {
@@ -39,6 +52,7 @@ interface RumboState {
   aiSource: "openai" | "gemini" | "fallback" | "idle";
   syncStatus: "idle" | "syncing" | "synced" | "offline" | "error";
   lastSyncAt?: string;
+  primaryCurrency: Currency;
 }
 
 interface RumboContext extends RumboState {
@@ -60,6 +74,9 @@ interface RumboContext extends RumboState {
   updateOnboarding: (patch: Partial<OnboardingData>) => void;
   resetDemo: () => void;
   prioritize: () => Promise<void>;
+  setPrimaryCurrency: (c: Currency) => void;
+  /** Returns the entry's amount converted into the user's primary currency. */
+  amountInPrimary: (entry: FinancialEntry) => number;
 }
 
 const STORAGE_PREFIX = "rumbo_state_v5_";
@@ -75,6 +92,7 @@ const defaultState: RumboState = {
   prioritizing: false,
   aiSource: "idle",
   syncStatus: supabaseEnabled ? "idle" : "offline",
+  primaryCurrency: "EUR",
 };
 
 const Ctx = createContext<RumboContext | null>(null);
@@ -94,10 +112,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   // Load current profile + its data on mount.
   useEffect(() => {
+    // Kick off live FX-rate fetch in the background.
+    fetchRates().catch(() => {});
     const id = getCurrentProfileId();
     const p = findProfile(id);
     setProfile(p);
     if (p) {
+      const profileCurrency = getProfileCurrency(p.id);
       // Local cache first (instant load).
       try {
         const raw = localStorage.getItem(storageKeyFor(p.id));
@@ -109,15 +130,17 @@ export function RumboProvider({ children }: { children: ReactNode }) {
             prioritizing: false,
             aiSource: parsed.aiSource ?? "idle",
             syncStatus: supabaseEnabled ? "syncing" : "offline",
+            primaryCurrency: profileCurrency,
           });
         } else {
           setState({
             ...defaultState,
             user: { ...mockUser, name: p.name, email: p.email ?? "" },
+            primaryCurrency: profileCurrency,
           });
         }
       } catch {
-        setState(defaultState);
+        setState({ ...defaultState, primaryCurrency: profileCurrency });
       }
       // Then pull from Supabase to get the latest authoritative state.
       if (supabaseEnabled) {
@@ -382,6 +405,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     if (!p) return;
     setCurrentProfileId(p.id);
     setProfile(p);
+    const profileCurrency = getProfileCurrency(p.id);
     // Local cache first.
     try {
       const raw = localStorage.getItem(storageKeyFor(p.id));
@@ -393,18 +417,21 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           prioritizing: false,
           aiSource: parsed.aiSource ?? "idle",
           syncStatus: supabaseEnabled ? "syncing" : "offline",
+          primaryCurrency: profileCurrency,
         });
       } else {
         setState({
           ...defaultState,
           user: { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" },
           syncStatus: supabaseEnabled ? "syncing" : "offline",
+          primaryCurrency: profileCurrency,
         });
       }
     } catch {
       setState({
         ...defaultState,
         user: { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" },
+        primaryCurrency: profileCurrency,
       });
     }
     // Pull authoritative state from Supabase.
@@ -418,6 +445,22 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       });
     }
   }, []);
+
+  const setPrimaryCurrency = useCallback(
+    (c: Currency) => {
+      setState((s) => ({ ...s, primaryCurrency: c }));
+      if (profile) updateProfileCurrency(profile.id, c);
+    },
+    [profile]
+  );
+
+  const amountInPrimary = useCallback(
+    (entry: FinancialEntry) => {
+      const from = entry.currency ?? stateRef.current.primaryCurrency;
+      return convertAmount(entry.amount, from, stateRef.current.primaryCurrency);
+    },
+    []
+  );
 
   const signOut = useCallback(() => {
     setCurrentProfileId(null);
@@ -756,6 +799,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       updateOnboarding,
       resetDemo,
       prioritize,
+      setPrimaryCurrency,
+      amountInPrimary,
     }),
     [
       state,
@@ -777,6 +822,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       updateOnboarding,
       resetDemo,
       prioritize,
+      setPrimaryCurrency,
+      amountInPrimary,
     ]
   );
 
@@ -787,4 +834,16 @@ export function useRumbo() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useRumbo debe usarse dentro de RumboProvider");
   return ctx;
+}
+
+/**
+ * Returns a formatter bound to the user's primary currency.
+ * Use this for aggregate displays where the value is already in primary.
+ */
+export function useFormatMoney() {
+  const { primaryCurrency } = useRumbo();
+  return useCallback(
+    (value: number) => formatCurrency(value, primaryCurrency),
+    [primaryCurrency]
+  );
 }

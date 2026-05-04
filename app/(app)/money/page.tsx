@@ -17,8 +17,9 @@ import { MoneyHero } from "@/components/MoneyHero";
 import { MoneyGoalsEditor } from "@/components/MoneyGoalsEditor";
 import { MonthlyIncome } from "@/components/MonthlyIncome";
 import { Reveal } from "@/components/Reveal";
-import { useRumbo } from "@/lib/store";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { useFormatMoney, useRumbo } from "@/lib/store";
+import { CURRENCIES } from "@/lib/currency";
+import { formatDate } from "@/lib/utils";
 
 function useTodayLabel() {
   return new Date().toLocaleDateString("es-ES", {
@@ -31,6 +32,7 @@ function useTodayLabel() {
 
 export default function MoneyPage() {
   const { snapshots, addSnapshot, removeSnapshot, onboarding } = useRumbo();
+  const formatMoney = useFormatMoney();
   const todayLabel = useTodayLabel();
 
   const sorted = useMemo(
@@ -217,6 +219,7 @@ function SnapshotForm({
 }: {
   onSave: ReturnType<typeof useRumbo>["addSnapshot"];
 }) {
+  const { primaryCurrency } = useRumbo();
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [total, setTotal] = useState<number | "">("");
   const [note, setNote] = useState("");
@@ -241,7 +244,7 @@ function SnapshotForm({
           }
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted text-sm">
-          €
+          {CURRENCIES[primaryCurrency].symbol}
         </span>
       </div>
       <input

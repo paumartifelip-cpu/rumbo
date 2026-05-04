@@ -11,11 +11,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useRumbo } from "@/lib/store";
-import { formatMoney } from "@/lib/utils";
+import { useFormatMoney, useRumbo } from "@/lib/store";
 
 export function SpendingTrend() {
-  const { finances } = useRumbo();
+  const { finances, amountInPrimary } = useRumbo();
+  const formatMoney = useFormatMoney();
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
 
@@ -30,7 +30,7 @@ export function SpendingTrend() {
         .replace(".", "");
       const total = finances
         .filter((f) => f.type === "gasto" && monthKey(new Date(f.date)) === key)
-        .reduce((a, b) => a + b.amount, 0);
+        .reduce((a, b) => a + amountInPrimary(b), 0);
       buckets.push({ label, total, key, isCurrent: i === 0 });
     }
 
@@ -50,7 +50,8 @@ export function SpendingTrend() {
     );
 
     return { data: buckets, current, previous, deltaAbs, avg, maxMonth };
-  }, [finances]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finances, amountInPrimary]);
 
   const hasData = data.some((d) => d.total > 0);
 

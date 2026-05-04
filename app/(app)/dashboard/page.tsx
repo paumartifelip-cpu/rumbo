@@ -16,11 +16,11 @@ import {
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { MoneyMetrics } from "@/components/MoneyMetrics";
 import { Reveal } from "@/components/Reveal";
-import { useRumbo } from "@/lib/store";
-import { formatMoney } from "@/lib/utils";
+import { useFormatMoney, useRumbo } from "@/lib/store";
 
 export default function DashboardPage() {
   const { goals, tasks, snapshots, aiAdvice } = useRumbo();
+  const formatMoney = useFormatMoney();
 
   const completedByWeek = useMemo(() => {
     const result = [

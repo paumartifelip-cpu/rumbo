@@ -12,11 +12,20 @@ import {
   YAxis,
 } from "recharts";
 import { Card, ProgressBar, SectionTitle } from "./Card";
-import { useRumbo } from "@/lib/store";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { useFormatMoney, useRumbo } from "@/lib/store";
+import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
+import { formatDate } from "@/lib/utils";
 
 export function MonthlyIncome() {
-  const { finances, addFinance, removeFinance, onboarding } = useRumbo();
+  const {
+    finances,
+    addFinance,
+    removeFinance,
+    onboarding,
+    primaryCurrency,
+    amountInPrimary,
+  } = useRumbo();
+  const format = useFormatMoney();
 
   const now = new Date();
   const monthLabel = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
@@ -39,7 +48,8 @@ export function MonthlyIncome() {
   );
 
   const earnedThisMonth =
-    baseSalary + thisMonthEntries.reduce((a, b) => a + b.amount, 0);
+    baseSalary +
+    thisMonthEntries.reduce((a, b) => a + amountInPrimary(b), 0);
 
   const animated = useCounter(earnedThisMonth);
 
@@ -62,20 +72,29 @@ export function MonthlyIncome() {
       .forEach((f) => {
         const k = monthKey(new Date(f.date));
         if (buckets.has(k)) {
-          buckets.get(k)!.total += f.amount;
+          buckets.get(k)!.total += amountInPrimary(f);
         }
       });
-    // Add the base salary to each visible month.
     if (baseSalary > 0) {
       buckets.forEach((b) => (b.total += baseSalary));
     }
     return Array.from(buckets.values());
-  }, [finances, baseSalary]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finances, baseSalary, amountInPrimary]);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    title: string;
+    amount: number | "";
+    currency: Currency;
+  }>({
     title: "",
-    amount: "" as number | "",
+    amount: "",
+    currency: primaryCurrency,
   });
+
+  useEffect(() => {
+    setForm((f) => ({ ...f, currency: primaryCurrency }));
+  }, [primaryCurrency]);
 
   function submit() {
     if (!form.title || typeof form.amount !== "number" || form.amount <= 0)
@@ -84,9 +103,10 @@ export function MonthlyIncome() {
       type: "ingreso",
       title: form.title,
       amount: form.amount,
+      currency: form.currency,
       date: new Date().toISOString(),
     });
-    setForm({ title: "", amount: "" });
+    setForm({ title: "", amount: "", currency: primaryCurrency });
   }
 
   return (
@@ -107,12 +127,12 @@ export function MonthlyIncome() {
             animate={{ opacity: 1, y: 0 }}
             className="text-4xl md:text-5xl font-semibold tracking-tight tabular-nums mt-1.5"
           >
-            {formatMoney(animated)}
+            {format(animated)}
           </motion.div>
           {monthlyTarget > 0 && (
             <>
               <div className="text-sm text-rumbo-muted mt-1">
-                de {formatMoney(monthlyTarget)} ·{" "}
+                de {format(monthlyTarget)} ·{" "}
                 <span className="font-medium text-rumbo-ink">
                   {Math.round(progress)}%
                 </span>
@@ -121,14 +141,14 @@ export function MonthlyIncome() {
                 <ProgressBar value={progress} tone="violet" />
               </div>
               <div className="text-xs text-rumbo-muted mt-2">
-                Faltan {formatMoney(Math.max(0, monthlyTarget - earnedThisMonth))}{" "}
+                Faltan {format(Math.max(0, monthlyTarget - earnedThisMonth))}{" "}
                 este mes
               </div>
             </>
           )}
           {baseSalary > 0 && (
             <div className="text-xs text-rumbo-muted mt-3 border-t border-rumbo-line pt-3">
-              Incluye sueldo base de {formatMoney(baseSalary)}/mes
+              Incluye sueldo base de {format(baseSalary)}/mes
             </div>
           )}
         </div>
@@ -149,7 +169,7 @@ export function MonthlyIncome() {
                 />
                 <YAxis hide />
                 <Tooltip
-                  formatter={(v: number) => formatMoney(v)}
+                  formatter={(v: number) => format(v)}
                   labelStyle={{ color: "#6B7280" }}
                   contentStyle={{
                     borderRadius: 12,
@@ -165,7 +185,7 @@ export function MonthlyIncome() {
       </div>
 
       {/* Form */}
-      <div className="mt-5 grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-2">
+      <div className="mt-5 grid grid-cols-1 md:grid-cols-[1fr_180px_120px_auto] gap-2">
         <input
           className="input"
           placeholder="Concepto (ej: Cliente A, factura mayo)"
@@ -177,7 +197,7 @@ export function MonthlyIncome() {
           <input
             type="number"
             inputMode="numeric"
-            className="input pr-8"
+            className="input pr-10"
             placeholder="Cantidad"
             value={form.amount}
             onChange={(e) =>
@@ -189,9 +209,23 @@ export function MonthlyIncome() {
             onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted text-sm">
-            €
+            {CURRENCIES[form.currency].symbol}
           </span>
         </div>
+        <select
+          className="input"
+          value={form.currency}
+          onChange={(e) =>
+            setForm({ ...form, currency: e.target.value as Currency })
+          }
+          aria-label="Moneda"
+        >
+          {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
+            <option key={c} value={c}>
+              {CURRENCIES[c].flag} {c}
+            </option>
+          ))}
+        </select>
         <button className="btn-primary" onClick={submit}>
           + Añadir ingreso
         </button>
@@ -205,34 +239,45 @@ export function MonthlyIncome() {
               Aún no has registrado ingresos este mes.
             </div>
           ) : (
-            thisMonthEntries.map((f) => (
-              <motion.div
-                key={f.id}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex items-center justify-between py-2.5 border-b last:border-0 border-rumbo-line"
-              >
-                <div>
-                  <div className="font-medium">{f.title}</div>
-                  <div className="text-xs text-rumbo-muted">
-                    {formatDate(f.date)}
+            thisMonthEntries.map((f) => {
+              const entryCurrency = f.currency ?? primaryCurrency;
+              const isForeign = entryCurrency !== primaryCurrency;
+              return (
+                <motion.div
+                  key={f.id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center justify-between py-2.5 border-b last:border-0 border-rumbo-line"
+                >
+                  <div>
+                    <div className="font-medium">{f.title}</div>
+                    <div className="text-xs text-rumbo-muted">
+                      {formatDate(f.date)}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-emerald-600 font-medium">
-                    +{formatMoney(f.amount)}
-                  </span>
-                  <button
-                    onClick={() => removeFinance(f.id)}
-                    className="text-rumbo-muted hover:text-rose-600"
-                    aria-label="Eliminar"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </motion.div>
-            ))
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <span className="text-emerald-600 font-medium">
+                        +{formatCurrency(f.amount, entryCurrency)}
+                      </span>
+                      {isForeign && (
+                        <div className="text-[10px] text-rumbo-muted">
+                          ≈ +{format(amountInPrimary(f))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeFinance(f.id)}
+                      className="text-rumbo-muted hover:text-rose-600"
+                      aria-label="Eliminar"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })
           )}
         </AnimatePresence>
       </div>
