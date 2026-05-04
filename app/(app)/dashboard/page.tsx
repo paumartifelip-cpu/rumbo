@@ -3,19 +3,13 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  Area,
-  AreaChart,
 } from "recharts";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { DashboardHero } from "@/components/DashboardHero";
-import { SpendingTrend } from "@/components/SpendingTrend";
 import { SpendingDonut } from "@/components/SpendingDonut";
 import { IncomeVsExpensesChart } from "@/components/IncomeVsExpensesChart";
 import { TaskRow } from "@/components/TaskRow";
@@ -23,7 +17,7 @@ import { Reveal } from "@/components/Reveal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 
 export default function DashboardPage() {
-  const { goals, tasks, snapshots, aiAdvice, toggleTask } = useRumbo();
+  const { goals, tasks, snapshots, toggleTask } = useRumbo();
   const formatMoney = useFormatMoney();
 
   const ordered = useMemo(
@@ -57,20 +51,6 @@ export default function DashboardPage() {
       });
     return result;
   }, [tasks]);
-
-  const moneyEvolution = useMemo(
-    () =>
-      [...snapshots]
-        .sort((a, b) => +new Date(a.date) - +new Date(b.date))
-        .map((s) => ({
-          date: new Date(s.date).toLocaleDateString("es-ES", {
-            day: "2-digit",
-            month: "short",
-          }),
-          total: s.total,
-        })),
-    [snapshots]
-  );
 
   return (
     <div>
@@ -124,17 +104,7 @@ export default function DashboardPage() {
           </Card>
         </Reveal>
 
-        <Reveal delay={0.1}>
-          <Card className="card-hover h-full">
-            <SectionTitle title="Consejo de la IA" />
-            <p className="text-rumbo-ink text-sm leading-relaxed">
-              {aiAdvice?.financial_advice ?? aiAdvice?.today_focus ??
-                "Cuando crees objetivos y tareas, aquí verás qué hacer primero."}
-            </p>
-          </Card>
-        </Reveal>
-
-        <Reveal delay={0.15} className="lg:col-span-3">
+        <Reveal delay={0.1} className="lg:col-span-3">
           <Card className="card-hover">
             <SectionTitle 
               title="Balance Mensual" 
@@ -144,62 +114,7 @@ export default function DashboardPage() {
           </Card>
         </Reveal>
 
-        <Reveal delay={0.2} className="lg:col-span-2">
-          <Card className="card-hover">
-            <SectionTitle title="Evolución de tu patrimonio total" />
-            {moneyEvolution.length === 0 ? (
-              <EmptyState
-                icon="📈"
-                title="Sin datos aún"
-                description="Añade tu primera medición en la pantalla de Dinero."
-                action={
-                  <Link href="/money" className="btn-primary">
-                    Ir a Dinero
-                  </Link>
-                }
-              />
-            ) : (
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={moneyEvolution}>
-                    <defs>
-                      <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#064E3B" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#064E3B" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="#EEF0F4" vertical={false} />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} />
-                    <YAxis axisLine={false} tickLine={false} />
-                    <Tooltip
-                      formatter={(v: number) => formatMoney(v)}
-                      contentStyle={{
-                        borderRadius: 12,
-                        border: "1px solid #EEF0F4",
-                      }}
-                    />
-                    <Area
-                      dataKey="total"
-                      stroke="#064E3B"
-                      fill="url(#dg)"
-                      strokeWidth={2.5}
-                      dot={{ fill: "#064E3B", r: 3 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </Card>
-        </Reveal>
-
-        <Reveal delay={0.25}>
-          <Card className="card-hover">
-            <SectionTitle title="Tendencia de gastos" />
-            <SpendingTrend />
-          </Card>
-        </Reveal>
-
-        <Reveal delay={0.28}>
+        <Reveal delay={0.15}>
           <Card className="card-hover">
             <SectionTitle title="Reparto por categorías" />
             <SpendingDonut />
@@ -230,7 +145,7 @@ export default function DashboardPage() {
           </Card>
         </Reveal>
 
-        <Reveal delay={0.35}>
+        <Reveal delay={0.3}>
           <Card className="card-hover">
             <SectionTitle title="Resumen de cuenta" />
             <ul className="text-sm space-y-2">
