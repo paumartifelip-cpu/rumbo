@@ -17,8 +17,8 @@ export interface GeminiPriorityResponse {
 }
 
 function getOpenAIKey(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("rumbo_gpt_key") || null;
+  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_OPENAI_API_KEY || null;
+  return localStorage.getItem("rumbo_gpt_key") || process.env.NEXT_PUBLIC_OPENAI_API_KEY || null;
 }
 
 function getKey(): string | null {
