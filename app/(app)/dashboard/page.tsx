@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { MoneyMetrics } from "@/components/MoneyMetrics";
+import { SpendingTrend } from "@/components/SpendingTrend";
 import { Reveal } from "@/components/Reveal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 
@@ -75,6 +76,61 @@ export default function DashboardPage() {
 
       <div className="grid lg:grid-cols-3 gap-4">
         <Reveal className="lg:col-span-2">
+          <Card className="card-hover">
+            <SectionTitle title="Evolución de tu dinero total" />
+            {moneyEvolution.length === 0 ? (
+              <EmptyState
+                icon="📈"
+                title="Sin datos aún"
+                description="Añade tu primera medición en la pantalla de Dinero."
+                action={
+                  <Link href="/money" className="btn-primary">
+                    Ir a Dinero
+                  </Link>
+                }
+              />
+            ) : (
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={moneyEvolution}>
+                    <defs>
+                      <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#064E3B" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#064E3B" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="#EEF0F4" vertical={false} />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} />
+                    <YAxis axisLine={false} tickLine={false} />
+                    <Tooltip
+                      formatter={(v: number) => formatMoney(v)}
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: "1px solid #EEF0F4",
+                      }}
+                    />
+                    <Area
+                      dataKey="total"
+                      stroke="#064E3B"
+                      fill="url(#dg)"
+                      strokeWidth={2.5}
+                      dot={{ fill: "#064E3B", r: 3 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Card>
+        </Reveal>
+
+        <Reveal delay={0.06}>
+          <Card className="card-hover">
+            <SectionTitle title="Tendencia de gastos" />
+            <SpendingTrend />
+          </Card>
+        </Reveal>
+
+        <Reveal delay={0.12} className="lg:col-span-2">
           <Card className="card-hover h-full">
             <SectionTitle title="Foco de hoy" />
             <p className="text-rumbo-ink">
@@ -89,102 +145,54 @@ export default function DashboardPage() {
           </Card>
         </Reveal>
 
-        <Reveal delay={0.06}>
-        <Card className="card-hover">
-          <SectionTitle title="Resumen" />
-          <ul className="text-sm space-y-2">
-            <li className="flex justify-between">
-              <span className="text-rumbo-muted">Objetivos</span>
-              <span className="font-medium">{goals.length}</span>
-            </li>
-            <li className="flex justify-between">
-              <span className="text-rumbo-muted">Tareas pendientes</span>
-              <span className="font-medium">
-                {tasks.filter((t) => t.status !== "completada").length}
-              </span>
-            </li>
-            <li className="flex justify-between">
-              <span className="text-rumbo-muted">Tareas completadas</span>
-              <span className="font-medium">
-                {tasks.filter((t) => t.status === "completada").length}
-              </span>
-            </li>
-            <li className="flex justify-between">
-              <span className="text-rumbo-muted">Mediciones de dinero</span>
-              <span className="font-medium">{snapshots.length}</span>
-            </li>
-          </ul>
-        </Card>
+        <Reveal delay={0.18}>
+          <Card className="card-hover">
+            <SectionTitle title="Resumen" />
+            <ul className="text-sm space-y-2">
+              <li className="flex justify-between">
+                <span className="text-rumbo-muted">Objetivos</span>
+                <span className="font-medium">{goals.length}</span>
+              </li>
+              <li className="flex justify-between">
+                <span className="text-rumbo-muted">Tareas pendientes</span>
+                <span className="font-medium">
+                  {tasks.filter((t) => t.status !== "completada").length}
+                </span>
+              </li>
+              <li className="flex justify-between">
+                <span className="text-rumbo-muted">Tareas completadas</span>
+                <span className="font-medium">
+                  {tasks.filter((t) => t.status === "completada").length}
+                </span>
+              </li>
+              <li className="flex justify-between">
+                <span className="text-rumbo-muted">Mediciones de dinero</span>
+                <span className="font-medium">{snapshots.length}</span>
+              </li>
+            </ul>
+          </Card>
         </Reveal>
 
-        <Reveal delay={0.12} className="lg:col-span-2">
-        <Card className="card-hover">
-          <SectionTitle title="Evolución de tu dinero total" />
-          {moneyEvolution.length === 0 ? (
-            <EmptyState
-              icon="📈"
-              title="Sin datos aún"
-              description="Añade tu primera medición en la pantalla de Dinero."
-              action={
-                <Link href="/money" className="btn-primary">
-                  Ir a Dinero
-                </Link>
-              }
-            />
-          ) : (
-            <div className="h-56">
+        <Reveal delay={0.24} className="lg:col-span-3">
+          <Card className="card-hover">
+            <SectionTitle title="Tareas completadas (esta semana)" />
+            <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={moneyEvolution}>
-                  <defs>
-                    <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#064E3B" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#064E3B" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={completedByWeek}>
                   <CartesianGrid stroke="#EEF0F4" vertical={false} />
-                  <XAxis dataKey="date" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
                   <Tooltip
-                    formatter={(v: number) => formatMoney(v)}
                     contentStyle={{
                       borderRadius: 12,
                       border: "1px solid #EEF0F4",
                     }}
                   />
-                  <Area
-                    dataKey="total"
-                    stroke="#064E3B"
-                    fill="url(#dg)"
-                    strokeWidth={2.5}
-                    dot={{ fill: "#064E3B", r: 3 }}
-                  />
-                </AreaChart>
+                  <Bar dataKey="v" fill="#0B1220" radius={[6, 6, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
-          )}
-        </Card>
-        </Reveal>
-
-        <Reveal delay={0.18}>
-        <Card className="card-hover">
-          <SectionTitle title="Completadas (semana)" />
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={completedByWeek}>
-                <CartesianGrid stroke="#EEF0F4" vertical={false} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid #EEF0F4",
-                  }}
-                />
-                <Bar dataKey="v" fill="#0B1220" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+          </Card>
         </Reveal>
       </div>
     </div>

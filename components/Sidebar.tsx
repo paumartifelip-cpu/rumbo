@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
 import { useRumbo } from "@/lib/store";
@@ -41,14 +42,32 @@ export function Sidebar() {
               key={it.href}
               href={it.href}
               className={cn(
-                "nav-item group relative",
-                active && "nav-item-active"
+                "nav-item group relative transition-colors duration-200",
+                active ? "nav-item-active" : "hover:bg-slate-50"
               )}
             >
-              <span className="text-base leading-none transition-transform duration-200 group-hover:scale-110">
+              {active && (
+                <motion.div
+                  layoutId="active-nav"
+                  className="absolute inset-0 bg-rumbo-ink rounded-xl -z-10"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <motion.span 
+                whileHover={{ scale: 1.2, rotate: 5 }}
+                className={cn(
+                  "text-lg leading-none transition-colors",
+                  active ? "text-white" : "text-rumbo-muted group-hover:text-rumbo-ink"
+                )}
+              >
                 {it.icon}
+              </motion.span>
+              <span className={cn(
+                "font-medium transition-colors",
+                active ? "text-white" : "text-rumbo-muted group-hover:text-rumbo-ink"
+              )}>
+                {it.label}
               </span>
-              <span className="font-medium">{it.label}</span>
             </Link>
           );
         })}

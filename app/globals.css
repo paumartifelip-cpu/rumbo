@@ -61,7 +61,7 @@ body {
            hover:bg-slate-100 hover:text-rumbo-ink hover:translate-x-0.5;
   }
   .nav-item-active {
-    @apply bg-rumbo-ink text-white shadow-soft hover:bg-rumbo-ink hover:text-white hover:translate-x-0;
+    @apply text-white shadow-soft hover:translate-x-0;
   }
 }
 
