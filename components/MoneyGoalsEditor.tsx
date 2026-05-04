@@ -14,6 +14,7 @@ export function MoneyGoalsEditor() {
     total_target: onboarding?.total_target ?? 0,
     current_monthly_income: onboarding?.current_monthly_income ?? 0,
     monthly_target: onboarding?.monthly_target ?? 0,
+    income_type: onboarding?.income_type ?? "salariado",
     target_date: onboarding?.target_date ?? new Date().toISOString(),
   });
 
@@ -23,6 +24,7 @@ export function MoneyGoalsEditor() {
       total_target: onboarding?.total_target ?? 0,
       current_monthly_income: onboarding?.current_monthly_income ?? 0,
       monthly_target: onboarding?.monthly_target ?? 0,
+      income_type: onboarding?.income_type ?? "salariado",
       target_date: onboarding?.target_date ?? new Date().toISOString(),
     });
     setEditing(true);
@@ -79,6 +81,14 @@ export function MoneyGoalsEditor() {
             value={onboarding?.monthly_target ?? 0}
             suffix="/ mes"
           />
+          <div className="md:col-span-2 pt-2 border-t border-rumbo-line mt-2">
+            <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">Situación laboral</div>
+            <div className="text-sm font-medium text-rumbo-ink mt-1">
+              {onboarding?.income_type === "empresario" 
+                ? "🚀 Empresario (empiezas de 0 cada mes)" 
+                : "💼 Salariado (tienes un sueldo base fijo)"}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -102,6 +112,31 @@ export function MoneyGoalsEditor() {
             value={form.monthly_target ?? 0}
             onChange={(v) => setForm({ ...form, monthly_target: v })}
           />
+          <div className="md:col-span-2">
+            <label className="label">¿Cuál es tu situación laboral?</label>
+            <div className="flex flex-col sm:flex-row gap-4 mt-2">
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg border border-rumbo-line hover:bg-slate-50 transition-colors">
+                <input
+                  type="radio"
+                  name="income_type"
+                  checked={form.income_type === "salariado"}
+                  onChange={() => setForm({ ...form, income_type: "salariado" })}
+                  className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-sm">💼 Tengo un salario fijo</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer p-2 rounded-lg border border-rumbo-line hover:bg-slate-50 transition-colors">
+                <input
+                  type="radio"
+                  name="income_type"
+                  checked={form.income_type === "empresario"}
+                  onChange={() => setForm({ ...form, income_type: "empresario" })}
+                  className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span className="text-sm">🚀 Soy empresario / Empiezo de 0</span>
+              </label>
+            </div>
+          </div>
           <div className="md:col-span-2">
             <label className="label">Fecha objetivo</label>
             <input

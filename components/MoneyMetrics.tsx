@@ -17,8 +17,9 @@ export function MoneyMetrics({ compact = false }: { compact?: boolean }) {
 
   // Ingresos del mes actual a partir de movimientos en finances + sueldo base.
   const now = new Date();
+  const isEntrepreneur = onboarding?.income_type === "empresario";
   const monthIncome =
-    (onboarding?.current_monthly_income ?? 0) +
+    (isEntrepreneur ? 0 : (onboarding?.current_monthly_income ?? 0)) +
     finances
       .filter(
         (f) =>

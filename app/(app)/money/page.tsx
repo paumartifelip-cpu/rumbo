@@ -70,15 +70,9 @@ export default function MoneyPage() {
         </div>
       </Reveal>
 
-      <Reveal delay={0.05}>
-        <div className="mb-6">
-          <MonthlyIncome />
-        </div>
-      </Reveal>
-
       <Reveal delay={0.08}>
         <div className="mb-6">
-          <MoneyGoalsEditor />
+          <MonthlyIncome />
         </div>
       </Reveal>
 
@@ -155,7 +149,7 @@ export default function MoneyPage() {
       </Reveal>
 
       <Reveal delay={0.12}>
-      <Card className="card-hover">
+      <Card className="card-hover mb-6">
         <SectionTitle title="Tus mediciones" />
         {sorted.length === 0 ? (
           <EmptyState
@@ -187,8 +181,8 @@ export default function MoneyPage() {
                       <span
                         className={
                           diff >= 0
-                            ? "text-emerald-600 text-sm font-medium"
-                            : "text-rose-600 text-sm font-medium"
+                            ? "text-green-900 text-sm font-bold"
+                            : "text-red-600 text-sm font-black"
                         }
                       >
                         {diff >= 0 ? "+" : ""}
@@ -197,7 +191,7 @@ export default function MoneyPage() {
                     )}
                     <button
                       onClick={() => removeSnapshot(s.id)}
-                      className="text-rumbo-muted hover:text-rose-600"
+                      className="text-rumbo-muted hover:text-red-600"
                       aria-label="Eliminar"
                     >
                       ✕
@@ -209,6 +203,12 @@ export default function MoneyPage() {
           </div>
         )}
       </Card>
+      </Reveal>
+
+      <Reveal delay={0.15}>
+        <div className="mb-10">
+          <MoneyGoalsEditor />
+        </div>
       </Reveal>
     </div>
   );

@@ -78,6 +78,7 @@ export interface OnboardingData {
   total_target: number;         // total que quieres tener
   current_monthly_income: number; // lo que ganas/cobras al mes hoy
   monthly_target: number;       // lo que quieres ganar al mes
+  income_type?: "salariado" | "empresario";
   target_date: string;
 }
 

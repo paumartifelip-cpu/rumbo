@@ -24,8 +24,9 @@ export function MoneyHero() {
   const totalTarget = onboarding?.total_target ?? 0;
 
   const now = new Date();
+  const isEntrepreneur = onboarding?.income_type === "empresario";
   const monthIncome =
-    (onboarding?.current_monthly_income ?? 0) +
+    (isEntrepreneur ? 0 : (onboarding?.current_monthly_income ?? 0)) +
     finances
       .filter(
         (f) =>

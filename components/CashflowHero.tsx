@@ -73,8 +73,9 @@ export function CashflowHero({ selectedDate }: { selectedDate: Date }) {
   const cards = useMemo(
     () =>
       SPECS.map((spec) => {
+        const isEntrepreneur = onboarding?.income_type === "empresario";
         const baseSalary =
-          (spec.includeBaseSalary || spec.kind === "ahorro")
+          (spec.includeBaseSalary || spec.kind === "ahorro") && !isEntrepreneur
             ? onboarding?.current_monthly_income ?? 0
             : 0;
 
@@ -101,7 +102,7 @@ export function CashflowHero({ selectedDate }: { selectedDate: Date }) {
               .toLocaleDateString("es-ES", { month: "short" })
               .replace(".", "");
             const base =
-              (spec.includeBaseSalary || spec.kind === "ahorro")
+              (spec.includeBaseSalary || spec.kind === "ahorro") && !onboarding?.income_type || onboarding?.income_type === "salariado"
                 ? onboarding?.current_monthly_income ?? 0
                 : 0;
             const total =
