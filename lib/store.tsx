@@ -26,6 +26,7 @@ import {
   Profile,
   setCurrentProfileId,
   updateProfileCurrency,
+  updateProfileLocally,
 } from "./profiles";
 import { pullFromSupabase, pushToSupabase, SyncSnapshot } from "./sync";
 import { getSupabase, supabaseEnabled } from "./supabase";
@@ -165,10 +166,16 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     // yet on the server are preserved (so a device with offline-only history
     // doesn't get wiped the first time it syncs). Edits to the same id keep
     // the remote version; pure-local items survive.
-    const mergeById = <T extends { id: string }>(local: T[], rem: T[]): T[] => {
+    const mergeById = <T extends { id: string; created_at?: string }>(local: T[], rem: T[]): T[] => {
       const map = new Map<string, T>();
       for (const r of rem) map.set(r.id, r);
-      for (const l of local) if (!map.has(l.id)) map.set(l.id, l);
+      for (const l of local) {
+        if (!map.has(l.id)) {
+          if (!cur.lastSyncAt || (l.created_at && l.created_at > cur.lastSyncAt)) {
+            map.set(l.id, l);
+          }
+        }
+      }
       return Array.from(map.values());
     };
 
@@ -201,6 +208,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         // ignore
       }
     }
+    if (remote.profileMeta) {
+      try {
+        updateProfileLocally({ ...remote.profileMeta, id: p.id });
+      } catch {
+        // ignore
+      }
+    }
     setState((s) => ({
       ...s,
       goals: mergedGoals,
@@ -212,7 +226,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       user: {
         ...mockUser,
         id: p.user_id,
-        name: mergedOnboarding?.name || p.name,
+        name: remote.profileMeta?.name || mergedOnboarding?.name || p.name,
         email: p.email ?? "",
       },
       primaryCurrency: remote.primaryCurrency ?? s.primaryCurrency,
@@ -319,7 +333,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated || !profile) return;
     try {
-      const { prioritizing, syncStatus, lastSyncAt, ...persisted } = state;
+      const { prioritizing, syncStatus, ...persisted } = state;
       localStorage.setItem(
         storageKeyFor(profile.id),
         JSON.stringify(persisted)

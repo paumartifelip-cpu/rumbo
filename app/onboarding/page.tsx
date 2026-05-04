@@ -66,6 +66,13 @@ export default function OnboardingPage() {
       set: (v: number) => setData({ ...data, monthly_target: v }),
     },
     {
+      title: "¿Cuál es tu situación laboral?",
+      hint: "Para saber cómo tratar tus ingresos cada mes.",
+      kind: "income_type" as const,
+      get: () => data.income_type ?? "salariado",
+      set: (v: string) => setData({ ...data, income_type: v as any }),
+    },
+    {
       title: "¿Para cuándo quieres lograrlo?",
       hint: "Una fecha objetivo para medir tu ritmo.",
       kind: "date" as const,
@@ -87,16 +94,24 @@ export default function OnboardingPage() {
   }
   function finish() {
     saveOnboarding(data);
-    router.push("/today");
+    router.push("/dashboard");
+  }
+  function skip() {
+    router.push("/dashboard");
   }
 
   return (
     <div className="min-h-screen flex flex-col">
       <header className="px-6 md:px-10 py-5 flex items-center justify-between">
         <Logo />
-        <span className="text-sm text-rumbo-muted">
-          {step + 1} / {total}
-        </span>
+        <div className="flex items-center gap-6">
+          <button onClick={skip} className="text-sm font-medium text-rumbo-muted hover:text-rumbo-ink transition-colors">
+            Dejar para más tarde
+          </button>
+          <span className="text-sm text-rumbo-muted">
+            {step + 1} / {total}
+          </span>
+        </div>
       </header>
 
       <div className="px-6 md:px-10 max-w-lg w-full mx-auto pt-8 md:pt-16 flex-1">
@@ -123,10 +138,11 @@ export default function OnboardingPage() {
             <div className="mt-8">
               {current.kind === "text" && (
                 <input
-                  className="input text-xl"
+                  className="input text-xl w-full"
                   placeholder={current.placeholder}
                   value={current.get() as string}
                   onChange={(e) => current.set(e.target.value as never)}
+                  onKeyDown={(e) => { if (e.key === "Enter") next(); }}
                   autoFocus
                 />
               )}
@@ -138,7 +154,7 @@ export default function OnboardingPage() {
                     return (
                       <button
                         key={c}
-                        onClick={() => setPrimaryCurrency(c)}
+                        onClick={() => { setPrimaryCurrency(c); setTimeout(next, 300); }}
                         className={`flex items-center gap-3 px-4 py-4 rounded-xl border transition-all text-left ${
                           active
                             ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
@@ -162,12 +178,31 @@ export default function OnboardingPage() {
                   value={current.get() as number}
                   onChange={(v) => current.set(v as never)}
                   symbol={currencyMeta.symbol}
+                  onEnter={next}
                 />
+              )}
+              {current.kind === "income_type" && (
+                <div className="flex flex-col gap-3">
+                  <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${current.get() === "salariado" ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+                    <input type="radio" name="income_type" checked={current.get() === "salariado"} onChange={() => current.set("salariado" as never)} className="mt-1" />
+                    <div>
+                      <div className="font-semibold">💼 Salariado (sueldo fijo)</div>
+                      <div className="text-sm text-rumbo-muted mt-1">Ganas una cantidad estable mes a mes.</div>
+                    </div>
+                  </label>
+                  <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-colors ${current.get() === "empresario" ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+                    <input type="radio" name="income_type" checked={current.get() === "empresario"} onChange={() => current.set("empresario" as never)} className="mt-1" />
+                    <div>
+                      <div className="font-semibold">🚀 Empresario / Freelance</div>
+                      <div className="text-sm text-rumbo-muted mt-1">Empiezas el mes en 0 y tus ingresos varían.</div>
+                    </div>
+                  </label>
+                </div>
               )}
               {current.kind === "date" && (
                 <input
                   type="date"
-                  className="input text-xl"
+                  className="input text-xl w-full"
                   value={current.get() as string}
                   onChange={(e) => current.set(e.target.value as never)}
                 />
@@ -176,7 +211,7 @@ export default function OnboardingPage() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="flex justify-between items-center mt-12">
+        <div className="flex justify-between items-center mt-12 pb-10">
           <button
             className="btn-ghost"
             onClick={back}
@@ -197,19 +232,24 @@ function Money({
   value,
   onChange,
   symbol,
+  onEnter,
 }: {
   value: number;
   onChange: (v: number) => void;
   symbol: string;
+  onEnter?: () => void;
 }) {
   return (
     <div className="relative">
       <input
         type="number"
         inputMode="numeric"
-        className="input text-3xl font-semibold pr-12 py-4"
+        className="input text-3xl font-semibold w-full pr-12 py-4"
         value={Number.isFinite(value) ? value : 0}
         onChange={(e) => onChange(Number(e.target.value) || 0)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && onEnter) onEnter();
+        }}
         autoFocus
       />
       <span className="absolute right-5 top-1/2 -translate-y-1/2 text-rumbo-muted text-2xl">

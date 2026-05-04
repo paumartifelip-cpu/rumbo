@@ -6,6 +6,7 @@ import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { CashflowHero } from "@/components/CashflowHero";
 import { SpendingTrend } from "@/components/SpendingTrend";
 import { SpendingDonut } from "@/components/SpendingDonut";
+import { DailyExpensesChart } from "@/components/DailyExpensesChart";
 import { Reveal } from "@/components/Reveal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
@@ -400,6 +401,22 @@ export default function GastosPage() {
                 })}
               </div>
             )}
+          </Card>
+        </Reveal>
+      </div>
+
+      {/* Ritmo diario */}
+      <div className="mb-6">
+        <Reveal delay={0.14}>
+          <Card className="card-hover">
+            <SectionTitle 
+              title="Gastos por día" 
+              hint={`Distribución de tus gastos durante ${month}`} 
+            />
+            <DailyExpensesChart 
+              expenses={thisMonth} 
+              selectedDate={selectedDate} 
+            />
           </Card>
         </Reveal>
       </div>

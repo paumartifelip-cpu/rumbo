@@ -97,12 +97,21 @@ export async function pullFromSupabase(
           total_target: Number(profile.total_target ?? 0),
           current_monthly_income: Number(profile.current_monthly_income ?? 0),
           monthly_target: Number(profile.monthly_target ?? 0),
+          income_type: profile.income_type as "salariado" | "empresario" | undefined,
           target_date: profile.target_date ?? new Date().toISOString(),
         }
       : undefined;
     const primaryCurrency = isCurrency(profile?.primary_currency)
       ? profile.primary_currency
       : undefined;
+
+    const profileMeta = profile ? {
+      id: profile.profile_id ?? profile.user_id,
+      name: profile.name ?? "Sin nombre",
+      initials: profile.initials ?? "?",
+      color: profile.color ?? "from-slate-200 to-slate-400",
+      emoji: profile.emoji ?? undefined,
+    } : undefined;
 
     return {
       goals: (g.data ?? []).map(normalizeGoal),
@@ -111,6 +120,7 @@ export async function pullFromSupabase(
       snapshots: (s.data ?? []).map(normalizeSnapshot),
       onboarding,
       primaryCurrency,
+      profileMeta,
     };
   } catch (e) {
     console.warn("Supabase pull threw", e);
@@ -149,6 +159,7 @@ export async function pushToSupabase(
         profileRow.total_target            = snap.onboarding.total_target;
         profileRow.current_monthly_income  = snap.onboarding.current_monthly_income;
         profileRow.monthly_target          = snap.onboarding.monthly_target;
+        profileRow.income_type             = snap.onboarding.income_type;
         profileRow.target_date             = snap.onboarding.target_date;
       }
       if (snap.primaryCurrency) {
@@ -161,14 +172,14 @@ export async function pushToSupabase(
     }
 
     await Promise.all([
-      replaceTable(userId, "goals", snap.goals.map(stripGoal(userId))),
-      replaceTable(userId, "tasks", snap.tasks.map(stripTask(userId))),
-      replaceTable(
+      syncTable(userId, "goals", snap.goals.map(stripGoal(userId))),
+      syncTable(userId, "tasks", snap.tasks.map(stripTask(userId))),
+      syncTable(
         userId,
         "financial_entries",
         snap.finances.map(stripFinance(userId))
       ),
-      replaceTable(
+      syncTable(
         userId,
         "money_snapshots",
         snap.snapshots.map(stripSnapshot(userId))
@@ -182,13 +193,22 @@ export async function pushToSupabase(
   }
 }
 
-async function replaceTable(userId: string, table: string, rows: any[]) {
+async function syncTable(userId: string, table: string, rows: any[]) {
   const supa = getSupabase()!;
-  const { error: de } = await supa.from(table).delete().eq("user_id", userId);
-  if (de) console.warn(`${table} delete error`, de);
-  if (rows.length === 0) return;
-  const { error: ie } = await supa.from(table).insert(rows);
-  if (ie) console.warn(`${table} insert error`, ie);
+  const { data } = await supa.from(table).select("id").eq("user_id", userId);
+  const remoteIds = new Set((data || []).map((r: any) => r.id));
+  const localIds = new Set(rows.map((r) => r.id));
+  const idsToDelete = [...remoteIds].filter((id) => !localIds.has(id));
+
+  if (idsToDelete.length > 0) {
+    const { error: de } = await supa.from(table).delete().in("id", idsToDelete);
+    if (de) console.warn(`${table} delete error`, de);
+  }
+
+  if (rows.length > 0) {
+    const { error: ie } = await supa.from(table).upsert(rows);
+    if (ie) console.warn(`${table} upsert error`, ie);
+  }
 }
 
 /**

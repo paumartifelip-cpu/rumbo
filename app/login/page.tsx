@@ -11,9 +11,10 @@ import {
   addCustomProfile,
   getAllProfiles,
   removeCustomProfile,
-  syncProfileLocally,
+  syncRegistryLocally,
 } from "@/lib/profiles";
 import { CURRENCIES, Currency } from "@/lib/currency";
+import { getSupabase } from "@/lib/supabase";
 import { deleteProfileFromSupabase, pullProfileRegistry, pushToSupabase } from "@/lib/sync";
 import {
   checkPin,
@@ -39,13 +40,29 @@ export default function LoginPage() {
   }, [profile, router]);
 
   useEffect(() => {
-    // Load local profiles immediately, then merge with remote registry.
+    const refreshProfiles = () => {
+      pullProfileRegistry().then((remote) => {
+        if (!remote) return;
+        syncRegistryLocally(remote);
+        setProfiles(getAllProfiles());
+      });
+    };
+
     setProfiles(getAllProfiles());
-    pullProfileRegistry().then((remote) => {
-      if (!remote) return;
-      remote.forEach(syncProfileLocally);
-      setProfiles(getAllProfiles());
-    });
+    refreshProfiles();
+
+    const supa = getSupabase();
+    if (!supa) return;
+
+    const channel = supa.channel('public:profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        refreshProfiles();
+      })
+      .subscribe();
+
+    return () => {
+      supa.removeChannel(channel);
+    };
   }, []);
 
   function pick(p: Profile) {
@@ -62,20 +79,21 @@ export default function LoginPage() {
     enter(p);
   }
 
-  function enter(p: Profile) {
+  function enter(p: Profile, isNew = false) {
     markVerified(p.id);
     signIn(p.id);
-    router.push("/dashboard");
+    router.push(isNew ? "/onboarding" : "/dashboard");
   }
 
   function handlePinSuccess(pin: string) {
     if (!pendingProfile) return;
-    if (pinMode === "create") {
+    const isNew = pinMode === "create";
+    if (isNew) {
       setPin(pendingProfile.id, pin);
     } else {
       markVerified(pendingProfile.id);
     }
-    enter(pendingProfile);
+    enter(pendingProfile, isNew);
     setPendingProfile(null);
   }
 

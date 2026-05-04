@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, PageHeader, SectionTitle } from "@/components/Card";
+import { PageHeader } from "@/components/Card";
+import { SettingsAccordion } from "@/components/SettingsAccordion";
 import { PinModal } from "@/components/PinModal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { supabaseEnabled } from "@/lib/supabase";
@@ -30,6 +31,12 @@ export default function SettingsPage() {
     primaryCurrency,
     setPrimaryCurrency,
   } = useRumbo();
+
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  function toggleSection(id: string) {
+    setActiveSection((prev) => (prev === id ? null : id));
+  }
 
   // Latest snapshot total = the same figure shown in the money evolution chart
   const latestTotal = snapshots.length
@@ -113,12 +120,15 @@ export default function SettingsPage() {
     <div>
       <PageHeader title="Ajustes" subtitle="Tu cuenta, IA y plan." />
 
-      <div className="grid gap-4">
-        <Card>
-          <SectionTitle
-            title="Moneda principal"
-            hint="Todos los totales se mostrarán en esta moneda. Puedes elegir otra al añadir un gasto o ingreso."
-          />
+      <div className="flex flex-col gap-3">
+        <SettingsAccordion
+          id="currency"
+          title="Moneda principal"
+          icon="🌍"
+          hint="Todos los totales se mostrarán en esta moneda. Puedes elegir otra al añadir un gasto."
+          activeId={activeSection}
+          onToggle={toggleSection}
+        >
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {(Object.keys(CURRENCIES) as Currency[]).map((c) => {
               const meta = CURRENCIES[c];
@@ -144,14 +154,17 @@ export default function SettingsPage() {
               );
             })}
           </div>
-        </Card>
+        </SettingsAccordion>
 
-        <Card>
-          <SectionTitle
-            title="Inteligencia artificial"
-            hint="Pega tu API key de Gemini para que la app priorice tus tareas con IA real."
-          />
-          <div className="grid gap-3">
+        <SettingsAccordion
+          id="ai"
+          title="Inteligencia artificial"
+          icon="🤖"
+          hint="Configura Gemini u OpenAI para priorizar tareas automáticamente."
+          activeId={activeSection}
+          onToggle={toggleSection}
+        >
+          <div className="grid gap-5">
             <div>
               <label className="label">API key de Gemini</label>
               <div className="flex gap-2 mt-1">
@@ -191,7 +204,7 @@ export default function SettingsPage() {
               )}
             </div>
 
-            <div className={`mt-2 p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${savedKey ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${savedKey ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
               <div>
                 <div className="font-bold flex items-center gap-2 text-sm">
                   {savedKey ? "✅ IA Activa y Conectada" : "⚠️ IA Inactiva"}
@@ -207,7 +220,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="border-t border-slate-100 pt-4 mt-2">
+            <div className="border-t border-rumbo-line pt-5">
               <label className="label">API key de OpenAI (ChatGPT)</label>
               <div className="flex gap-2 mt-1">
                 <input
@@ -244,7 +257,7 @@ export default function SettingsPage() {
               )}
             </div>
 
-            <div className={`mt-2 p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${savedGptKey ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
+            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${savedGptKey ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
               <div>
                 <div className="font-bold flex items-center gap-2 text-sm">
                   {savedGptKey ? "✅ OpenAI Configurado" : "⚪️ OpenAI Opcional"}
@@ -260,37 +273,43 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </Card>
+        </SettingsAccordion>
 
-        <Card>
-          <SectionTitle title="Cuenta" />
-          <div className="grid gap-2 text-sm">
-            <div>
-              <span className="text-rumbo-muted">Nombre:</span>{" "}
+        <SettingsAccordion
+          id="account"
+          title="Mi Cuenta"
+          icon="👤"
+          hint="Gestiona tu información personal, patrimonio y objetivos."
+          activeId={activeSection}
+          onToggle={toggleSection}
+        >
+          <div className="grid gap-3 text-sm bg-white p-4 rounded-xl border border-rumbo-line">
+            <div className="flex justify-between items-center py-1 border-b border-slate-100">
+              <span className="text-rumbo-muted">Nombre</span>
               <span className="font-medium">{user.name || "—"}</span>
             </div>
-            <div>
-              <span className="text-rumbo-muted">Tienes en total:</span>{" "}
+            <div className="flex justify-between items-center py-1 border-b border-slate-100">
+              <span className="text-rumbo-muted">Tienes en total</span>
               <span className="font-medium">
                 {latestTotal != null ? formatMoney(latestTotal) : "—"}
               </span>
             </div>
-            <div>
-              <span className="text-rumbo-muted">Objetivo total:</span>{" "}
+            <div className="flex justify-between items-center py-1 border-b border-slate-100">
+              <span className="text-rumbo-muted">Objetivo total</span>
               <span className="font-medium">
                 {onboarding?.total_target ? formatMoney(onboarding.total_target) : "—"}
               </span>
             </div>
-            <div>
-              <span className="text-rumbo-muted">Cobras al mes:</span>{" "}
+            <div className="flex justify-between items-center py-1 border-b border-slate-100">
+              <span className="text-rumbo-muted">Cobras al mes</span>
               <span className="font-medium">
                 {onboarding?.current_monthly_income
                   ? `${formatMoney(onboarding.current_monthly_income)}/mes`
                   : "—"}
               </span>
             </div>
-            <div>
-              <span className="text-rumbo-muted">Objetivo mensual:</span>{" "}
+            <div className="flex justify-between items-center py-1">
+              <span className="text-rumbo-muted">Objetivo mensual</span>
               <span className="font-medium">
                 {onboarding?.monthly_target
                   ? `${formatMoney(onboarding.monthly_target)}/mes`
@@ -298,9 +317,9 @@ export default function SettingsPage() {
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 mt-4">
-            <a href="/onboarding" className="btn-soft">
-              Editar onboarding
+          <div className="flex flex-wrap gap-3 mt-5">
+            <a href="/onboarding" className="btn-primary">
+              Editar información
             </a>
             {profile && (
               <button
@@ -310,28 +329,31 @@ export default function SettingsPage() {
                 }}
                 className="btn-soft"
               >
-                Cambiar de usuario ({profile.name})
+                Cerrar sesión
               </button>
             )}
             <button onClick={resetDemo} className="btn-ghost text-rose-600">
-              Reiniciar mis datos
+              Borrar todos mis datos
             </button>
           </div>
-        </Card>
+        </SettingsAccordion>
 
-        <Card>
-          <SectionTitle
-            title="Seguridad"
-            hint={`PIN de 4 dígitos para entrar a esta cuenta. Si no entras durante ${PIN_THRESHOLD_DAYS} días, te lo pediremos otra vez.`}
-          />
-          <div className="flex items-center justify-between flex-wrap gap-3">
+        <SettingsAccordion
+          id="security"
+          title="Seguridad"
+          icon="🔒"
+          hint={`Añade un PIN de 4 dígitos para bloquear tu app tras ${PIN_THRESHOLD_DAYS} días.`}
+          activeId={activeSection}
+          onToggle={toggleSection}
+        >
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="text-sm">
               <div className="font-medium flex items-center gap-2">
                 {pinHasValue ? "PIN activado 🔒" : "Sin PIN"}
               </div>
-              <div className="text-rumbo-muted text-xs mt-0.5">
+              <div className="text-rumbo-muted text-xs mt-1 max-w-sm">
                 {pinHasValue
-                  ? "Tendrás que escribirlo después de 7 días sin entrar."
+                  ? `Tendrás que escribirlo después de ${PIN_THRESHOLD_DAYS} días sin entrar.`
                   : "Crea uno para que nadie más pueda abrir tu cuenta."}
               </div>
             </div>
@@ -362,45 +384,48 @@ export default function SettingsPage() {
             </div>
           </div>
           {pinHint && (
-            <div className="text-emerald-600 text-sm mt-3">{pinHint}</div>
+            <div className="text-emerald-600 text-sm mt-3 bg-emerald-50 px-3 py-2 rounded-lg inline-block">{pinHint}</div>
           )}
-        </Card>
+        </SettingsAccordion>
 
-        <Card>
-          <SectionTitle title="Integraciones" />
-          <div className="grid gap-2 text-sm">
-            <div className="flex justify-between">
-              <span>Supabase</span>
-              <span
-                className={
-                  supabaseEnabled ? "text-emerald-600" : "text-rumbo-muted"
-                }
-              >
-                {supabaseEnabled ? "Conectado" : "Sin configurar"}
+        <SettingsAccordion
+          id="integrations"
+          title="Integraciones"
+          icon="🔌"
+          hint="Estado de conexión con servicios externos."
+          activeId={activeSection}
+          onToggle={toggleSection}
+        >
+          <div className="grid gap-3 text-sm">
+            <div className="flex justify-between items-center p-3 rounded-lg border border-rumbo-line bg-white">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${supabaseEnabled ? "bg-emerald-500" : "bg-slate-300"}`} />
+                <span className="font-medium">Supabase</span>
+              </div>
+              <span className={supabaseEnabled ? "text-emerald-600 font-medium" : "text-rumbo-muted"}>
+                {supabaseEnabled ? "Conectado (Tiempo real)" : "Desconectado"}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span>Gemini</span>
-              <span
-                className={
-                  savedKey ? "text-emerald-600" : "text-rumbo-muted"
-                }
-              >
-                {savedKey ? "Conectado" : "Pega tu API key arriba"}
+            <div className="flex justify-between items-center p-3 rounded-lg border border-rumbo-line bg-white">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${savedKey ? "bg-emerald-500" : "bg-slate-300"}`} />
+                <span className="font-medium">Google Gemini</span>
+              </div>
+              <span className={savedKey ? "text-emerald-600 font-medium" : "text-rumbo-muted"}>
+                {savedKey ? "API Key guardada" : "Falta configuración"}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span>OpenAI (ChatGPT)</span>
-              <span
-                className={
-                  savedGptKey ? "text-emerald-600" : "text-rumbo-muted"
-                }
-              >
-                {savedGptKey ? "Conectado" : "Opcional"}
+            <div className="flex justify-between items-center p-3 rounded-lg border border-rumbo-line bg-white">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${savedGptKey ? "bg-emerald-500" : "bg-slate-300"}`} />
+                <span className="font-medium">OpenAI</span>
+              </div>
+              <span className={savedGptKey ? "text-emerald-600 font-medium" : "text-rumbo-muted"}>
+                {savedGptKey ? "API Key guardada" : "Falta configuración"}
               </span>
             </div>
           </div>
-        </Card>
+        </SettingsAccordion>
       </div>
 
       {pinModal && profile && (

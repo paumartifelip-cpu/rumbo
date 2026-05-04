@@ -7,8 +7,18 @@ import { OnboardingData } from "@/lib/types";
 import { CURRENCIES } from "@/lib/currency";
 
 export function MoneyGoalsEditor() {
-  const { onboarding, updateOnboarding } = useRumbo();
+  const { onboarding, updateOnboarding, snapshots } = useRumbo();
   const [editing, setEditing] = useState(false);
+
+  // Compute the real total just like MoneyHero/DashboardHero
+  const sortedSnaps = [...snapshots].sort(
+    (a, b) => +new Date(a.date) - +new Date(b.date)
+  );
+  const hasSnapshots = sortedSnaps.length > 0;
+  const realTotal = hasSnapshots
+    ? sortedSnaps[sortedSnaps.length - 1].total
+    : (onboarding?.current_money ?? 0);
+
   const [form, setForm] = useState<Partial<OnboardingData>>({
     current_money: onboarding?.current_money ?? 0,
     total_target: onboarding?.total_target ?? 0,
@@ -65,7 +75,7 @@ export function MoneyGoalsEditor() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <ReadRow
             label="Tienes en total"
-            value={onboarding?.current_money ?? 0}
+            value={realTotal}
           />
           <ReadRow
             label="Quieres tener en total"
@@ -92,11 +102,22 @@ export function MoneyGoalsEditor() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field
-            label="Tienes en total"
-            value={form.current_money ?? 0}
-            onChange={(v) => setForm({ ...form, current_money: v })}
-          />
+          <div className="relative">
+            {hasSnapshots ? (
+              <>
+                <label className="label text-rumbo-muted">Tienes en total</label>
+                <div className="mt-1 text-lg font-semibold text-rumbo-muted opacity-60">
+                  Bloqueado (usa Dinero)
+                </div>
+              </>
+            ) : (
+              <Field
+                label="Tienes en total"
+                value={form.current_money ?? 0}
+                onChange={(v) => setForm({ ...form, current_money: v })}
+              />
+            )}
+          </div>
           <Field
             label="Quieres tener en total"
             value={form.total_target ?? 0}

@@ -193,19 +193,22 @@ export function findProfile(id: string | null): Profile | null {
   return getAllProfiles().find((p) => p.id === id) ?? null;
 }
 
-/**
- * Merges a profile discovered from the Supabase registry into local storage.
- * Default profiles are skipped (they're hardcoded). Custom profiles that don't
- * exist locally are written; existing ones are updated in-place.
- */
-export function syncProfileLocally(remote: Profile) {
-  if (DEFAULT_PROFILES.some((d) => d.id === remote.id)) return;
-  const customs = getCustomProfiles();
-  const idx = customs.findIndex((c) => c.id === remote.id);
-  if (idx >= 0) {
-    customs[idx] = { ...customs[idx], ...remote, custom: true };
-  } else {
-    customs.push({ ...remote, custom: true });
-  }
+export function syncRegistryLocally(remoteProfiles: Profile[]) {
+  const customs = remoteProfiles
+    .filter((p) => !DEFAULT_PROFILES.some((d) => d.id === p.id))
+    .map((p) => ({ ...p, custom: true }));
   writeCustomProfiles(customs);
+}
+
+export function updateProfileLocally(patch: Partial<Profile> & { id: string }) {
+  if (typeof window === "undefined") return;
+  const customs = getCustomProfiles();
+  const idx = customs.findIndex((p) => p.id === patch.id);
+  if (idx >= 0) {
+    customs[idx] = { ...customs[idx], ...patch };
+    writeCustomProfiles(customs);
+  } else {
+    // If it didn't exist in custom profiles, we don't do anything for now.
+    // Default profiles (Pau, Michelle) are read-only except for currency.
+  }
 }
