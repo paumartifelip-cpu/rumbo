@@ -227,6 +227,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         snapshots: mergedSnapshots,
         onboarding: mergedOnboarding,
         primaryCurrency: remote.primaryCurrency ?? cachedCurrency,
+        profileMeta: { id: p.id, name: p.name, initials: p.initials, color: p.color, emoji: p.emoji },
       }).then((ok) => {
         if (!ok) setState((s) => ({ ...s, syncStatus: "error" }));
       });
@@ -350,6 +351,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         snapshots: state.snapshots,
         onboarding: state.onboarding,
         primaryCurrency: state.primaryCurrency,
+        profileMeta: {
+          id: profile.id,
+          name: profile.name,
+          initials: profile.initials,
+          color: profile.color,
+          emoji: profile.emoji,
+        },
       });
       pushPendingRef.current = false;
       setState((s) => ({

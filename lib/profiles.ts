@@ -192,3 +192,20 @@ export function findProfile(id: string | null): Profile | null {
   if (!id) return null;
   return getAllProfiles().find((p) => p.id === id) ?? null;
 }
+
+/**
+ * Merges a profile discovered from the Supabase registry into local storage.
+ * Default profiles are skipped (they're hardcoded). Custom profiles that don't
+ * exist locally are written; existing ones are updated in-place.
+ */
+export function syncProfileLocally(remote: Profile) {
+  if (DEFAULT_PROFILES.some((d) => d.id === remote.id)) return;
+  const customs = getCustomProfiles();
+  const idx = customs.findIndex((c) => c.id === remote.id);
+  if (idx >= 0) {
+    customs[idx] = { ...customs[idx], ...remote, custom: true };
+  } else {
+    customs.push({ ...remote, custom: true });
+  }
+  writeCustomProfiles(customs);
+}

@@ -11,9 +11,10 @@ import {
   addCustomProfile,
   getAllProfiles,
   removeCustomProfile,
+  syncProfileLocally,
 } from "@/lib/profiles";
 import { CURRENCIES, Currency } from "@/lib/currency";
-import { deleteProfileFromSupabase } from "@/lib/sync";
+import { deleteProfileFromSupabase, pullProfileRegistry, pushToSupabase } from "@/lib/sync";
 import {
   checkPin,
   clearPin,
@@ -38,7 +39,13 @@ export default function LoginPage() {
   }, [profile, router]);
 
   useEffect(() => {
+    // Load local profiles immediately, then merge with remote registry.
     setProfiles(getAllProfiles());
+    pullProfileRegistry().then((remote) => {
+      if (!remote) return;
+      remote.forEach(syncProfileLocally);
+      setProfiles(getAllProfiles());
+    });
   }, []);
 
   function pick(p: Profile) {
@@ -80,6 +87,13 @@ export default function LoginPage() {
     setNewName("");
     setNewCurrency("EUR");
     setShowCreate(false);
+    // Push the new profile metadata to Supabase immediately so it appears
+    // on other devices without waiting for a full data sync.
+    pushToSupabase(created.user_id, {
+      goals: [], tasks: [], finances: [], snapshots: [],
+      primaryCurrency: newCurrency,
+      profileMeta: { id: created.id, name: created.name, initials: created.initials, color: created.color, emoji: created.emoji },
+    }).catch(() => {});
     setPendingProfile(created);
     setPinMode("create");
   }

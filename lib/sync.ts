@@ -1,4 +1,5 @@
 import { Currency } from "./currency";
+import { Profile } from "./profiles";
 import { getSupabase } from "./supabase";
 import {
   FinancialEntry,
@@ -15,10 +16,41 @@ export interface SyncSnapshot {
   snapshots: MoneySnapshot[];
   onboarding?: OnboardingData;
   primaryCurrency?: Currency;
+  profileMeta?: Pick<Profile, "id" | "name" | "initials" | "color" | "emoji">;
 }
 
 const isCurrency = (v: any): v is Currency =>
   v === "EUR" || v === "USD" || v === "MXN" || v === "ARS";
+
+const DEFAULT_PROFILE_IDS = new Set(["pau", "michelle"]);
+
+/**
+ * Pull the full list of profiles from Supabase so any device can discover all
+ * existing profiles without relying on localStorage.
+ */
+export async function pullProfileRegistry(): Promise<Profile[] | null> {
+  const supa = getSupabase();
+  if (!supa) return null;
+  try {
+    const { data, error } = await supa
+      .from("profiles")
+      .select("user_id, profile_id, name, initials, emoji, color, primary_currency")
+      .not("profile_id", "is", null);
+    if (error || !data) return null;
+    return (data as any[]).map((r): Profile => ({
+      id: r.profile_id,
+      user_id: r.user_id,
+      name: r.name ?? r.profile_id,
+      initials: r.initials ?? (r.name?.[0]?.toUpperCase() ?? "?"),
+      color: r.color ?? "from-slate-200 to-slate-400",
+      emoji: r.emoji ?? undefined,
+      primary_currency: isCurrency(r.primary_currency) ? r.primary_currency : undefined,
+      custom: !DEFAULT_PROFILE_IDS.has(r.profile_id),
+    }));
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Pull all data for a user from Supabase. Returns null if Supabase isn't
@@ -98,19 +130,26 @@ export async function pushToSupabase(
   if (!supa) return false;
 
   try {
-    // Profile (onboarding + primary currency) — upsert if either is present.
-    if (snap.onboarding || snap.primaryCurrency) {
+    // Profile row — upsert whenever there's anything to write.
+    if (snap.onboarding || snap.primaryCurrency || snap.profileMeta) {
       const profileRow: Record<string, any> = {
         user_id: userId,
         updated_at: new Date().toISOString(),
       };
+      if (snap.profileMeta) {
+        profileRow.profile_id = snap.profileMeta.id;
+        profileRow.name       = snap.profileMeta.name;
+        profileRow.initials   = snap.profileMeta.initials;
+        profileRow.color      = snap.profileMeta.color;
+        profileRow.emoji      = snap.profileMeta.emoji ?? null;
+      }
       if (snap.onboarding) {
-        profileRow.name = snap.onboarding.name ?? null;
-        profileRow.current_money = snap.onboarding.current_money;
-        profileRow.total_target = snap.onboarding.total_target;
-        profileRow.current_monthly_income = snap.onboarding.current_monthly_income;
-        profileRow.monthly_target = snap.onboarding.monthly_target;
-        profileRow.target_date = snap.onboarding.target_date;
+        profileRow.name                    = snap.onboarding.name ?? profileRow.name ?? null;
+        profileRow.current_money           = snap.onboarding.current_money;
+        profileRow.total_target            = snap.onboarding.total_target;
+        profileRow.current_monthly_income  = snap.onboarding.current_monthly_income;
+        profileRow.monthly_target          = snap.onboarding.monthly_target;
+        profileRow.target_date             = snap.onboarding.target_date;
       }
       if (snap.primaryCurrency) {
         profileRow.primary_currency = snap.primaryCurrency;
