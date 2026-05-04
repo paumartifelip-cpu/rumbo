@@ -134,71 +134,41 @@ export function MonthlyIncome() {
         hint="Apunta cada cobro o ingreso. Tu contador se actualiza al instante."
       />
 
-      <div className="grid md:grid-cols-[1.1fr_1fr] gap-5 items-stretch">
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-violet-50 border border-rumbo-line p-5">
-          <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">
-            Has ganado este mes
+      <div className="flex flex-col gap-6">
+        <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-violet-50 border border-rumbo-line p-8 text-center">
+          <div className="text-xs uppercase tracking-[0.2em] text-rumbo-muted font-bold mb-2">
+            Total ganado en {monthLabel.split(' ')[0]}
           </div>
           <motion.div
             key={earnedThisMonth}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-4xl md:text-5xl font-semibold tracking-tight tabular-nums mt-1.5"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-5xl md:text-7xl font-black tracking-tighter tabular-nums text-rumbo-ink"
           >
             {format(animated)}
           </motion.div>
+          
           {monthlyTarget > 0 && (
-            <>
-              <div className="text-sm text-rumbo-muted mt-1">
-                de {format(monthlyTarget)} ·{" "}
-                <span className="font-medium text-rumbo-ink">
-                  {Math.round(progress)}%
-                </span>
+            <div className="max-w-md mx-auto mt-6">
+              <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-2">
+                <span className="text-rumbo-muted">Meta: {format(monthlyTarget)}</span>
+                <span className="text-violet-600">{Math.round(progress)}%</span>
               </div>
-              <div className="mt-3">
-                <ProgressBar value={progress} tone="violet" />
+              <ProgressBar value={progress} tone="violet" />
+              <div className="text-sm text-rumbo-muted mt-3 font-medium">
+                {earnedThisMonth >= monthlyTarget 
+                  ? "🎉 ¡Objetivo conseguido!" 
+                  : `Faltan ${format(monthlyTarget - earnedThisMonth)} para tu meta`
+                }
               </div>
-              <div className="text-xs text-rumbo-muted mt-2">
-                Faltan {format(Math.max(0, monthlyTarget - earnedThisMonth))}{" "}
-                este mes
-              </div>
-            </>
+            </div>
           )}
+
           {baseSalary > 0 && (
-            <div className="text-xs text-rumbo-muted mt-3 border-t border-rumbo-line pt-3">
+            <div className="text-[10px] text-rumbo-muted mt-6 inline-block px-3 py-1 bg-white/50 rounded-full border border-rumbo-line">
               Incluye sueldo base de {format(baseSalary)}/mes
             </div>
           )}
-        </div>
-
-        <div className="rounded-2xl border border-rumbo-line p-3">
-          <div className="text-xs text-rumbo-muted px-2 pt-1">
-            Últimos 6 meses
-          </div>
-          <div className="h-36">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={last6}>
-                <CartesianGrid stroke="#EEF0F4" vertical={false} />
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fill: "#6B7280", fontSize: 11 }}
-                />
-                <YAxis hide />
-                <Tooltip
-                  formatter={(v: number) => format(v)}
-                  labelStyle={{ color: "#6B7280" }}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid #EEF0F4",
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="total" fill="#7C3AED" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
         </div>
       </div>
 
@@ -364,6 +334,38 @@ export function MonthlyIncome() {
             })
           )}
         </AnimatePresence>
+      </div>
+
+      {/* Historical Chart at bottom */}
+      <div className="mt-12 border-t border-rumbo-line pt-8">
+        <SectionTitle 
+          title="Histórico de ingresos" 
+          hint="Comparativa de los últimos 6 meses."
+        />
+        <div className="h-48 mt-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={last6}>
+              <CartesianGrid stroke="#EEF0F4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fill: "#6B7280", fontSize: 11 }}
+              />
+              <YAxis hide />
+              <Tooltip
+                formatter={(v: number) => format(v)}
+                labelStyle={{ color: "#6B7280" }}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "1px solid #EEF0F4",
+                  fontSize: 12,
+                }}
+              />
+              <Bar dataKey="total" fill="#7C3AED" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </Card>
   );
