@@ -34,7 +34,7 @@ export default function LoginPage() {
   const [newCurrency, setNewCurrency] = useState<Currency>("EUR");
 
   useEffect(() => {
-    if (profile) router.replace("/today");
+    if (profile) router.replace("/dashboard");
   }, [profile, router]);
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function LoginPage() {
   function enter(p: Profile) {
     markVerified(p.id);
     signIn(p.id);
-    router.push("/today");
+    router.push("/dashboard");
   }
 
   function handlePinSuccess(pin: string) {

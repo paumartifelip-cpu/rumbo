@@ -178,14 +178,28 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const mergedOnboarding = remote.onboarding ?? cur.onboarding;
 
     // If the merge added anything the server didn't have, push it back so
-    // the next device that pulls sees the same union.
+    // the next device that pulls sees the same union. Also push if this
+    // device has a primary currency the server hasn't recorded yet.
+    const cachedCurrency = stateRef.current.primaryCurrency;
+    const currencyMissingOnRemote =
+      !remote.primaryCurrency && Boolean(cachedCurrency);
     const localAddedItems =
       mergedGoals.length > remote.goals.length ||
       mergedTasks.length > remote.tasks.length ||
       mergedFinances.length > remote.finances.length ||
-      mergedSnapshots.length > remote.snapshots.length;
+      mergedSnapshots.length > remote.snapshots.length ||
+      currencyMissingOnRemote;
 
     justPulledRef.current = true;
+    // If the remote profile has a primary_currency, adopt it (and keep the
+    // local profile cache in sync so currency picks survive without Supabase).
+    if (remote.primaryCurrency) {
+      try {
+        updateProfileCurrency(p.id, remote.primaryCurrency);
+      } catch {
+        // ignore
+      }
+    }
     setState((s) => ({
       ...s,
       goals: mergedGoals,
@@ -200,6 +214,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         name: mergedOnboarding?.name || p.name,
         email: p.email ?? "",
       },
+      primaryCurrency: remote.primaryCurrency ?? s.primaryCurrency,
       syncStatus: "synced",
       lastSyncAt: new Date().toISOString(),
     }));
@@ -211,6 +226,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         finances: mergedFinances,
         snapshots: mergedSnapshots,
         onboarding: mergedOnboarding,
+        primaryCurrency: remote.primaryCurrency ?? cachedCurrency,
       }).then((ok) => {
         if (!ok) setState((s) => ({ ...s, syncStatus: "error" }));
       });
@@ -333,6 +349,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         finances: state.finances,
         snapshots: state.snapshots,
         onboarding: state.onboarding,
+        primaryCurrency: state.primaryCurrency,
       });
       pushPendingRef.current = false;
       setState((s) => ({
@@ -352,6 +369,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     state.finances,
     state.snapshots,
     state.onboarding,
+    state.primaryCurrency,
     profile,
     hydrated,
   ]);
@@ -385,13 +403,14 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     // 30s fallback poll (Realtime handles the fast path)
     const interval = setInterval(refresh, 30000);
 
-    // Supabase Realtime — listen to all 4 tables for this user.
+    // Supabase Realtime — listen to all 5 tables for this user.
     const channel = supa
       ?.channel(`rumbo-${profile.user_id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "financial_entries", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "goals", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "money_snapshots", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .subscribe();
 
     return () => {

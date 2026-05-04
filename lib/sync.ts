@@ -1,3 +1,4 @@
+import { Currency } from "./currency";
 import { getSupabase } from "./supabase";
 import {
   FinancialEntry,
@@ -13,7 +14,11 @@ export interface SyncSnapshot {
   finances: FinancialEntry[];
   snapshots: MoneySnapshot[];
   onboarding?: OnboardingData;
+  primaryCurrency?: Currency;
 }
+
+const isCurrency = (v: any): v is Currency =>
+  v === "EUR" || v === "USD" || v === "MXN" || v === "ARS";
 
 /**
  * Pull all data for a user from Supabase. Returns null if Supabase isn't
@@ -45,7 +50,15 @@ export async function pullFromSupabase(
     }
 
     const profile = p.data as any | null;
-    const onboarding: OnboardingData | undefined = profile
+    const hasOnboardingData =
+      profile &&
+      (profile.name != null ||
+        profile.current_money != null ||
+        profile.total_target != null ||
+        profile.current_monthly_income != null ||
+        profile.monthly_target != null ||
+        profile.target_date != null);
+    const onboarding: OnboardingData | undefined = hasOnboardingData
       ? {
           name: profile.name ?? "",
           current_money: Number(profile.current_money ?? 0),
@@ -55,6 +68,9 @@ export async function pullFromSupabase(
           target_date: profile.target_date ?? new Date().toISOString(),
         }
       : undefined;
+    const primaryCurrency = isCurrency(profile?.primary_currency)
+      ? profile.primary_currency
+      : undefined;
 
     return {
       goals: (g.data ?? []).map(normalizeGoal),
@@ -62,6 +78,7 @@ export async function pullFromSupabase(
       finances: (f.data ?? []).map(normalizeFinance),
       snapshots: (s.data ?? []).map(normalizeSnapshot),
       onboarding,
+      primaryCurrency,
     };
   } catch (e) {
     console.warn("Supabase pull threw", e);
@@ -81,21 +98,26 @@ export async function pushToSupabase(
   if (!supa) return false;
 
   try {
-    // Profile (onboarding) — upsert.
-    if (snap.onboarding) {
-      const { error: pe } = await supa.from("profiles").upsert(
-        {
-          user_id: userId,
-          name: snap.onboarding.name ?? null,
-          current_money: snap.onboarding.current_money,
-          total_target: snap.onboarding.total_target,
-          current_monthly_income: snap.onboarding.current_monthly_income,
-          monthly_target: snap.onboarding.monthly_target,
-          target_date: snap.onboarding.target_date,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      );
+    // Profile (onboarding + primary currency) — upsert if either is present.
+    if (snap.onboarding || snap.primaryCurrency) {
+      const profileRow: Record<string, any> = {
+        user_id: userId,
+        updated_at: new Date().toISOString(),
+      };
+      if (snap.onboarding) {
+        profileRow.name = snap.onboarding.name ?? null;
+        profileRow.current_money = snap.onboarding.current_money;
+        profileRow.total_target = snap.onboarding.total_target;
+        profileRow.current_monthly_income = snap.onboarding.current_monthly_income;
+        profileRow.monthly_target = snap.onboarding.monthly_target;
+        profileRow.target_date = snap.onboarding.target_date;
+      }
+      if (snap.primaryCurrency) {
+        profileRow.primary_currency = snap.primaryCurrency;
+      }
+      const { error: pe } = await supa
+        .from("profiles")
+        .upsert(profileRow, { onConflict: "user_id" });
       if (pe) console.warn("profiles upsert error", pe);
     }
 
