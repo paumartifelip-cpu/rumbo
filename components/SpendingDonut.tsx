@@ -7,7 +7,6 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  Legend,
 } from "recharts";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 
@@ -48,41 +47,70 @@ export function SpendingDonut() {
     );
   }
 
+  const totalAmount = data.reduce((a, b) => a + b.value, 0);
+
   return (
-    <div className="h-64 mt-4 relative">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={80}
-            paddingAngle={5}
-            dataKey="value"
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip 
-            formatter={(v: number) => formatMoney(v)}
-            contentStyle={{ borderRadius: 12, border: "1px solid #EEF0F4" }}
-          />
-          <Legend 
-            layout="vertical" 
-            align="right" 
-            verticalAlign="middle"
-            iconType="circle"
-            wrapperStyle={{ fontSize: 11, paddingLeft: 20 }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-8">
-        <div className="text-[10px] uppercase text-rumbo-muted font-bold">Total</div>
-        <div className="text-lg font-bold text-rumbo-ink">
-          {formatMoney(data.reduce((a, b) => a + b.value, 0))}
+    <div className="mt-6 flex items-center gap-4">
+      <div className="h-64 w-64 relative shrink-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={70}
+              outerRadius={95}
+              paddingAngle={4}
+              dataKey="value"
+              stroke="none"
+            >
+              {data.map((entry, index) => (
+                <Cell 
+                  key={`cell-${index}`} 
+                  fill={COLORS[index % COLORS.length]} 
+                  className="hover:opacity-80 transition-opacity cursor-pointer outline-none"
+                />
+              ))}
+            </Pie>
+            <Tooltip 
+              formatter={(v: number) => formatMoney(v)}
+              contentStyle={{ 
+                borderRadius: 16, 
+                border: "none", 
+                boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+                fontWeight: "bold"
+              }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+        
+        {/* Perfectly centered text */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <div className="text-[10px] uppercase text-rumbo-muted font-black tracking-widest mb-1">Total</div>
+          <div className="text-2xl font-black text-rumbo-ink tracking-tighter">
+            {formatMoney(totalAmount).split(',')[0]}
+          </div>
         </div>
+      </div>
+
+      {/* Manual Legend for better control */}
+      <div className="flex-1 grid gap-2">
+        {data.map((entry, index) => (
+          <div key={entry.name} className="flex items-center justify-between group">
+            <div className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full shrink-0" 
+                style={{ backgroundColor: COLORS[index % COLORS.length] }} 
+              />
+              <span className="text-xs font-bold text-rumbo-muted group-hover:text-rumbo-ink transition-colors">
+                {entry.name}
+              </span>
+            </div>
+            <span className="text-xs font-black text-rumbo-ink opacity-60 group-hover:opacity-100 transition-opacity">
+              {formatMoney(entry.value)}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
