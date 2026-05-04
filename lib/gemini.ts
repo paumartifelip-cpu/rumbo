@@ -3,6 +3,10 @@ import { Goal, Task } from "./types";
 const ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
+// Lighter, faster model used only for expense categorization
+const CATEGORIZE_ENDPOINT =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent";
+
 export interface GeminiPriorityResponse {
   ordered_tasks: Array<{
     task_id: string;
@@ -28,12 +32,13 @@ function getKey(): string | null {
 
 async function callGemini<T>(
   prompt: string,
-  temperature = 0.3
+  temperature = 0.3,
+  endpoint = ENDPOINT
 ): Promise<T | null> {
   const apiKey = getKey();
   if (!apiKey) return null;
   try {
-    const res = await fetch(`${ENDPOINT}?key=${apiKey}`, {
+    const res = await fetch(`${endpoint}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -155,55 +160,114 @@ No incluyas texto adicional fuera del JSON.`;
   return null;
 }
 
+/**
+ * Fast rule-based categorizer. Returns null when no rule matches so the
+ * caller knows it needs to fall back to AI.
+ */
+export function heuristicCategorize(title: string): string | null {
+  const t = title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+
+  // Vivienda
+  if (
+    /(alquiler|hipoteca|comunidad|ibi|derrama|portero|ascensor|piso|casa|apartamento|habitacion|studio|flat|rent|mortgage|electricity|electric|luz|agua|calefaccion|caldera|gas natural|wifi|internet|fibra|router|modem|vodafone|movistar|orange|digi|yoigo|euskaltel)/.test(t)
+  )
+    return "Vivienda";
+
+  // Comida (supermercados y alimentación)
+  if (
+    /(mercadona|carrefour|lidl|aldi|dia |eroski|consum|alcampo|hipercor|bonpreu|condis|covirán|spar|froiz|supercor|supermercado|fruteria|verduleria|carniceria|pescaderia|panaderia|pasteleria|charcuteria|colmado|ultramarinos|alimentacion|grocery|supermarket|glovo|just eat|deliveroo|uber eats|rappi|getir|gorillas)/.test(t)
+  )
+    return "Comida";
+
+  // Restaurantes y bares
+  if (
+    /(restaurante|restaurant|bar |cafeteria|cafe |coffee|starbucks|mcdonalds|mcdonald|burger king|kfc|dominos|telepizza|pizza hut|subway|five guys|popeyes|foster|taco bell|tapas|bocadillo|bocata|menu del dia|cena|almuerzo|desayuno|brunch|sushi|ramen|kebab|chino|italiano|mexicano|hamburgues|poke|sандwich)/.test(t)
+  )
+    return "Restaurantes";
+
+  // Transporte
+  if (
+    /(uber|cabify|bolt|taxi|blablacar|gasolina|gasolinera|repsol|bp |cepsa|shell|esso|carburante|fuel|metro|bus |autobus|renfe|ave |cercanias|fgc|emt |tmb|tram|bicing|nextbike|voi |lime |tier |peaje|autopista|parking|aparcamiento|garaje|itv|seguro.*coche|coche|moto|ciclomotor|patinete|bicicleta|vueling|iberia|ryanair|easyjet|wizz|air europa|level|transavia|ferry|barco|crucero|aerolinea|flight|avion)/.test(t)
+  )
+    return "Transporte";
+
+  // Suscripciones y software
+  if (
+    /(netflix|hbo|max |disney|prime video|apple tv|mubi|filmin|rakuten|crunchyroll|spotify|apple music|tidal|deezer|youtube premium|twitch|patreon|chatgpt|openai|claude|anthropic|notion|obsidian|figma|adobe|photoshop|illustrator|premiere|lightroom|canva|sketch|framer|webflow|github|gitlab|vercel|netlify|heroku|aws |azure |google cloud|gcp |dropbox|icloud|onedrive|google one|1password|lastpass|bitwarden|nordvpn|expressvpn|linear|jira|asana|trello|slack|zoom|loom|calendly|typeform|airtable|hubspot|mailchimp|convertkit|substack|beehiiv|plus|pro |premium|plan |subscription|suscripcion|mensualidad|anualidad|licencia)/.test(t)
+  )
+    return "Suscripciones";
+
+  // Salud y bienestar
+  if (
+    /(farmacia|medicamento|medicina|pastilla|receta|medico|doctor|consulta|clinica|hospital|dentista|ortodoncista|optica|gafas|lentillas|fisioterapia|psicólogo|psicologo|terapeuta|quiropractico|gym|gimnasio|crossfit|pilates|yoga|padel|tenis|natacion|running|maratón|maraton|suplemento|proteina|vitamina|health|wellness|sanitas|adeslas|asisa|dkv|mapfre salud|mutua)/.test(t)
+  )
+    return "Salud";
+
+  // Compras y moda
+  if (
+    /(amazon|ebay|aliexpress|shein|zara|h&m|mango|bershka|stradivarius|pull.*bear|massimo dutti|el corte ingles|primark|lefties|calzedonia|intimissimi|decathlon|nike|adidas|puma|new balance|vans|converse|timberland|zalando|asos|farfetch|vinted|wallapop|fnac|media markt|pc componentes|phone house|apple store|ikea|leroy merlin|aki |bricomart|bauhaus|worten|ropa|zapatillas|zapatos|vestido|pantalon|camisa|chaqueta|abrigo|complementos|bolso|cartera|reloj|joya|mueble|sofa|cama|colchon|electrodomestico|nevera|lavadora|secadora|microondas|television|movil|ordenador|portatil|tablet|auriculares|altavoz|camara)/.test(t)
+  )
+    return "Compras";
+
+  // Ocio y entretenimiento
+  if (
+    /(cine|teatro|museo|concierto|festival|espectaculo|entrada|ticketmaster|viagogo|eventbrite|bowling|escape room|karting|lasertag|parque.*atrac|parque.*acuat|zoo|aquarium|arcade|videojuego|steam|playstation|xbox|nintendo|ps5|ps4|switch|juego|hobby|manualidades|pintura|fotografia)/.test(t)
+  )
+    return "Ocio";
+
+  // Viajes y alojamiento
+  if (
+    /(hotel|hostal|pension|airbnb|booking|trivago|edreams|rumbo|lastminute|viaje|vacacion|vacation|holiday|travel|turismo|excursion|tour|crucero|resort|spa |balneario|camping|glamping)/.test(t)
+  )
+    return "Viajes";
+
+  // Educación
+  if (
+    /(udemy|coursera|linkedin learning|masterclass|domestika|platzi|skillshare|duolingo|babbel|academia|curso|formacion|máster|master|universidad|colegio|escuela|libro|libros|amazon kindle|audible|fnac.*libro|libreria|material escolar|clase particular)/.test(t)
+  )
+    return "Educación";
+
+  // Finanzas y seguros
+  if (
+    /(seguro|aseguradora|mapfre|allianz|axa|generali|zurich|mutua|fondo|pension|inversion|broker|trading|comision bancaria|transferencia|tarjeta|cuota.*banco|mantenimiento.*cuenta|prestamo|credito|hipoteca|interes|asesor)/.test(t)
+  )
+    return "Finanzas";
+
+  return null; // no match → let AI decide
+}
+
 export async function aiCategorize(input: {
   title: string;
   amount?: number;
   existing_categories?: string[];
 }): Promise<string | null> {
+  // Rule-based first — instant, no API call needed
+  const fast = heuristicCategorize(input.title);
+  if (fast !== null) return fast;
+
+  // Nothing matched → fall back to AI with the lightest/fastest model
   const hasOpenAI = !!getOpenAIKey();
   const hasGemini = !!getKey();
   if (!hasOpenAI && !hasGemini) return null;
-  const prompt = `Eres un clasificador de gastos personales en español.
-Te paso el concepto de un gasto y su importe. Tu trabajo es asignarle UNA categoría corta (1-2 palabras), en singular, en español, que tenga sentido.
-Si la lista de categorías existentes ya contiene una que encaje, REUTILÍZALA tal cual (mismo texto, mismas mayúsculas).
-Si ninguna encaja, inventa una nueva categoría útil y compacta.
 
+  const prompt = `Clasifica este gasto personal en UNA categoría corta (1-2 palabras) en español.
+Si alguna de las categorías existentes encaja, reutilízala exactamente igual.
 Categorías existentes: ${JSON.stringify(input.existing_categories ?? [])}
-Concepto: "${input.title}"
-Importe: ${input.amount ?? "?"} €
+Gasto: "${input.title}"${input.amount ? ` — ${input.amount}` : ""}
+Responde SOLO con JSON: { "category": "..." }`;
 
-Devuelve SOLO un JSON válido con esta forma exacta:
-{ "category": "..." }
-Sin texto adicional.`;
   if (hasOpenAI) {
-    const r = await callOpenAI<{ category: string }>(prompt, 0.2);
+    const r = await callOpenAI<{ category: string }>(prompt, 0.1);
     if (r?.category) return r.category.trim();
   }
-  
-  if (hasGemini) {
-    const r = await callGemini<{ category: string }>(prompt, 0.2);
-    if (r?.category) return r.category.trim();
-  }
-  
-  return null;
-}
 
-// Heuristic fallback used when there's no API key.
-export function heuristicCategorize(title: string): string {
-  const t = title.toLowerCase();
-  if (/(alquiler|hipoteca|piso|casa|comunidad|ibi|luz|agua|gas|wifi|internet|electric)/.test(t))
-    return "Vivienda";
-  if (/(super|mercadona|carrefour|lidl|comida|supermercado|fruta|carniceria)/.test(t))
-    return "Comida";
-  if (/(restaurante|bar|cena|menu|tapas|bocata)/.test(t)) return "Restaurantes";
-  if (/(uber|cabify|taxi|gasolin|metro|bus|tren|renfe|peaje|park)/.test(t))
-    return "Transporte";
-  if (/(netflix|spotify|hbo|prime|disney|youtube|chatgpt|notion|figma|adobe|github|saas)/.test(t))
-    return "Suscripciones";
-  if (/(medico|farma|gimnasio|gym|dentista|salud|crossfit)/.test(t))
-    return "Salud";
-  if (/(amazon|zalando|ropa|zapat|nike|adidas)/.test(t)) return "Compras";
-  if (/(cine|concierto|viaje|hotel|booking|airbnb|vacacion)/.test(t))
-    return "Ocio";
-  return "Otros";
+  if (hasGemini) {
+    const r = await callGemini<{ category: string }>(prompt, 0.1, CATEGORIZE_ENDPOINT);
+    if (r?.category) return r.category.trim();
+  }
+
+  return null;
 }

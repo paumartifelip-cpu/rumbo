@@ -708,7 +708,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         existing_categories: existingCategories,
       })
         .then((cat) => {
-          const final = cat || heuristicCategorize(f.title);
+          const final = cat ?? heuristicCategorize(f.title) ?? "Otros";
           setState((s) => ({
             ...s,
             finances: s.finances.map((x) =>
@@ -717,7 +717,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           }));
         })
         .catch(() => {
-          const final = heuristicCategorize(f.title);
+          const final = heuristicCategorize(f.title) ?? "Otros";
           setState((s) => ({
             ...s,
             finances: s.finances.map((x) =>
