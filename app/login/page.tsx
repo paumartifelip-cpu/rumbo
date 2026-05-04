@@ -13,6 +13,7 @@ import {
   removeCustomProfile,
 } from "@/lib/profiles";
 import { CURRENCIES, Currency } from "@/lib/currency";
+import { deleteProfileFromSupabase } from "@/lib/sync";
 import {
   checkPin,
   clearPin,
@@ -85,9 +86,11 @@ export default function LoginPage() {
 
   function deleteUser(p: Profile, e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirm(`¿Borrar el usuario "${p.name}"? Sus datos locales se mantienen.`)) return;
+    if (!confirm(`¿Borrar el usuario "${p.name}"? Se eliminarán sus datos locales y de la nube.`)) return;
     removeCustomProfile(p.id);
     clearPin(p.id);
+    // Also wipe their data from Supabase
+    deleteProfileFromSupabase(p.user_id).catch(() => {});
     setProfiles(getAllProfiles());
   }
 

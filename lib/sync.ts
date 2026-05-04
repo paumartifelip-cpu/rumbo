@@ -130,6 +130,28 @@ async function replaceTable(userId: string, table: string, rows: any[]) {
   if (ie) console.warn(`${table} insert error`, ie);
 }
 
+/**
+ * Delete ALL data for a user from every Supabase table.
+ * Called when a custom profile is removed from the app.
+ */
+export async function deleteProfileFromSupabase(userId: string): Promise<boolean> {
+  const supa = getSupabase();
+  if (!supa) return false;
+  try {
+    await Promise.all([
+      supa.from("financial_entries").delete().eq("user_id", userId),
+      supa.from("goals").delete().eq("user_id", userId),
+      supa.from("tasks").delete().eq("user_id", userId),
+      supa.from("money_snapshots").delete().eq("user_id", userId),
+      supa.from("profiles").delete().eq("user_id", userId),
+    ]);
+    return true;
+  } catch (e) {
+    console.warn("deleteProfileFromSupabase threw", e);
+    return false;
+  }
+}
+
 // --- Strippers: remove client-only fields and force user_id ---
 
 const stripGoal = (userId: string) => (g: Goal) => ({

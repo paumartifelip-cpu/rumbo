@@ -28,7 +28,7 @@ import {
   updateProfileCurrency,
 } from "./profiles";
 import { pullFromSupabase, pushToSupabase, SyncSnapshot } from "./sync";
-import { supabaseEnabled } from "./supabase";
+import { getSupabase, supabaseEnabled } from "./supabase";
 import {
   FinancialEntry,
   Goal,
@@ -356,18 +356,17 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     hydrated,
   ]);
 
-  // Auto-refresh from Supabase when the tab regains focus, becomes visible,
-  // or every 15s while visible. Skips if a local push is pending so we never
-  // overwrite an in-flight local change.
+  // Real-time Supabase subscriptions + fallback polling.
+  // Any INSERT/UPDATE/DELETE on the user's tables triggers an instant pull.
   useEffect(() => {
     if (!profile || !supabaseEnabled) return;
 
     let cancelled = false;
+    const supa = getSupabase();
 
     async function refresh() {
       if (cancelled || !profile) return;
-      if (typeof document !== "undefined" && document.visibilityState !== "visible")
-        return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       if (pushPendingRef.current) return;
       if (stateRef.current.syncStatus === "syncing") return;
       const remote = await pullFromSupabase(profile.user_id);
@@ -376,29 +375,31 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }
 
     const onVisibility = () => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") {
-        refresh();
-      }
+      if (typeof document !== "undefined" && document.visibilityState === "visible") refresh();
     };
     const onFocus = () => refresh();
 
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", onVisibility);
-    }
-    if (typeof window !== "undefined") {
-      window.addEventListener("focus", onFocus);
-    }
-    const interval = setInterval(refresh, 15000);
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisibility);
+    if (typeof window !== "undefined") window.addEventListener("focus", onFocus);
+
+    // 30s fallback poll (Realtime handles the fast path)
+    const interval = setInterval(refresh, 30000);
+
+    // Supabase Realtime — listen to all 4 tables for this user.
+    const channel = supa
+      ?.channel(`rumbo-${profile.user_id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "financial_entries", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "goals", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "money_snapshots", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
+      .subscribe();
 
     return () => {
       cancelled = true;
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", onVisibility);
-      }
-      if (typeof window !== "undefined") {
-        window.removeEventListener("focus", onFocus);
-      }
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
+      if (typeof window !== "undefined") window.removeEventListener("focus", onFocus);
       clearInterval(interval);
+      if (channel) supa?.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.user_id]);
