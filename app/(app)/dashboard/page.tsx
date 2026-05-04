@@ -16,6 +16,7 @@ import {
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { DashboardHero } from "@/components/DashboardHero";
 import { SpendingTrend } from "@/components/SpendingTrend";
+import { IncomeVsExpensesChart } from "@/components/IncomeVsExpensesChart";
 import { TaskRow } from "@/components/TaskRow";
 import { Reveal } from "@/components/Reveal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
@@ -132,9 +133,19 @@ export default function DashboardPage() {
           </Card>
         </Reveal>
 
-        <Reveal delay={0.15} className="lg:col-span-2">
+        <Reveal delay={0.15} className="lg:col-span-3">
           <Card className="card-hover">
-            <SectionTitle title="Evolución de tu dinero total" />
+            <SectionTitle 
+              title="Balance Mensual" 
+              hint="Comparativa de lo que entra (verde) vs lo que sale (rojo) cada mes."
+            />
+            <IncomeVsExpensesChart />
+          </Card>
+        </Reveal>
+
+        <Reveal delay={0.2} className="lg:col-span-2">
+          <Card className="card-hover">
+            <SectionTitle title="Evolución de tu patrimonio total" />
             {moneyEvolution.length === 0 ? (
               <EmptyState
                 icon="📈"
@@ -180,14 +191,14 @@ export default function DashboardPage() {
           </Card>
         </Reveal>
 
-        <Reveal delay={0.2}>
+        <Reveal delay={0.25}>
           <Card className="card-hover">
             <SectionTitle title="Tendencia de gastos" />
             <SpendingTrend />
           </Card>
         </Reveal>
 
-        <Reveal delay={0.25} className="lg:col-span-2">
+        <Reveal delay={0.3} className="lg:col-span-2">
           <Card className="card-hover">
             <SectionTitle title="Tus próximas tareas" />
             <div className="grid gap-2">
@@ -211,9 +222,9 @@ export default function DashboardPage() {
           </Card>
         </Reveal>
 
-        <Reveal delay={0.3}>
+        <Reveal delay={0.35}>
           <Card className="card-hover">
-            <SectionTitle title="Resumen" />
+            <SectionTitle title="Resumen de cuenta" />
             <ul className="text-sm space-y-2">
               <li className="flex justify-between">
                 <span className="text-rumbo-muted">Objetivos</span>

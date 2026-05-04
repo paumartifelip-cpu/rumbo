@@ -9,10 +9,10 @@ import { useRumbo } from "@/lib/store";
 
 const items = [
   { href: "/dashboard", label: "Inicio", icon: "🏠" },
-  { href: "/goals", label: "Objetivos", icon: "🚩" },
-  { href: "/tasks", label: "Tareas", icon: "✅" },
   { href: "/money", label: "Dinero", icon: "💸" },
   { href: "/gastos", label: "Gastos", icon: "🧾" },
+  { href: "/tasks", label: "Tareas", icon: "✅" },
+  { href: "/goals", label: "Objetivos", icon: "🚩" },
   { href: "/settings", label: "Ajustes", icon: "⚙️" },
 ];
 
