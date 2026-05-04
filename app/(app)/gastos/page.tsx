@@ -10,16 +10,16 @@ import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
 
-function useDateLabels() {
-  const now = new Date();
-  const today = now.toLocaleDateString("es-ES", {
+function useDateLabels(date: Date) {
+  const isCurrentMonth = date.getMonth() === new Date().getMonth() && date.getFullYear() === new Date().getFullYear();
+  const today = isCurrentMonth ? new Date().toLocaleDateString("es-ES", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-  });
-  const month = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
-  return { today, month };
+  }) : date.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  const month = date.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  return { today, month, isCurrentMonth };
 }
 
 export default function GastosPage() {
@@ -31,7 +31,8 @@ export default function GastosPage() {
     amountInPrimary,
   } = useRumbo();
   const format = useFormatMoney();
-  const { today, month } = useDateLabels();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const { today, month, isCurrentMonth } = useDateLabels(selectedDate);
   const [form, setForm] = useState<{
     title: string;
     amount: number | "";
@@ -50,8 +51,7 @@ export default function GastosPage() {
   }, [primaryCurrency]);
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
-  const now = new Date();
-  const currentKey = monthKey(now);
+  const currentKey = monthKey(selectedDate);
 
   const thisMonth = useMemo(
     () =>
@@ -108,7 +108,7 @@ export default function GastosPage() {
       title: form.title,
       amount: form.amount,
       currency: form.currency,
-      date: new Date().toISOString(),
+      date: selectedDate.toISOString(),
       ...(form.recurrence ? { recurrence: form.recurrence } : {}),
     });
     setForm({
@@ -125,18 +125,28 @@ export default function GastosPage() {
         title="Gastos"
         subtitle={`Todo lo que añadas cuenta para ${month}.`}
       />
-      <div className="text-2xl md:text-3xl font-semibold capitalize tracking-tight -mt-2 mb-6">
-        📅 {today}
+      <div className="flex items-center gap-4 -mt-2 mb-6">
+        <button
+          onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1))}
+          className="p-2 -ml-2 rounded-lg hover:bg-slate-100 text-rumbo-muted hover:text-rumbo-ink transition-colors"
+          aria-label="Mes anterior"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <div className="text-2xl md:text-3xl font-semibold capitalize tracking-tight flex-1">
+          {isCurrentMonth ? `📅 ${today}` : today}
+        </div>
+        <button
+          onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1))}
+          className="p-2 -mr-2 rounded-lg hover:bg-slate-100 text-rumbo-muted hover:text-rumbo-ink transition-colors"
+          aria-label="Mes siguiente"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
       </div>
 
       <Reveal>
-        <div className="mb-6">
-          <CashflowHero />
-        </div>
-      </Reveal>
-
-      <Reveal delay={0.06}>
-      <Card className="mb-6 card-hover">
+      <Card className="mb-6 card-hover border-emerald-100 shadow-sm">
         <SectionTitle
           title="Añadir gasto"
           hint="Concepto, cantidad y moneda. La IA elige la categoría."
@@ -200,7 +210,7 @@ export default function GastosPage() {
                 title: "_",
                 amount: form.amount,
                 currency: form.currency,
-                date: new Date().toISOString(),
+                date: selectedDate.toISOString(),
                 created_at: new Date().toISOString(),
               })
             )}{" "}
@@ -218,6 +228,12 @@ export default function GastosPage() {
           <label htmlFor="rec-check" className="cursor-pointer select-none">🔁 Es una suscripción o gasto fijo mensual</label>
         </div>
       </Card>
+      </Reveal>
+
+      <Reveal delay={0.06}>
+        <div className="mb-6">
+          <CashflowHero selectedDate={selectedDate} />
+        </div>
       </Reveal>
 
       {/* Tendencia + Suscripciones */}
@@ -375,7 +391,7 @@ export default function GastosPage() {
       <Card className="card-hover">
         <SectionTitle
           title="Movimientos del mes"
-          hint={`${thisMonth.length} gastos en ${now.toLocaleDateString(
+          hint={`${thisMonth.length} gastos en ${selectedDate.toLocaleDateString(
             "es-ES",
             { month: "long", year: "numeric" }
           )}`}

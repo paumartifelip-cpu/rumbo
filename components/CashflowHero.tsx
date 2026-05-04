@@ -64,12 +64,11 @@ const SPECS: Spec[] = [
   },
 ];
 
-export function CashflowHero() {
+export function CashflowHero({ selectedDate }: { selectedDate: Date }) {
   const { finances, onboarding, amountInPrimary } = useRumbo();
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
-  const now = new Date();
-  const currentKey = monthKey(now);
+  const currentKey = monthKey(selectedDate);
 
   const cards = useMemo(
     () =>
@@ -96,7 +95,7 @@ export function CashflowHero() {
         const last6 = (() => {
           const buckets: Array<{ label: string; total: number }> = [];
           for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const d = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - i, 1);
             const key = monthKey(d);
             const label = d
               .toLocaleDateString("es-ES", { month: "short" })
