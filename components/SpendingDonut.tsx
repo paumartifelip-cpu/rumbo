@@ -50,16 +50,16 @@ export function SpendingDonut() {
   const totalAmount = data.reduce((a, b) => a + b.value, 0);
 
   return (
-    <div className="mt-6 flex items-center gap-4">
-      <div className="h-64 w-64 relative shrink-0">
+    <div className="mt-6 flex flex-col sm:flex-row items-center gap-8">
+      <div className="h-56 w-56 sm:h-64 sm:w-64 relative shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={70}
-              outerRadius={95}
+              innerRadius="75%"
+              outerRadius="100%"
               paddingAngle={4}
               dataKey="value"
               stroke="none"

@@ -75,18 +75,18 @@ export function DashboardHero() {
                   initial={{ x: -20, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                 >
-                  <div className="text-xs uppercase tracking-[0.3em] font-black opacity-70 mb-2">
+                  <div className="text-[10px] sm:text-xs uppercase tracking-[0.3em] font-black opacity-70 mb-2">
                     Progreso hacia tu meta de {formatMoney(monthTarget)}
                   </div>
-                  <div className="text-4xl md:text-6xl font-black tracking-tighter">
+                  <div className="text-3xl sm:text-4xl md:text-6xl font-black tracking-tighter leading-none">
                     Faltan {formatMoney(animatedMissing)}
                   </div>
                 </motion.div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <motion.div 
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    className="text-5xl md:text-7xl font-black tracking-tighter opacity-20 leading-none"
+                    className="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter opacity-20 leading-none"
                   >
                     {Math.round(incomeProgress)}%
                   </motion.div>
@@ -256,7 +256,7 @@ function HeroMetric({
             <div className="text-[10px] uppercase tracking-[0.3em] text-rumbo-muted font-black mb-4 opacity-70 group-hover:opacity-100 transition-opacity">
               {label}
             </div>
-            <div className={`text-4xl md:text-5xl font-black tracking-tighter leading-tight ${colors} ${isTask ? 'line-clamp-2' : ''}`}>
+            <div className={`text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-tight ${colors} ${isTask ? 'line-clamp-2' : ''}`}>
               {value}
             </div>
           </div>
