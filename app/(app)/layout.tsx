@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MobileNav, Sidebar } from "@/components/Sidebar";
+import { MobileHeader, MobileNav, Sidebar } from "@/components/Sidebar";
 import { useRumbo } from "@/lib/store";
 import { getCurrentProfileId, setCurrentProfileId } from "@/lib/profiles";
 import { needsPinPrompt } from "@/lib/pin";
@@ -40,11 +40,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex flex-col md:flex-row min-h-screen">
       <Sidebar />
-      <main className="flex-1 px-4 md:px-10 py-6 md:py-10 pb-24 md:pb-10 max-w-[1400px] w-full mx-auto">
-        {children}
-      </main>
+      <div className="flex-1 flex flex-col min-h-screen">
+        <MobileHeader />
+        <main className="flex-1 px-4 md:px-10 py-6 md:py-10 pb-24 md:pb-10 max-w-[1400px] w-full mx-auto">
+          {children}
+        </main>
+      </div>
       <MobileNav />
     </div>
   );

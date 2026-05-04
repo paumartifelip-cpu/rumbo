@@ -116,15 +116,35 @@ function SyncDot({ status }: { status: string }) {
   );
 }
 
-// Mobile bottom nav shows only the most-used 5 to avoid cramping.
-const MOBILE_ITEMS = ["/dashboard", "/tasks", "/money", "/settings"];
+export function MobileHeader() {
+  const { profile, syncStatus } = useRumbo();
+  return (
+    <header className="md:hidden flex items-center justify-between px-6 py-4 bg-white border-b border-rumbo-line sticky top-0 z-50">
+      <Link href="/dashboard">
+        <Logo size="sm" />
+      </Link>
+      
+      {profile && (
+        <div className="flex items-center gap-3">
+          <SyncDot status={syncStatus} />
+          <Link href="/settings" className={`w-8 h-8 rounded-full bg-gradient-to-br ${profile.color} flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white`}>
+            {profile.initials}
+          </Link>
+        </div>
+      )}
+    </header>
+  );
+}
+
+// Mobile bottom nav shows all items to maintain consistency with desktop.
+const MOBILE_ITEMS = ["/dashboard", "/money", "/gastos", "/tasks", "/goals", "/settings"];
 
 export function MobileNav() {
   const pathname = usePathname();
   const mobileItems = items.filter((it) => MOBILE_ITEMS.includes(it.href));
   return (
     <nav
-      className="md:hidden fixed left-2 right-2 bg-white border border-rumbo-line rounded-2xl shadow-card p-1 flex justify-between z-50"
+      className="md:hidden fixed left-2 right-2 bg-white/90 backdrop-blur-md border border-rumbo-line rounded-2xl shadow-2xl p-1 flex justify-between z-50"
       style={{ bottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
     >
       {mobileItems.map((it) => {
@@ -134,14 +154,14 @@ export function MobileNav() {
             key={it.href}
             href={it.href}
             className={cn(
-              "flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl text-[10px] transition-all duration-200 min-w-0 active:scale-95",
+              "flex flex-col items-center justify-center flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all duration-300 min-w-0 active:scale-90",
               active
-                ? "bg-rumbo-ink text-white shadow-soft scale-105"
+                ? "bg-rumbo-ink text-white shadow-lg scale-110 -translate-y-1"
                 : "text-rumbo-muted hover:text-rumbo-ink"
             )}
           >
-            <span className="text-lg leading-none">{it.icon}</span>
-            <span className="mt-0.5">{it.label}</span>
+            <span className="text-xl leading-none mb-0.5">{it.icon}</span>
+            <span className="opacity-80">{it.label}</span>
           </Link>
         );
       })}
