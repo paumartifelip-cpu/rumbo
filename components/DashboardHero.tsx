@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { Card, SectionTitle } from "./Card";
 import { SpendingTrend } from "./SpendingTrend";
@@ -10,7 +9,7 @@ import { Reveal } from "./Reveal";
 import { useEffect, useState } from "react";
 
 export function DashboardHero() {
-  const { snapshots, onboarding, finances, tasks, amountInPrimary } = useRumbo();
+  const { snapshots, onboarding, finances, amountInPrimary } = useRumbo();
   const formatMoney = useFormatMoney();
 
   const now = new Date();
@@ -46,14 +45,7 @@ export function DashboardHero() {
     )
     .reduce((a, b) => a + amountInPrimary(b), 0);
 
-  // 4. Que tarea debo hacer ya
-  const topTask = useMemo(() => {
-    return tasks
-      .filter((t) => t.status !== "completada" && t.status !== "descartada")
-      .sort((a, b) => (b.ai_priority_score ?? 0) - (a.ai_priority_score ?? 0))[0];
-  }, [tasks]);
-
-  // 5. Progress values
+  // Progress values
   const totalTarget = onboarding?.total_target ?? 0;
   const totalProgress = totalTarget ? Math.min(100, (total / totalTarget) * 100) : 0;
 
@@ -139,13 +131,6 @@ export function DashboardHero() {
           value={formatMoney(animatedSpent)}
           tone="red"
           icon="📉"
-        />
-        <HeroMetric
-          label="Tarea prioritaria"
-          value={topTask?.title ?? "Sin tareas"}
-          tone="blue"
-          icon="🎯"
-          isTask
         />
       </div>
     </div>
