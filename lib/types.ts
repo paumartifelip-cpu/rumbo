@@ -64,6 +64,7 @@ export interface FinancialEntry {
   title: string;
   amount: number;
   currency?: "EUR" | "USD" | "MXN" | "ARS"; // if absent, treat as primary
+  amount_in_primary?: number; // Snapshot of the value in primary currency at creation time
   date: string;
   category?: string;
   recurrence?: "mensual" | "anual";

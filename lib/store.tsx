@@ -276,10 +276,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           if (idx >= 0) {
             newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
           }
+          const entryCurrency = f.currency ?? s.primaryCurrency;
+          const currentPrimaryAmt = convertAmount(f.amount, entryCurrency, s.primaryCurrency);
           newFinances.push({
             ...f,
             id: uid(),
             date: now.toISOString(),
+            amount_in_primary: currentPrimaryAmt,
             created_at: now.toISOString(),
             last_generated_date: now.toISOString(),
           });
@@ -456,6 +459,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   const amountInPrimary = useCallback(
     (entry: FinancialEntry) => {
+      if (entry.amount_in_primary !== undefined) return entry.amount_in_primary;
       const from = entry.currency ?? stateRef.current.primaryCurrency;
       return convertAmount(entry.amount, from, stateRef.current.primaryCurrency);
     },
@@ -643,18 +647,23 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   const addFinance: RumboContext["addFinance"] = useCallback((f) => {
     const id = uid();
-    setState((s) => ({
-      ...s,
-      finances: [
-        ...s.finances,
-        {
-          ...f,
-          id,
-          user_id: s.user.id,
-          created_at: new Date().toISOString(),
-        },
-      ],
-    }));
+    setState((s) => {
+      const from = f.currency ?? s.primaryCurrency;
+      const amount_in_primary = convertAmount(f.amount, from, s.primaryCurrency);
+      return {
+        ...s,
+        finances: [
+          ...s.finances,
+          {
+            ...f,
+            id,
+            amount_in_primary,
+            user_id: s.user.id,
+            created_at: new Date().toISOString(),
+          },
+        ],
+      };
+    });
 
     // AI categorization for expenses without a category.
     if (f.type === "gasto" && !f.category) {
