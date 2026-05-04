@@ -2,7 +2,9 @@
 
 import { useMemo } from "react";
 import { useFormatMoney, useRumbo } from "@/lib/store";
-import { Card } from "./Card";
+import { Card, SectionTitle } from "./Card";
+import { SpendingTrend } from "./SpendingTrend";
+import { SpendingDonut } from "./SpendingDonut";
 import { motion } from "framer-motion";
 import { Reveal } from "./Reveal";
 import { useEffect, useState } from "react";
@@ -212,6 +214,16 @@ function RadialProgress({ progress, tone }: { progress: number; tone: "green" | 
   );
 }
 
+function useCanHover() {
+  const [canHover, setCanHover] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCanHover(window.matchMedia("(hover: hover)").matches);
+    }
+  }, []);
+  return canHover;
+}
+
 function HeroMetric({
   label,
   value,
@@ -227,6 +239,7 @@ function HeroMetric({
   isTask?: boolean;
   progress?: number;
 }) {
+  const canHover = useCanHover();
   const colors = {
     green: "text-green-900",
     red: "text-red-600 font-black",
@@ -241,31 +254,31 @@ function HeroMetric({
 
   return (
     <motion.div
-      whileHover={{ 
+      whileHover={canHover ? { 
         y: -10,
         scale: 1.02,
         rotateX: 2,
         rotateY: -2,
-      }}
+      } : {}}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
       style={{ perspective: 1000 }}
     >
-      <Card className={`p-10 flex flex-col justify-center shadow-md hover:shadow-2xl transition-all duration-500 relative overflow-hidden min-h-[260px] ${bg} border-none group cursor-default`}>
-        <div className="relative z-10 flex items-center justify-between gap-6">
+      <Card className={`p-6 sm:p-10 flex flex-col justify-center shadow-md hover:shadow-2xl transition-all duration-500 relative overflow-hidden min-h-[220px] sm:min-h-[260px] ${bg} border-none group cursor-default`}>
+        <div className="relative z-10 flex items-center justify-between gap-4 sm:gap-6">
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-rumbo-muted font-black mb-4 opacity-70 group-hover:opacity-100 transition-opacity">
+            <div className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] sm:tracking-[0.3em] text-rumbo-muted font-black mb-2 sm:mb-4 opacity-70 group-hover:opacity-100 transition-opacity">
               {label}
             </div>
-            <div className={`text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-tight ${colors} ${isTask ? 'line-clamp-2' : ''}`}>
+            <div className={`text-2xl sm:text-4xl md:text-5xl font-black tracking-tighter leading-tight ${colors} ${isTask ? 'line-clamp-2' : ''}`}>
               {value}
             </div>
           </div>
           
-          <div className="shrink-0 scale-110 group-hover:scale-125 transition-transform duration-500">
+          <div className="shrink-0 scale-90 sm:scale-110 group-hover:scale-125 transition-transform duration-500">
             {progress !== undefined ? (
               <RadialProgress progress={progress} tone={tone} />
             ) : (
-              <div className="w-24 h-24 rounded-full bg-white/50 flex items-center justify-center text-5xl shadow-inner group-hover:bg-white/80 transition-colors">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-white/50 flex items-center justify-center text-3xl sm:text-5xl shadow-inner group-hover:bg-white/80 transition-colors">
                 {icon}
               </div>
             )}
