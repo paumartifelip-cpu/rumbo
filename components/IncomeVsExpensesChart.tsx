@@ -46,46 +46,68 @@ export function IncomeVsExpensesChart() {
   }, [finances, amountInPrimary, onboarding]);
 
   return (
-    <div className="h-64 mt-4">
+    <div className="h-96 mt-6">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-          <CartesianGrid stroke="#EEF0F4" vertical={false} />
+        <BarChart 
+          data={data} 
+          margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+          barGap={12}
+        >
+          <defs>
+            <linearGradient id="ingresoGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#064E3B" stopOpacity={1} />
+              <stop offset="100%" stopColor="#064E3B" stopOpacity={0.8} />
+            </linearGradient>
+            <linearGradient id="gastoGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#FF0000" stopOpacity={1} />
+              <stop offset="100%" stopColor="#FF0000" stopOpacity={0.8} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#F1F5F9" vertical={false} strokeDasharray="3 3" />
           <XAxis 
             dataKey="label" 
             axisLine={false} 
             tickLine={false} 
-            tick={{ fill: "#6B7280", fontSize: 11 }}
+            tick={{ fill: "#94A3B8", fontSize: 12, fontWeight: 600 }}
+            dy={10}
           />
           <YAxis 
             axisLine={false} 
             tickLine={false} 
-            tick={{ fill: "#6B7280", fontSize: 11 }}
+            tick={{ fill: "#94A3B8", fontSize: 11 }}
+            tickFormatter={(v) => formatMoney(v)}
           />
           <Tooltip
-            formatter={(v: number) => formatMoney(v)}
+            cursor={{ fill: '#F8FAFC' }}
+            formatter={(v: number) => [formatMoney(v), ""]}
             contentStyle={{
-              borderRadius: 12,
-              border: "1px solid #EEF0F4",
-              fontSize: 12,
+              borderRadius: 16,
+              border: "none",
+              boxShadow: "0 10px 30px -10px rgba(0,0,0,0.1)",
+              padding: "12px 16px",
+              fontWeight: "bold"
             }}
           />
           <Legend 
             verticalAlign="top" 
             align="right" 
             iconType="circle"
-            wrapperStyle={{ fontSize: 11, paddingBottom: 10 }}
+            iconSize={10}
+            wrapperStyle={{ paddingBottom: 40, fontWeight: "bold", textTransform: "uppercase", letterSpacing: "0.1em", fontSize: 10 }}
           />
           <Bar 
+            name="Ingresos"
             dataKey="ingresos" 
-            fill="#064E3B" 
-            radius={[4, 4, 0, 0]} 
-            barSize={16}
+            fill="url(#ingresoGrad)" 
+            radius={[8, 8, 0, 0]} 
+            barSize={24}
           />
           <Bar 
+            name="Gastos"
             dataKey="gastos" 
-            fill="#FF0000" 
-            radius={[4, 4, 0, 0]} 
-            barSize={16}
+            fill="url(#gastoGrad)" 
+            radius={[8, 8, 0, 0]} 
+            barSize={24}
           />
         </BarChart>
       </ResponsiveContainer>

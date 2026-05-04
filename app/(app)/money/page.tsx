@@ -73,12 +73,6 @@ export default function MoneyPage() {
 
       <Reveal delay={0.08}>
         <div className="mb-6">
-          <IncomeVsExpensesChart />
-        </div>
-      </Reveal>
-
-      <Reveal delay={0.1}>
-        <div className="mb-6">
           <MonthlyIncome />
         </div>
       </Reveal>
@@ -216,6 +210,16 @@ export default function MoneyPage() {
         <div className="mb-10">
           <MoneyGoalsEditor />
         </div>
+      </Reveal>
+
+      <Reveal delay={0.18}>
+        <Card className="mb-10 card-hover">
+          <SectionTitle 
+            title="Balance de Ingresos vs Gastos" 
+            hint="Histórico comparativo de los últimos 6 meses."
+          />
+          <IncomeVsExpensesChart />
+        </Card>
       </Reveal>
     </div>
   );
