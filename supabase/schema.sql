@@ -96,17 +96,19 @@ create table if not exists user_tools (
 create index if not exists user_tools_user_id_idx on user_tools(user_id);
 
 -- Paywall: Stripe payments are upserted here by the stripe-webhook Edge
--- Function. Every NEW custom profile (i.e. anyone other than Pau & Michelle)
--- must match an unused row in this table.
-create table if not exists paid_users (
-  email text primary key,
+-- Function. The app generates an 8-char access code BEFORE redirecting to
+-- Stripe and passes it as `client_reference_id`. The webhook stores it here.
+-- Every NEW custom profile (i.e. anyone other than Pau & Michelle) must match
+-- an unused row in this table.
+create table if not exists paid_codes (
+  code text primary key,
   name text,
   paid_at timestamptz default now(),
   stripe_session_id text,
   used boolean default false,
   created_at timestamptz default now()
 );
-create index if not exists paid_users_session_idx on paid_users(stripe_session_id);
+create index if not exists paid_codes_session_idx on paid_codes(stripe_session_id);
 
 -- =============================================
 -- Pre-cargar las dos sesiones (Pau y Michelle)
@@ -131,7 +133,7 @@ alter table tasks enable row level security;
 alter table financial_entries enable row level security;
 alter table money_snapshots enable row level security;
 alter table user_tools enable row level security;
-alter table paid_users enable row level security;
+alter table paid_codes enable row level security;
 
 -- Borra políticas previas para que el script sea repetible.
 drop policy if exists "open_all_profiles" on profiles;
@@ -140,8 +142,8 @@ drop policy if exists "open_all_tasks" on tasks;
 drop policy if exists "open_all_financial_entries" on financial_entries;
 drop policy if exists "open_all_money_snapshots" on money_snapshots;
 drop policy if exists "open_all_user_tools" on user_tools;
-drop policy if exists "anon_read_paid_users" on paid_users;
-drop policy if exists "anon_update_paid_users" on paid_users;
+drop policy if exists "anon_read_paid_codes"   on paid_codes;
+drop policy if exists "anon_update_paid_codes" on paid_codes;
 
 create policy "open_all_profiles" on profiles for all using (true) with check (true);
 create policy "open_all_goals" on goals for all using (true) with check (true);
@@ -150,8 +152,8 @@ create policy "open_all_financial_entries" on financial_entries for all using (t
 create policy "open_all_money_snapshots" on money_snapshots for all using (true) with check (true);
 create policy "open_all_user_tools" on user_tools for all using (true) with check (true);
 
--- paid_users: anon can READ (to verify a payment) and UPDATE (mark used=true
+-- paid_codes: anon can READ (to verify a code) and UPDATE (mark used=true
 -- after creating a profile). Inserts come exclusively from the stripe-webhook
 -- Edge Function which uses the service role key.
-create policy "anon_read_paid_users"   on paid_users for select using (true);
-create policy "anon_update_paid_users" on paid_users for update using (true) with check (true);
+create policy "anon_read_paid_codes"   on paid_codes for select using (true);
+create policy "anon_update_paid_codes" on paid_codes for update using (true) with check (true);

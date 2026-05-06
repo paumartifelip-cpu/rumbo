@@ -27,9 +27,10 @@ import {
 import {
   buildStripeUrl,
   clearPendingPayment,
-  fetchPaidUser,
+  generateCode,
   getPendingPayment,
-  markPaidEmailUsed,
+  markCodeUsed,
+  normalizeCode,
   pollForPayment,
   savePendingPayment,
 } from "@/lib/payment";
@@ -51,15 +52,15 @@ function LoginPageInner() {
   const [pinMode, setPinMode] = useState<"enter" | "create">("enter");
 
   // Paywall flow states
-  // "paywall" — explain the price + email/name fields
-  // "verifying" — returned from Stripe, polling for the webhook
-  // "create" — payment confirmed, ask for currency + create profile
-  const [createStep, setCreateStep] = useState<null | "paywall" | "verifying" | "create">(null);
+  // "intro"     — explain the price, show the user-generated code + Stripe button
+  // "verifying" — returned from Stripe (or pressed "Ya pagué"), polling for the webhook
+  // "redeem"    — manual entry: user types the code they have
+  // "create"    — payment confirmed, ask for name + currency to create profile
+  const [createStep, setCreateStep] = useState<null | "intro" | "verifying" | "redeem" | "create">(null);
 
-  const [payEmail, setPayEmail] = useState("");
-  const [payName, setPayName] = useState("");
-  const [paidEmail, setPaidEmail] = useState("");
+  const [accessCode, setAccessCode] = useState(""); // current code (generated or typed)
   const [paywallError, setPaywallError] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
   const [newCurrency, setNewCurrency] = useState<Currency>("EUR");
 
   useEffect(() => {
@@ -97,28 +98,23 @@ function LoginPageInner() {
     if (searchParams.get("from_stripe") !== "1") return;
     const pending = getPendingPayment();
     if (!pending) {
-      // No localStorage record — user paid on a different device.
-      // Show paywall in "verifying" mode so they can type the email they paid with.
-      setCreateStep("paywall");
-      setPaywallError("Introduce el email con el que pagaste para verificar tu pago.");
+      setCreateStep("redeem");
+      setPaywallError("Introduce el código que generaste antes de pagar.");
       return;
     }
     setCreateStep("verifying");
-    setPayEmail(pending.email);
-    setPayName(pending.name);
-    pollForPayment(pending.email).then((row) => {
+    setAccessCode(pending.code);
+    setNewName(pending.name);
+    pollForPayment(pending.code).then((row) => {
       if (!row) {
         setPaywallError(
-          "No hemos recibido tu pago aún. Si pagaste hace unos segundos, espera un momento y vuelve a intentarlo."
+          "Aún no hemos recibido confirmación de Stripe. Espera unos segundos y vuelve a intentarlo."
         );
-        setCreateStep("paywall");
+        setCreateStep("intro");
         return;
       }
-      // Payment confirmed — move to profile creation
-      setPaidEmail(row.email);
-      setPayName(row.name || pending.name);
+      setNewName(row.name || pending.name || "");
       setCreateStep("create");
-      // Clean the URL so a refresh doesn't re-trigger the flow
       router.replace("/login");
     });
   }, [searchParams, router]);
@@ -157,9 +153,14 @@ function LoginPageInner() {
 
   function startPaywall() {
     setPaywallError(null);
-    setPayEmail("");
-    setPayName("");
-    setCreateStep("paywall");
+    setNewName("");
+    setNewCurrency("EUR");
+    // Reuse a pending code if there's one in localStorage; otherwise generate
+    // a fresh one. This way, if the user closes the modal mid-purchase, they
+    // can resume with the same code.
+    const pending = getPendingPayment();
+    setAccessCode(pending?.code || generateCode());
+    setCreateStep("intro");
   }
 
   function closePaywall() {
@@ -167,66 +168,62 @@ function LoginPageInner() {
     setPaywallError(null);
   }
 
-  async function goToStripe() {
-    const email = payEmail.trim().toLowerCase();
-    const name = payName.trim();
-    if (!email || !name) {
-      setPaywallError("Necesitamos tu nombre y email para emparejar el pago.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setPaywallError("Ese email no parece válido.");
-      return;
-    }
-    // Maybe the user already paid earlier with this email — check first.
-    const existing = await fetchPaidUser(email);
-    if (existing && !existing.used) {
-      setPaidEmail(existing.email);
-      setPayName(existing.name || name);
-      setCreateStep("create");
-      return;
-    }
-    savePendingPayment(email, name);
-    window.location.href = buildStripeUrl(email);
+  function regenerateCode() {
+    const fresh = generateCode();
+    setAccessCode(fresh);
+    setPaywallError(null);
   }
 
-  async function verifyExistingPayment() {
-    const email = payEmail.trim().toLowerCase();
-    if (!email) {
-      setPaywallError("Introduce el email con el que pagaste.");
+  function goToStripe() {
+    if (!accessCode) {
+      setPaywallError("No hay código generado.");
+      return;
+    }
+    savePendingPayment(accessCode, newName);
+    window.location.href = buildStripeUrl(accessCode);
+  }
+
+  function openRedeem() {
+    setPaywallError(null);
+    setAccessCode("");
+    setCreateStep("redeem");
+  }
+
+  async function verifyTypedCode() {
+    const code = normalizeCode(accessCode);
+    if (!code) {
+      setPaywallError("Introduce tu código de 8 caracteres.");
       return;
     }
     setPaywallError(null);
     setCreateStep("verifying");
-    const row = await pollForPayment(email, { timeoutMs: 10000 });
+    const row = await pollForPayment(code, { timeoutMs: 12000 });
     if (!row) {
-      setCreateStep("paywall");
+      setCreateStep("redeem");
       setPaywallError(
-        "No hay ningún pago registrado con ese email. Si acabas de pagar espera unos segundos."
+        "Ese código no se ha pagado todavía. Si acabas de pagar, espera unos segundos."
       );
       return;
     }
-    setPaidEmail(row.email);
-    setPayName(row.name || payName);
+    setAccessCode(code);
+    setNewName(row.name || newName);
     setCreateStep("create");
   }
 
   async function createUser() {
-    const name = payName.trim();
-    if (!name || !paidEmail) return;
+    const name = newName.trim();
+    const code = normalizeCode(accessCode);
+    if (!name || !code) return;
     const created = addCustomProfile(name, newCurrency);
     setProfiles(getAllProfiles());
     setCreateStep(null);
     clearPendingPayment();
-    // Push the new profile metadata to Supabase immediately so it appears
-    // on other devices without waiting for a full data sync.
     pushToSupabase(created.user_id, {
       goals: [], tasks: [], finances: [], snapshots: [], userTools: [],
       primaryCurrency: newCurrency,
       profileMeta: { id: created.id, name: created.name, initials: created.initials, color: created.color, emoji: created.emoji },
     }).catch(() => {});
-    // Mark the paid email so it can't be used to spawn another profile.
-    markPaidEmailUsed(paidEmail).catch(() => {});
+    markCodeUsed(code).catch(() => {});
     setPendingProfile(created);
     setPinMode("create");
   }
@@ -294,29 +291,42 @@ function LoginPageInner() {
       )}
 
       <AnimatePresence>
-        {createStep === "paywall" && (
-          <PaywallModal
-            email={payEmail}
-            name={payName}
+        {createStep === "intro" && (
+          <PaywallIntroModal
+            code={accessCode}
             error={paywallError}
-            onEmailChange={setPayEmail}
-            onNameChange={setPayName}
-            onCancel={closePaywall}
+            onRegenerate={regenerateCode}
             onPay={goToStripe}
-            onVerifyExisting={verifyExistingPayment}
+            onRedeem={openRedeem}
+            onCancel={closePaywall}
+          />
+        )}
+
+        {createStep === "redeem" && (
+          <RedeemModal
+            code={accessCode}
+            error={paywallError}
+            onChange={(v) => setAccessCode(v)}
+            onVerify={verifyTypedCode}
+            onBack={() => {
+              setCreateStep("intro");
+              setPaywallError(null);
+              if (!accessCode) setAccessCode(generateCode());
+            }}
+            onCancel={closePaywall}
           />
         )}
 
         {createStep === "verifying" && (
-          <VerifyingModal email={payEmail} />
+          <VerifyingModal code={accessCode} />
         )}
 
         {createStep === "create" && (
           <CreateProfileModal
-            email={paidEmail}
-            name={payName}
+            code={accessCode}
+            name={newName}
             currency={newCurrency}
-            onNameChange={setPayName}
+            onNameChange={setNewName}
             onCurrencyChange={setNewCurrency}
             onCancel={closePaywall}
             onCreate={createUser}
@@ -327,27 +337,35 @@ function LoginPageInner() {
   );
 }
 
-// ─── Paywall Modal ────────────────────────────────────────────────────────────
+// ─── Paywall Intro Modal ──────────────────────────────────────────────────────
 
-function PaywallModal({
-  email,
-  name,
+function PaywallIntroModal({
+  code,
   error,
-  onEmailChange,
-  onNameChange,
-  onCancel,
+  onRegenerate,
   onPay,
-  onVerifyExisting,
+  onRedeem,
+  onCancel,
 }: {
-  email: string;
-  name: string;
+  code: string;
   error: string | null;
-  onEmailChange: (s: string) => void;
-  onNameChange: (s: string) => void;
-  onCancel: () => void;
+  onRegenerate: () => void;
   onPay: () => void;
-  onVerifyExisting: () => void;
+  onRedeem: () => void;
+  onCancel: () => void;
 }) {
+  const [copied, setCopied] = useState(false);
+  function copyCode() {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(code).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    }
+  }
+  // Display formatted as XXXX-XXXX for readability.
+  const display = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -368,40 +386,42 @@ function PaywallModal({
             🔓
           </div>
           <h2 className="text-xl font-semibold tracking-tight">
-            Crear tu perfil
+            Crear perfil premium
           </h2>
         </div>
         <p className="text-sm text-rumbo-muted">
           Rumbo es una app premium. Para crear tu propio perfil con todas las
-          funciones, completa el pago único. Después podrás entrar todas las
-          veces que quieras.
+          funciones, completa el pago único y obtendrás acceso ilimitado.
         </p>
 
-        <div className="mt-5 space-y-3">
-          <div>
-            <label className="text-xs uppercase tracking-wider text-rumbo-muted">Tu nombre</label>
-            <input
-              autoFocus
-              className="input mt-1 w-full"
-              placeholder="Cómo te llamas"
-              value={name}
-              onChange={(e) => onNameChange(e.target.value)}
-              maxLength={24}
-            />
+        <div className="mt-5 rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 mb-1">
+            Tu código de acceso
           </div>
-          <div>
-            <label className="text-xs uppercase tracking-wider text-rumbo-muted">Tu email</label>
-            <input
-              type="email"
-              className="input mt-1 w-full"
-              placeholder="tu@email.com"
-              value={email}
-              onChange={(e) => onEmailChange(e.target.value)}
-            />
-            <div className="text-[11px] text-rumbo-muted mt-1.5">
-              Usaremos este email para emparejar tu pago. Debe ser el mismo
-              que introduzcas en Stripe.
+          <div className="flex items-center justify-between gap-3">
+            <code className="text-2xl font-mono font-bold tracking-[0.2em] text-emerald-900 select-all">
+              {display}
+            </code>
+            <div className="flex gap-1">
+              <button
+                onClick={copyCode}
+                className="px-2.5 py-1.5 rounded-lg bg-white text-emerald-700 text-[11px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-colors border border-emerald-200"
+                title="Copiar código"
+              >
+                {copied ? "✓" : "📋"}
+              </button>
+              <button
+                onClick={onRegenerate}
+                className="px-2.5 py-1.5 rounded-lg bg-white text-emerald-700 text-[11px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-colors border border-emerald-200"
+                title="Generar otro"
+              >
+                ↻
+              </button>
             </div>
+          </div>
+          <div className="text-[11px] text-emerald-700/80 mt-2.5 leading-relaxed">
+            Anótalo o cópialo. Lo necesitarás después del pago para crear tu
+            perfil. Lo guardaremos en este navegador automáticamente.
           </div>
         </div>
 
@@ -420,10 +440,10 @@ function PaywallModal({
 
         <div className="mt-3 text-center">
           <button
-            onClick={onVerifyExisting}
+            onClick={onRedeem}
             className="text-xs text-rumbo-muted hover:text-rumbo-ink underline"
           >
-            Ya pagué — verificar mi email
+            Ya tengo un código pagado
           </button>
         </div>
 
@@ -438,9 +458,94 @@ function PaywallModal({
   );
 }
 
+// ─── Redeem (manual code entry) Modal ─────────────────────────────────────────
+
+function RedeemModal({
+  code,
+  error,
+  onChange,
+  onVerify,
+  onBack,
+  onCancel,
+}: {
+  code: string;
+  error: string | null;
+  onChange: (s: string) => void;
+  onVerify: () => void;
+  onBack: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center px-4"
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0, y: 12 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md"
+      >
+        <h2 className="text-xl font-semibold tracking-tight">
+          Canjear código
+        </h2>
+        <p className="text-sm text-rumbo-muted mt-1">
+          Introduce el código de 8 caracteres que generaste cuando pagaste.
+        </p>
+
+        <input
+          autoFocus
+          className="input mt-5 w-full text-lg font-mono tracking-widest text-center uppercase"
+          placeholder="XXXX-XXXX"
+          value={code}
+          maxLength={9}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onVerify();
+            if (e.key === "Escape") onCancel();
+          }}
+        />
+
+        {error && (
+          <div className="mt-3 text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={onVerify}
+          className="mt-5 w-full px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors"
+        >
+          Verificar →
+        </button>
+
+        <div className="mt-3 flex justify-between">
+          <button
+            onClick={onBack}
+            className="text-xs text-rumbo-muted hover:text-rumbo-ink underline"
+          >
+            ← No tengo código aún
+          </button>
+          <button
+            onClick={onCancel}
+            className="text-xs text-rumbo-muted hover:text-rumbo-ink"
+          >
+            Cancelar
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Verifying Modal ──────────────────────────────────────────────────────────
 
-function VerifyingModal({ email }: { email: string }) {
+function VerifyingModal({ code }: { code: string }) {
+  const display = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -459,7 +564,7 @@ function VerifyingModal({ email }: { email: string }) {
         </div>
         <h2 className="text-lg font-semibold">Verificando tu pago…</h2>
         <p className="text-sm text-rumbo-muted mt-2">
-          Buscamos el pago asociado a <span className="font-medium">{email}</span>.
+          Buscamos el código <code className="font-mono font-bold tracking-wider">{display}</code>.
           Suele tardar unos segundos.
         </p>
       </motion.div>
@@ -470,7 +575,7 @@ function VerifyingModal({ email }: { email: string }) {
 // ─── Create Profile Modal (after payment) ─────────────────────────────────────
 
 function CreateProfileModal({
-  email,
+  code,
   name,
   currency,
   onNameChange,
@@ -478,7 +583,7 @@ function CreateProfileModal({
   onCancel,
   onCreate,
 }: {
-  email: string;
+  code: string;
   name: string;
   currency: Currency;
   onNameChange: (s: string) => void;
@@ -486,6 +591,7 @@ function CreateProfileModal({
   onCancel: () => void;
   onCreate: () => void;
 }) {
+  const display = code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -511,7 +617,7 @@ function CreateProfileModal({
           Crea tu perfil
         </h2>
         <p className="text-sm text-rumbo-muted mt-1">
-          Bienvenido a Rumbo, <span className="font-medium">{email}</span>.
+          Código <code className="font-mono font-bold">{display}</code> verificado.
           Después elegirás un PIN.
         </p>
         <input
@@ -575,7 +681,7 @@ function CreateProfileModal({
   );
 }
 
-// ─── Profile / Create cards (unchanged) ───────────────────────────────────────
+// ─── Profile / Create cards ───────────────────────────────────────────────────
 
 function ProfileCard({
   profile,

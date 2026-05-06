@@ -104,17 +104,6 @@ const BASE_DEFAULT_TOOLS = [
     highlight: true,
   },
   {
-    name: "NotebookLM",
-    icon: "📚",
-    category: "Productividad",
-    description: "IA de Google que analiza tus documentos y genera resúmenes, preguntas y podcasts de audio con tu contenido.",
-    url: "https://notebooklm.google.com",
-    tags: ["IA", "documentos", "resúmenes", "podcast"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
     name: "Obsidian",
     icon: "🪨",
     category: "Productividad",
@@ -143,6 +132,36 @@ const BASE_DEFAULT_TOOLS = [
     tags: ["agenda", "reuniones"],
     free: true,
     rating: 4,
+  },
+  {
+    name: "Cal.com",
+    icon: "🗓️",
+    category: "Productividad",
+    description: "Alternativa open-source a Calendly. Programación de reuniones moderna, self-host opcional.",
+    url: "https://cal.com",
+    tags: ["agenda", "open-source", "reuniones"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Linear",
+    icon: "📐",
+    category: "Productividad",
+    description: "Gestión de proyectos para equipos modernos. Rapidísimo, con atajos de teclado y enfoque en velocidad.",
+    url: "https://linear.app",
+    tags: ["proyectos", "equipos", "issues"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Raycast",
+    icon: "🚦",
+    category: "Productividad",
+    description: "Lanzador para Mac con IA, snippets, ventanas, calculadora y mil extensiones. Reemplaza Spotlight.",
+    url: "https://raycast.com",
+    tags: ["Mac", "lanzador", "atajos"],
+    free: true,
+    rating: 5,
   },
   // Finanzas
   {
@@ -197,6 +216,78 @@ const BASE_DEFAULT_TOOLS = [
     free: true,
     rating: 5,
     highlight: true,
+  },
+  {
+    name: "v0",
+    icon: "🧱",
+    category: "IA",
+    description: "Genera interfaces React/Next.js con IA. Le describes lo que quieres y obtienes código listo para producción.",
+    url: "https://v0.app",
+    tags: ["código", "UI", "Vercel", "generación"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Lovable",
+    icon: "💖",
+    category: "IA",
+    description: "Construye apps web completas describiéndolas en lenguaje natural. Backend, frontend y base de datos sin tocar código.",
+    url: "https://lovable.dev",
+    tags: ["código", "no-code", "fullstack", "app builder"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Bolt",
+    icon: "⚡",
+    category: "IA",
+    description: "App builder con IA en el navegador. Genera, ejecuta y depura aplicaciones full-stack en tiempo real.",
+    url: "https://bolt.new",
+    tags: ["código", "app builder", "fullstack", "browser"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Replit Agent",
+    icon: "🛠️",
+    category: "IA",
+    description: "Agente IA dentro de Replit que construye, ejecuta y despliega apps automáticamente desde un prompt.",
+    url: "https://replit.com",
+    tags: ["código", "agente", "deploy"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "DeepSeek",
+    icon: "🔬",
+    category: "IA",
+    description: "Modelo de razonamiento abierto, gratis y rapidísimo. Excelente para programación y matemáticas.",
+    url: "https://chat.deepseek.com",
+    tags: ["chat", "razonamiento", "open-source"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Mistral Le Chat",
+    icon: "🐈",
+    category: "IA",
+    description: "Asistente de Mistral AI con búsqueda web, generación de imágenes y código. Alternativa europea a ChatGPT.",
+    url: "https://chat.mistral.ai",
+    tags: ["chat", "Europa", "open-source"],
+    free: true,
+    rating: 4,
+  },
+  {
+    name: "NotebookLM",
+    icon: "📚",
+    category: "IA",
+    description: "IA de Google que analiza tus documentos y genera resúmenes, preguntas y podcasts de audio con tu contenido.",
+    url: "https://notebooklm.google.com",
+    tags: ["IA", "documentos", "podcast", "Google"],
+    free: true,
+    rating: 5,
   },
   {
     name: "Antigravity",
@@ -290,6 +381,46 @@ const BASE_DEFAULT_TOOLS = [
     tags: ["voz", "audio", "podcast"],
     free: true,
     rating: 5,
+  },
+  {
+    name: "Runway",
+    icon: "🎞️",
+    category: "IA",
+    description: "Generación y edición de vídeo con IA de última generación. Modelos Gen-3 / Gen-4 para vídeo cinematográfico.",
+    url: "https://runwayml.com",
+    tags: ["vídeo", "generación", "edición"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "HeyGen",
+    icon: "👤",
+    category: "IA",
+    description: "Vídeos con avatares hiperrealistas a partir de texto. Tu avatar habla en cualquier idioma sin grabar.",
+    url: "https://heygen.com",
+    tags: ["vídeo", "avatar", "doblaje"],
+    free: true,
+    rating: 4,
+  },
+  {
+    name: "Higgsfield",
+    icon: "🎥",
+    category: "IA",
+    description: "Movimiento de cámara cinematográfico con IA. Convierte una imagen estática en planos dinámicos profesionales.",
+    url: "https://higgsfield.ai",
+    tags: ["vídeo", "cinematográfico", "cámara"],
+    free: true,
+    rating: 4,
+  },
+  {
+    name: "Krea",
+    icon: "🖼️",
+    category: "IA",
+    description: "Estudio de generación de imagen y vídeo en tiempo real. Combina Flux, SDXL y otros modelos en una sola interfaz.",
+    url: "https://krea.ai",
+    tags: ["imágenes", "vídeo", "tiempo real"],
+    free: true,
+    rating: 4,
   },
   // Contenido
   {
@@ -512,11 +643,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         const raw = localStorage.getItem(storageKeyFor(p.id));
         if (raw) {
           const parsed = JSON.parse(raw);
-          // If userTools key exists in storage, trust it — even if empty
-          // (the user may have intentionally deleted everything).
-          // Only seed defaults when the key is completely absent.
+          // Seed defaults whenever the list is empty or missing — IDs and
+          // timestamps are stable so this won't cause visual shifting on
+          // subsequent renders.
           const userTools =
-            parsed.userTools !== undefined
+            Array.isArray(parsed.userTools) && parsed.userTools.length > 0
               ? parsed.userTools
               : buildDefaultUserTools(p.user_id);
           setState({
@@ -592,14 +723,18 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const mergedOnboarding = remote.onboarding ?? cur.onboarding;
 
     // Stable sort by created_at (asc), then by name — keeps order identical across syncs
-    const mergedUserTools = mergeById(cur.userTools || [], remote.userTools || []).sort((a, b) => {
+    let mergedUserTools = mergeById(cur.userTools || [], remote.userTools || []).sort((a, b) => {
       const ca = a.created_at ?? "";
       const cb = b.created_at ?? "";
       if (ca !== cb) return ca < cb ? -1 : 1;
       return (a.name || "").localeCompare(b.name || "");
     });
-    // NOTE: do NOT auto-fill defaults if the user has 0 tools — that would
-    // bring back tools they explicitly deleted.
+    // If both local and remote ended up empty, seed the defaults so the user
+    // never lands on a blank Stack page. Defaults have stable IDs/timestamps
+    // so this doesn't cause re-render flicker.
+    if (mergedUserTools.length === 0) {
+      mergedUserTools = buildDefaultUserTools(p.user_id);
+    }
 
     // If the merge added anything the server didn't have, push it back so
     // the next device that pulls sees the same union. Also push if this
@@ -886,7 +1021,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       if (raw) {
         const parsed = JSON.parse(raw);
         const userTools =
-          parsed.userTools !== undefined
+          Array.isArray(parsed.userTools) && parsed.userTools.length > 0
             ? parsed.userTools
             : buildDefaultUserTools(p.user_id);
         setState({
