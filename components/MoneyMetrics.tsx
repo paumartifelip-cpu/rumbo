@@ -38,86 +38,99 @@ export function MoneyMetrics({ compact = false }: { compact?: boolean }) {
     : 0;
 
   return (
-    <div
-      className={
-        compact
-          ? "grid grid-cols-2 lg:grid-cols-4 gap-3"
-          : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
-      }
-    >
-      <Metric
-        label="Tienes en total"
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <PremiumMetric
+        label="Patrimonio Total"
         value={total}
         target={totalTarget}
         progress={totalProgress}
-        tone="green"
+        tone="emerald"
+        icon="💎"
       />
-      <Metric
-        label="Quieres tener"
-        value={totalTarget}
-        muted
-      />
-      <Metric
-        label="Ganas al mes"
+      <PremiumMetric
+        label="Ingreso Mensual"
         value={monthIncome}
         target={monthTarget}
         progress={monthProgress}
         tone="violet"
-      />
-      <Metric
-        label="Quieres ganar"
-        value={monthTarget}
-        suffix="/ mes"
-        muted
+        icon="📈"
       />
     </div>
   );
 }
 
-function Metric({
+function PremiumMetric({
   label,
   value,
   target,
   progress,
-  tone = "green",
-  muted,
-  suffix,
+  tone,
+  icon,
 }: {
   label: string;
   value: number;
-  target?: number;
-  progress?: number;
-  tone?: "green" | "violet";
-  muted?: boolean;
-  suffix?: string;
+  target: number;
+  progress: number;
+  tone: "emerald" | "violet";
+  icon: string;
 }) {
   const formatMoney = useFormatMoney();
+  
+  const bgClass = tone === "emerald" 
+    ? "bg-gradient-to-br from-emerald-950 to-slate-900 border-emerald-800 shadow-emerald-900/20" 
+    : "bg-gradient-to-br from-violet-950 to-slate-900 border-violet-800 shadow-violet-900/20";
+    
+  const textClass = tone === "emerald" ? "text-emerald-400" : "text-violet-400";
+  const progressBgClass = tone === "emerald" ? "bg-emerald-900/50" : "bg-violet-900/50";
+  const progressFillClass = tone === "emerald" ? "bg-emerald-500" : "bg-violet-500";
+
   return (
-    <div className="card p-4">
-      <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">
-        {label}
-      </div>
-      <div className="flex items-baseline gap-1.5 mt-1.5">
-        <div
-          className={`text-2xl md:text-[28px] font-semibold tracking-tight ${
-            muted ? "text-rumbo-muted" : "text-rumbo-ink"
-          }`}
-        >
-          {formatMoney(value)}
+    <div className={`relative overflow-hidden border rounded-2xl p-6 shadow-xl ${bgClass}`}>
+      {/* Decorative Glow */}
+      <div className={`absolute -top-12 -right-12 w-32 h-32 blur-3xl opacity-30 rounded-full ${progressFillClass}`}></div>
+      
+      <div className="relative z-10 flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">{icon}</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+              {label}
+            </span>
+          </div>
+          <div className="text-3xl md:text-4xl font-black text-white tracking-tight mt-1">
+            {formatMoney(value)}
+          </div>
         </div>
-        {suffix && <span className="text-xs text-rumbo-muted">{suffix}</span>}
+        <div className="text-right">
+          <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Objetivo</div>
+          <div className={`text-sm md:text-base font-bold ${textClass}`}>
+            {formatMoney(target)}
+          </div>
+        </div>
       </div>
-      {target !== undefined && progress !== undefined && (
-        <>
-          <div className="mt-3">
-            <ProgressBar value={progress} tone={tone} />
+
+      <div className="relative z-10 mt-8">
+        <div className="flex justify-between items-end mb-2">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+            Progreso
           </div>
-          <div className="text-[11px] text-rumbo-muted mt-1.5">
-            {progress.toFixed(0)}% · faltan{" "}
-            {formatMoney(Math.max(0, target - value))}
+          <div className="text-xs font-bold text-white">
+            {progress.toFixed(1)}%
           </div>
-        </>
-      )}
+        </div>
+        
+        {/* Premium Progress Bar */}
+        <div className={`w-full h-3 rounded-full overflow-hidden ${progressBgClass}`}>
+          <div 
+            className={`h-full rounded-full transition-all duration-1000 ease-out ${progressFillClass}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        
+        <div className="text-[10px] text-slate-500 mt-2 font-medium tracking-wide">
+          Faltan {formatMoney(Math.max(0, target - value))} para la meta
+        </div>
+      </div>
     </div>
   );
 }

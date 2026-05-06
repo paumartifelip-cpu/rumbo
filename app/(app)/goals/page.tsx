@@ -54,83 +54,128 @@ export default function GoalsPage() {
                   ((g.current_amount ?? 0) / g.target_amount) * 100
                 )
               : g.progress;
+          const iconMap: Record<string, string> = {
+            dinero: "💰",
+            negocio: "💼",
+            salud: "🏥",
+            aprendizaje: "📚",
+            contenido: "📹",
+            "vida personal": "🧘",
+            productividad: "⚡",
+          };
+          const catIcon = iconMap[g.category] || "🎯";
+
           return (
-            <Card key={g.id} className="flex flex-col">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-rumbo-muted">
-                    {g.category}
+            <div key={g.id} className="relative overflow-hidden bg-white border border-slate-200 shadow-sm hover:shadow-md transition-shadow rounded-2xl p-5 flex flex-col group">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-xl shadow-sm shrink-0">
+                    {catIcon}
                   </div>
-                  <h3 className="text-lg font-semibold mt-1">{g.title}</h3>
-                  {g.description && (
-                    <p className="text-sm text-rumbo-muted mt-1">
-                      {g.description}
-                    </p>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 leading-tight">{g.title}</h3>
+                    <div className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mt-1">
+                      {g.category}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => updateGoal(g.id, { status: g.status === "completado" ? "activo" : "completado" })}
+                      className={`text-xs px-2 py-1 rounded-md font-bold transition-colors ${
+                        g.status === "completado" ? "bg-slate-100 text-slate-600 hover:bg-slate-200" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                      }`}
+                    >
+                      {g.status === "completado" ? "Reabrir" : "✓ Completar"}
+                    </button>
+                    <button
+                      onClick={() => removeGoal(g.id)}
+                      className="text-xs px-2 py-1 rounded-md font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                      title="Eliminar"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {g.status === "completado" && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-widest">
+                      Logrado
+                    </span>
+                  )}
+                  {g.status === "pausado" && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-widest">
+                      Pausado
+                    </span>
                   )}
                 </div>
-                <span className="chip bg-slate-100 text-slate-600">
-                  ⭐ {g.importance}/10
-                </span>
               </div>
 
-              <div className="my-5 flex justify-center">
-                <CircularProgress
-                  value={computed}
-                  size={170}
-                  tone={g.category === "dinero" ? "green" : "violet"}
-                  label={`Faltan ${100 - computed}%`}
-                />
-              </div>
-
-              {g.deadline && (
-                <div className="text-xs text-rumbo-muted text-center -mt-1">
-                  Hasta {formatDate(g.deadline)}
-                </div>
+              {g.description && (
+                <p className="text-sm text-slate-500 mb-5 line-clamp-2">
+                  {g.description}
+                </p>
               )}
 
-              {g.target_amount ? (
-                <div className="mt-3 text-sm">
-                  {formatMoney(g.current_amount ?? 0)} /{" "}
-                  <span className="text-rumbo-muted">
-                    {formatMoney(g.target_amount)}
-                  </span>
+              <div className="mt-auto">
+                <div className="flex justify-between items-end mb-2">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Progreso</div>
+                  <div className="text-lg font-black text-slate-800">{computed}%</div>
                 </div>
-              ) : null}
+                
+                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-1000 ${
+                      computed === 100 ? "bg-emerald-500" : (g.category === "dinero" ? "bg-emerald-400" : "bg-violet-500")
+                    }`}
+                    style={{ width: `${Math.min(100, computed)}%` }}
+                  />
+                </div>
 
-              <div className="mt-4 flex gap-2">
-                <select
-                  className="input text-xs flex-1"
-                  value={g.status}
-                  onChange={(e) =>
-                    updateGoal(g.id, { status: e.target.value as any })
-                  }
-                >
-                  <option value="activo">Activo</option>
-                  <option value="pausado">Pausado</option>
-                  <option value="completado">Completado</option>
-                </select>
-                <button
-                  onClick={() => removeGoal(g.id)}
-                  className="btn-ghost text-rose-600 text-xs"
-                >
-                  Eliminar
-                </button>
+                <div className="flex justify-between items-center mt-3">
+                  {g.target_amount ? (
+                    <div className="text-xs font-bold text-slate-700">
+                      {formatMoney(g.current_amount ?? 0)} <span className="text-slate-400 font-medium">/ {formatMoney(g.target_amount)}</span>
+                    </div>
+                  ) : (
+                    <div className="text-xs font-bold text-slate-400">
+                      {linked.length > 0 ? `${done} de ${linked.length} tareas` : "Basado en progreso manual"}
+                    </div>
+                  )}
+
+                  {g.deadline && (
+                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                      🗓️ {formatDate(g.deadline)}
+                    </div>
+                  )}
+                </div>
               </div>
-            </Card>
+            </div>
           );
         })}
         {goals.length === 0 && (
           <div className="md:col-span-2 xl:col-span-3">
-            <EmptyState
-              icon="🚩"
-              title="Aún no tienes objetivos"
-              description="Crea el primero para empezar a medir tu rumbo."
-              action={
-                <button className="btn-primary" onClick={() => setOpen(true)}>
-                  + Nuevo objetivo
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 to-slate-800 text-center py-16 px-6 border border-slate-800 shadow-2xl">
+              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500 rounded-full blur-[100px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+              
+              <div className="relative z-10 max-w-md mx-auto">
+                <div className="w-20 h-20 bg-white/10 rounded-3xl backdrop-blur-xl border border-white/20 flex items-center justify-center text-4xl shadow-xl mx-auto mb-6">
+                  🏔️
+                </div>
+                <h2 className="text-2xl md:text-3xl font-black text-white mb-3 tracking-tight">
+                  Un barco sin rumbo no llega a ningún puerto
+                </h2>
+                <p className="text-slate-400 text-sm md:text-base mb-8">
+                  Define tu primer gran objetivo. Ya sea financiero, de salud o de negocio, darle un norte a tus tareas multiplicará tu enfoque.
+                </p>
+                <button 
+                  className="bg-white text-slate-900 hover:bg-slate-100 hover:scale-105 transition-all font-bold px-8 py-3.5 rounded-full shadow-lg"
+                  onClick={() => setOpen(true)}
+                >
+                  + Trazar mi primer rumbo
                 </button>
-              }
-            />
+              </div>
+            </div>
           </div>
         )}
       </div>
