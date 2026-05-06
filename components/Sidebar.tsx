@@ -8,12 +8,13 @@ import { cn } from "@/lib/utils";
 import { useRumbo } from "@/lib/store";
 
 const items = [
-  { href: "/dashboard", label: "Inicio", icon: "🏠" },
-  { href: "/money", label: "Dinero", icon: "💸" },
-  { href: "/gastos", label: "Gastos", icon: "🧾" },
-  { href: "/tasks", label: "Tareas", icon: "✅" },
-  { href: "/goals", label: "Objetivos", icon: "🚩" },
-  { href: "/settings", label: "Ajustes", icon: "⚙️" },
+  { href: "/dashboard", label: "Inicio",       icon: "🏠" },
+  { href: "/money",     label: "Dinero",       icon: "💸" },
+  { href: "/gastos",    label: "Gastos",       icon: "🧾" },
+  { href: "/tasks",     label: "Tareas",       icon: "✅" },
+  { href: "/goals",     label: "Objetivos",    icon: "🚩" },
+  { href: "/stack",     label: "Stack",        icon: "🧰" },
+  { href: "/settings",  label: "Ajustes",      icon: "⚙️" },
 ];
 
 export function Sidebar() {
@@ -137,7 +138,7 @@ export function MobileHeader() {
 }
 
 // Mobile bottom nav shows all items to maintain consistency with desktop.
-const MOBILE_ITEMS = ["/dashboard", "/money", "/gastos", "/tasks", "/goals", "/settings"];
+const MOBILE_ITEMS = ["/dashboard", "/money", "/tasks", "/goals", "/stack", "/settings"];
 
 export function MobileNav() {
   const pathname = usePathname();
