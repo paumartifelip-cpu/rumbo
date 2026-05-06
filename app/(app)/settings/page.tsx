@@ -16,6 +16,7 @@ import {
   setPin,
 } from "@/lib/pin";
 import { verifyOpenAI } from "@/lib/gemini";
+import { RumboWrapped } from "@/components/RumboWrapped";
 
 const KEY_STORAGE = "rumbo_gemini_key";
 const KEY_STORAGE_GPT = "rumbo_gpt_key";
@@ -58,6 +59,7 @@ export default function SettingsPage() {
   const [pinModal, setPinModal] = useState<null | "create" | "change">(null);
   const [pinHasValue, setPinHasValue] = useState(false);
   const [pinHint, setPinHint] = useState<string | null>(null);
+  const [showWrapped, setShowWrapped] = useState(false);
 
   useEffect(() => {
     const k = localStorage.getItem(KEY_STORAGE);
@@ -124,6 +126,21 @@ export default function SettingsPage() {
       <PageHeader title="Ajustes" subtitle="Tu cuenta, IA y plan." />
 
       <div className="flex flex-col gap-3">
+
+        {/* ── Rumbo Wrapped ────────────────────────────────── */}
+        <button
+          onClick={() => setShowWrapped(true)}
+          className="w-full relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 text-white p-5 flex items-center gap-4 hover:scale-[1.01] active:scale-[0.99] transition-transform shadow-lg"
+        >
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay" />
+          <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl shrink-0">🎬</div>
+          <div className="text-left relative z-10">
+            <div className="font-black text-base">Mi Rumbo Wrapped</div>
+            <div className="text-white/70 text-xs mt-0.5">Tu resumen personal al estilo Spotify. Genera uno ahora.</div>
+          </div>
+          <div className="ml-auto text-white/60 text-xl relative z-10">›</div>
+        </button>
+
         <SettingsAccordion
           id="currency"
           title="Moneda principal"
@@ -453,6 +470,7 @@ export default function SettingsPage() {
           verify={(pin) => checkPin(profile.id, pin)}
         />
       )}
+      {showWrapped && <RumboWrapped onClose={() => setShowWrapped(false)} />}
     </div>
   );
 }
