@@ -43,18 +43,42 @@ export function TaskRow({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      initial={{ opacity: 0, y: 12, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      whileHover={{ y: -2, scale: 1.01, transition: { type: "spring", stiffness: 400, damping: 25 } }}
-      whileTap={{ scale: 0.98, cursor: "grabbing" }}
+      whileHover={{
+        y: -4,
+        scale: 1.02,
+        boxShadow: done
+          ? "0 4px 20px rgba(0,0,0,0.08)"
+          : isHighImpact
+          ? "0 8px 30px rgba(16,185,129,0.35)"
+          : isDistraction
+          ? "0 8px 30px rgba(225,29,72,0.35)"
+          : "0 6px 20px rgba(0,0,0,0.12)",
+        transition: { type: "spring", stiffness: 350, damping: 22 },
+      }}
+      whileTap={{ scale: 0.97 }}
       className={cn(
-        "group flex items-center gap-4 py-4 px-5 border transition-all shadow-sm rounded-xl mb-3 mx-4 cursor-grab",
+        "group relative flex items-center gap-4 py-4 px-5 border transition-colors shadow-sm rounded-xl mb-3 mx-4 cursor-grab overflow-hidden",
         highlight ? "ring-2 ring-emerald-400" : "",
         done ? "bg-slate-100 border-slate-200 opacity-60 grayscale" : rowTone,
-        !done && isHighImpact ? "border-l-[6px] border-l-emerald-500" : "",
-        !done && isDistraction ? "border-l-[6px] border-l-rose-500" : ""
+        !done && isHighImpact ? "border-l-[6px] border-l-emerald-400" : "",
+        !done && isDistraction ? "border-l-[6px] border-l-rose-400" : ""
       )}
     >
+      {/* Hover shimmer overlay */}
+      {!done && (
+        <div
+          className={cn(
+            "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none",
+            isHighImpact
+              ? "bg-gradient-to-r from-emerald-400/10 via-transparent to-transparent"
+              : isDistraction
+              ? "bg-gradient-to-r from-rose-400/10 via-transparent to-transparent"
+              : "bg-gradient-to-r from-white/10 via-transparent to-transparent"
+          )}
+        />
+      )}
       <div className="shrink-0 flex items-center justify-center w-6">
         <button
           onClick={() => onToggle(task.id)}
