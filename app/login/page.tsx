@@ -108,7 +108,7 @@ export default function LoginPage() {
     // Push the new profile metadata to Supabase immediately so it appears
     // on other devices without waiting for a full data sync.
     pushToSupabase(created.user_id, {
-      goals: [], tasks: [], finances: [], snapshots: [],
+      goals: [], tasks: [], finances: [], snapshots: [], userTools: [],
       primaryCurrency: newCurrency,
       profileMeta: { id: created.id, name: created.name, initials: created.initials, color: created.color, emoji: created.emoji },
     }).catch(() => {});

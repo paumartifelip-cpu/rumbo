@@ -7,6 +7,7 @@ import {
   MoneySnapshot,
   OnboardingData,
   Task,
+  UserTool,
 } from "./types";
 
 export interface SyncSnapshot {
@@ -14,6 +15,7 @@ export interface SyncSnapshot {
   tasks: Task[];
   finances: FinancialEntry[];
   snapshots: MoneySnapshot[];
+  userTools: UserTool[];
   onboarding?: OnboardingData;
   primaryCurrency?: Currency;
   profileMeta?: Pick<Profile, "id" | "name" | "initials" | "color" | "emoji">;
@@ -63,20 +65,22 @@ export async function pullFromSupabase(
   if (!supa) return null;
 
   try {
-    const [g, t, f, s, p] = await Promise.all([
+    const [g, t, f, s, p, ut] = await Promise.all([
       supa.from("goals").select("*").eq("user_id", userId),
       supa.from("tasks").select("*").eq("user_id", userId),
       supa.from("financial_entries").select("*").eq("user_id", userId),
       supa.from("money_snapshots").select("*").eq("user_id", userId),
       supa.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
+      supa.from("user_tools").select("*").eq("user_id", userId),
     ]);
 
-    if (g.error || t.error || f.error || s.error) {
+    if (g.error || t.error || f.error || s.error || ut.error) {
       console.warn("Supabase pull error", {
         g: g.error,
         t: t.error,
         f: f.error,
         s: s.error,
+        ut: ut.error,
       });
       return null;
     }
@@ -118,6 +122,7 @@ export async function pullFromSupabase(
       tasks: (t.data ?? []).map(normalizeTask),
       finances: (f.data ?? []).map(normalizeFinance),
       snapshots: (s.data ?? []).map(normalizeSnapshot),
+      userTools: (ut.data ?? []).map(normalizeUserTool),
       onboarding,
       primaryCurrency,
       profileMeta,
@@ -184,6 +189,11 @@ export async function pushToSupabase(
         "money_snapshots",
         snap.snapshots.map(stripSnapshot(userId))
       ),
+      syncTable(
+        userId,
+        "user_tools",
+        (snap.userTools || []).map(stripUserTool(userId))
+      ),
     ]);
 
     return true;
@@ -224,6 +234,7 @@ export async function deleteProfileFromSupabase(userId: string): Promise<boolean
       supa.from("goals").delete().eq("user_id", userId),
       supa.from("tasks").delete().eq("user_id", userId),
       supa.from("money_snapshots").delete().eq("user_id", userId),
+      supa.from("user_tools").delete().eq("user_id", userId),
       supa.from("profiles").delete().eq("user_id", userId),
     ]);
     return true;
@@ -295,6 +306,23 @@ const stripSnapshot = (userId: string) => (s: MoneySnapshot) => ({
   total: s.total,
   note: s.note ?? null,
   created_at: s.created_at,
+});
+
+const stripUserTool = (userId: string) => (ut: UserTool) => ({
+  id: ut.id,
+  user_id: userId,
+  name: ut.name,
+  description: ut.description ?? null,
+  url: ut.url ?? null,
+  category: ut.category,
+  tags: ut.tags ?? [],
+  free: ut.free,
+  cost: ut.cost ?? 0,
+  billing_period: ut.billing_period ?? "monthly",
+  rating: ut.rating,
+  icon: ut.icon,
+  highlight: ut.highlight ?? false,
+  created_at: ut.created_at,
 });
 
 // --- Normalizers ---
@@ -369,6 +397,25 @@ function normalizeSnapshot(r: any): MoneySnapshot {
     date: r.date,
     total: Number(r.total),
     note: r.note ?? undefined,
+    created_at: r.created_at,
+  };
+}
+
+function normalizeUserTool(r: any): UserTool {
+  return {
+    id: r.id,
+    user_id: r.user_id,
+    name: r.name,
+    description: r.description ?? undefined,
+    url: r.url ?? undefined,
+    category: r.category ?? "Productividad",
+    tags: r.tags ?? [],
+    free: !!r.free,
+    cost: r.cost != null ? Number(r.cost) : undefined,
+    billing_period: r.billing_period ?? undefined,
+    rating: Number(r.rating ?? 5),
+    icon: r.icon ?? "🔧",
+    highlight: !!r.highlight,
     created_at: r.created_at,
   };
 }

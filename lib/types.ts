@@ -106,3 +106,20 @@ export interface AIPriorityResult {
   financial_advice: string;
   today_focus: string;
 }
+
+export interface UserTool {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  url?: string;
+  category: string;
+  tags?: string[];
+  free: boolean;
+  cost?: number;
+  billing_period?: "monthly" | "yearly";
+  rating: number; // 1-5
+  icon: string;
+  highlight?: boolean;
+  created_at: string;
+}

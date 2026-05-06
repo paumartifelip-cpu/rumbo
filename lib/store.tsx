@@ -37,6 +37,7 @@ import {
   OnboardingData,
   Task,
   User,
+  UserTool,
 } from "./types";
 import { uid } from "./utils";
 
@@ -46,6 +47,7 @@ interface RumboState {
   tasks: Task[];
   finances: FinancialEntry[];
   snapshots: MoneySnapshot[];
+  userTools: UserTool[];
   onboarding?: OnboardingData;
   onboardingDone: boolean;
   aiAdvice?: { today_focus: string; financial_advice: string };
@@ -73,6 +75,9 @@ interface RumboContext extends RumboState {
   removeFinance: (id: string) => void;
   addSnapshot: (s: Omit<MoneySnapshot, "id" | "user_id" | "created_at">) => void;
   removeSnapshot: (id: string) => void;
+  addUserTool: (ut: Omit<UserTool, "id" | "user_id" | "created_at">) => void;
+  removeUserTool: (id: string) => void;
+  updateUserTool: (id: string, patch: Partial<UserTool>) => void;
   saveOnboarding: (data: OnboardingData) => void;
   updateOnboarding: (patch: Partial<OnboardingData>) => void;
   resetDemo: () => void;
@@ -85,12 +90,387 @@ interface RumboContext extends RumboState {
 const STORAGE_PREFIX = "rumbo_state_v5_";
 const storageKeyFor = (profileId: string) => `${STORAGE_PREFIX}${profileId}`;
 
+const BASE_DEFAULT_TOOLS = [
+  // Productividad
+  {
+    name: "Notion",
+    icon: "📓",
+    category: "Productividad",
+    description: "Tu segundo cerebro. Notas, wikis, bases de datos y proyectos en un solo lugar.",
+    url: "https://notion.so",
+    tags: ["notas", "wikis", "proyectos"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "NotebookLM",
+    icon: "📚",
+    category: "Productividad",
+    description: "IA de Google que analiza tus documentos y genera resúmenes, preguntas y podcasts de audio con tu contenido.",
+    url: "https://notebooklm.google.com",
+    tags: ["IA", "documentos", "resúmenes", "podcast"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Obsidian",
+    icon: "🪨",
+    category: "Productividad",
+    description: "Notas en Markdown con grafos de conexión. Perfecto para pensar en red.",
+    url: "https://obsidian.md",
+    tags: ["notas", "PKM", "offline"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Todoist",
+    icon: "☑️",
+    category: "Productividad",
+    description: "Gestor de tareas minimalista con prioridades y vistas de proyecto.",
+    url: "https://todoist.com",
+    tags: ["tareas", "GTD"],
+    free: true,
+    rating: 4,
+  },
+  {
+    name: "Calendly",
+    icon: "📅",
+    category: "Productividad",
+    description: "Elimina el ping-pong de emails para quedar. Tu cliente elige el hueco directamente.",
+    url: "https://calendly.com",
+    tags: ["agenda", "reuniones"],
+    free: true,
+    rating: 4,
+  },
+  // Finanzas
+  {
+    name: "Revolut",
+    icon: "💳",
+    category: "Finanzas",
+    description: "Banco digital con cambio de divisas sin comisiones y análisis de gastos automático.",
+    url: "https://revolut.com",
+    tags: ["banco", "divisas", "crypto"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "YNAB",
+    icon: "💰",
+    category: "Finanzas",
+    description: "You Need A Budget. El método de presupuesto por sobres que más resultados da.",
+    url: "https://youneedabudget.com",
+    tags: ["presupuesto", "ahorro"],
+    free: false,
+    rating: 5,
+  },
+  {
+    name: "Wise",
+    icon: "🌍",
+    category: "Finanzas",
+    description: "Transferencias internacionales con el tipo de cambio real. Sin comisiones ocultas.",
+    url: "https://wise.com",
+    tags: ["transferencias", "divisas"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Stripe",
+    icon: "⚡",
+    category: "Finanzas",
+    description: "Cobrar online de forma profesional. Acepta tarjetas, SEPA y más en minutos.",
+    url: "https://stripe.com",
+    tags: ["pagos", "facturación"],
+    free: true,
+    rating: 5,
+  },
+  // IA
+  {
+    name: "Google Gemini",
+    icon: "✨",
+    category: "IA",
+    description: "El modelo multimodal de Google. Razona con texto, imágenes, audio y vídeo. Integrado en todo el ecosistema Google.",
+    url: "https://gemini.google.com",
+    tags: ["chat", "multimodal", "Google"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Antigravity",
+    icon: "🚀",
+    category: "IA",
+    description: "Asistente de código IA de Google DeepMind. Pair programming inteligente que entiende tu repositorio entero.",
+    url: "https://antigravity.google/",
+    tags: ["código", "IA", "DeepMind", "programación"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Google Flow",
+    icon: "🎬",
+    category: "IA",
+    description: "Generación de vídeo cinematográfico con IA de Google. Crea escenas de alta calidad a partir de texto o imagen.",
+    url: "https://labs.google/flow",
+    tags: ["vídeo", "generación", "Google", "cinematográfico"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Google Whisk",
+    icon: "🎨",
+    category: "IA",
+    description: "Generación de imágenes por IA de Google que combina sujeto + escena + estilo de otras imágenes como referencia.",
+    url: "https://labs.google/whisk",
+    tags: ["imágenes", "estilo", "Google", "referencias"],
+    free: true,
+    rating: 4,
+  },
+  {
+    name: "Suno AI",
+    icon: "🎵",
+    category: "IA",
+    description: "Genera canciones completas con letra y música a partir de un prompt de texto. Estudio musical en tu bolsillo.",
+    url: "https://suno.com",
+    tags: ["música", "canciones", "audio", "generación"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "ChatGPT",
+    icon: "🤖",
+    category: "IA",
+    description: "El asistente más conocido. Ideal para redactar, resumir, generar ideas y código.",
+    url: "https://chat.openai.com",
+    tags: ["chat", "texto", "código"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Claude",
+    icon: "🧠",
+    category: "IA",
+    description: "El rival de ChatGPT con ventana de contexto enorme. Mejor para documentos largos.",
+    url: "https://claude.ai",
+    tags: ["chat", "análisis", "documentos"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Perplexity",
+    icon: "🔍",
+    category: "IA",
+    description: "Buscador con IA que cita fuentes. Sustituye a Google para investigación rápida.",
+    url: "https://perplexity.ai",
+    tags: ["búsqueda", "investigación"],
+    free: true,
+    rating: 4,
+  },
+  {
+    name: "Midjourney",
+    icon: "🖼️",
+    category: "IA",
+    description: "El mejor generador de imágenes IA para crear contenido visual de alta calidad.",
+    url: "https://midjourney.com",
+    tags: ["imágenes", "diseño", "arte"],
+    free: false,
+    rating: 5,
+  },
+  {
+    name: "ElevenLabs",
+    icon: "🎙️",
+    category: "IA",
+    description: "Texto a voz ultra-realista. Clona tu voz o elige entre cientos de voces.",
+    url: "https://elevenlabs.io",
+    tags: ["voz", "audio", "podcast"],
+    free: true,
+    rating: 5,
+  },
+  // Contenido
+  {
+    name: "Pomelli",
+    icon: "🍅",
+    category: "Contenido",
+    description: "Herramienta de productividad estilo Pomodoro diseñada para creadores. Sesiones de trabajo + descansos con seguimiento.",
+    url: "https://pomelli.com",
+    tags: ["pomodoro", "enfoque", "creadores"],
+    free: true,
+    rating: 4,
+    highlight: true,
+  },
+  {
+    name: "Canva",
+    icon: "✏️",
+    category: "Contenido",
+    description: "Diseño gráfico para no diseñadores. Plantillas profesionales para redes, vídeos y más.",
+    url: "https://canva.com",
+    tags: ["diseño", "redes sociales", "plantillas"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "CapCut",
+    icon: "🎬",
+    category: "Contenido",
+    description: "Editor de vídeo para móvil y web optimizado para formato vertical. Imprescindible para Reels y TikTok.",
+    url: "https://capcut.com",
+    tags: ["vídeo", "reels", "tiktok"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Descript",
+    icon: "🎞️",
+    category: "Contenido",
+    description: "Edita vídeo editando el texto de la transcripción. Perfecto para podcasters y YouTubers.",
+    url: "https://descript.com",
+    tags: ["podcast", "vídeo", "transcripción"],
+    free: true,
+    rating: 4,
+  },
+  {
+    name: "Figma",
+    icon: "🖌️",
+    category: "Contenido",
+    description: "Diseño de interfaces colaborativo en tiempo real. El estándar de la industria.",
+    url: "https://figma.com",
+    tags: ["UI/UX", "diseño", "colaborativo"],
+    free: true,
+    rating: 5,
+  },
+  // Automatización
+  {
+    name: "n8n",
+    icon: "⚙️",
+    category: "Automatización",
+    description: "Automatización de flujos open-source y self-hosteable. Conecta cualquier app con lógica visual y código.",
+    url: "https://n8n.io",
+    tags: ["automatización", "workflows", "open-source", "self-host"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Make",
+    icon: "🔄",
+    category: "Automatización",
+    description: "La alternativa visual a Zapier. Flujos de trabajo con cientos de integraciones y lógica avanzada sin código.",
+    url: "https://make.com",
+    tags: ["automatización", "no-code", "integraciones"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  // Código
+  {
+    name: "Cursor",
+    icon: "⌨️",
+    category: "Código",
+    description: "El editor de código con IA más potente. Basado en VS Code con autocompletado inteligente.",
+    url: "https://cursor.sh",
+    tags: ["IDE", "IA", "programación"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Vercel",
+    icon: "▲",
+    category: "Código",
+    description: "Deploy de apps Next.js en segundos. La infraestructura preferida de startups.",
+    url: "https://vercel.com",
+    tags: ["deploy", "hosting", "Next.js"],
+    free: true,
+    rating: 5,
+  },
+  {
+    name: "Supabase",
+    icon: "🟢",
+    category: "Código",
+    description: "Firebase open-source. Base de datos PostgreSQL + Auth + Storage sin backend propio.",
+    url: "https://supabase.com",
+    tags: ["base de datos", "auth", "backend"],
+    free: true,
+    rating: 5,
+  },
+  // Marketing
+  {
+    name: "Beehiiv",
+    icon: "🐝",
+    category: "Marketing",
+    description: "La plataforma de newsletters que usan los mejores creadores. Crece y monetiza.",
+    url: "https://beehiiv.com",
+    tags: ["newsletter", "monetización"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Kit (ConvertKit)",
+    icon: "📧",
+    category: "Marketing",
+    description: "Email marketing para creadores. Automatizaciones sencillas y páginas de suscripción.",
+    url: "https://kit.com",
+    tags: ["email", "newsletter", "automatización"],
+    free: true,
+    rating: 4,
+  },
+  {
+    name: "Buffer",
+    icon: "📲",
+    category: "Marketing",
+    description: "Programa publicaciones en todas tus redes sociales desde un solo lugar.",
+    url: "https://buffer.com",
+    tags: ["redes sociales", "programación"],
+    free: true,
+    rating: 4,
+  },
+  // Comunicación
+  {
+    name: "Loom",
+    icon: "🎥",
+    category: "Comunicación",
+    description: "Graba tu pantalla + cámara y comparte en segundos. Sustituye miles de reuniones.",
+    url: "https://loom.com",
+    tags: ["vídeo", "asincrónico", "reuniones"],
+    free: true,
+    rating: 5,
+    highlight: true,
+  },
+  {
+    name: "Slack",
+    icon: "💬",
+    category: "Comunicación",
+    description: "Chat de equipos con canales temáticos e integraciones con todo tu stack.",
+    url: "https://slack.com",
+    tags: ["chat", "equipos", "integraciones"],
+    free: true,
+    rating: 4,
+  },
+];
+
+export const buildDefaultUserTools = (userId: string): UserTool[] => {
+  return BASE_DEFAULT_TOOLS.map((t, idx) => ({
+    ...t,
+    id: `default-tool-${idx}`,
+    user_id: userId,
+    created_at: new Date().toISOString(),
+  }));
+};
+
 const defaultState: RumboState = {
   user: mockUser,
   goals: mockGoals,
   tasks: mockTasks,
   finances: mockFinances,
   snapshots: mockSnapshots,
+  userTools: [],
   onboardingDone: false,
   prioritizing: false,
   aiSource: "idle",
@@ -130,6 +510,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           setState({
             ...defaultState,
             ...parsed,
+            userTools: parsed.userTools?.length ? parsed.userTools : buildDefaultUserTools(p.user_id),
             prioritizing: false,
             aiSource: parsed.aiSource ?? "idle",
             syncStatus: supabaseEnabled ? "syncing" : "offline",
@@ -139,11 +520,16 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           setState({
             ...defaultState,
             user: { ...mockUser, name: p.name, email: p.email ?? "" },
+            userTools: buildDefaultUserTools(p.user_id),
             primaryCurrency: profileCurrency,
           });
         }
       } catch {
-        setState({ ...defaultState, primaryCurrency: profileCurrency });
+        setState({
+          ...defaultState,
+          userTools: buildDefaultUserTools(p.user_id),
+          primaryCurrency: profileCurrency,
+        });
       }
       // Then pull from Supabase to get the latest authoritative state.
       if (supabaseEnabled) {
@@ -193,6 +579,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const mergedSnapshots = mergeById(cur.snapshots, remote.snapshots);
     const mergedOnboarding = remote.onboarding ?? cur.onboarding;
 
+    let mergedUserTools = mergeById(cur.userTools || [], remote.userTools || []);
+    if (mergedUserTools.length === 0) {
+      mergedUserTools = buildDefaultUserTools(p.user_id);
+    }
+
     // If the merge added anything the server didn't have, push it back so
     // the next device that pulls sees the same union. Also push if this
     // device has a primary currency the server hasn't recorded yet.
@@ -204,6 +595,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       mergedTasks.length > remote.tasks.length ||
       mergedFinances.length > remote.finances.length ||
       mergedSnapshots.length > remote.snapshots.length ||
+      mergedUserTools.length > (remote.userTools || []).length ||
       currencyMissingOnRemote;
 
     justPulledRef.current = true;
@@ -229,6 +621,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       tasks: mergedTasks,
       finances: mergedFinances,
       snapshots: mergedSnapshots,
+      userTools: mergedUserTools,
       onboarding: mergedOnboarding,
       onboardingDone: Boolean(mergedOnboarding) || s.onboardingDone,
       user: {
@@ -248,6 +641,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         tasks: mergedTasks,
         finances: mergedFinances,
         snapshots: mergedSnapshots,
+        userTools: mergedUserTools,
         onboarding: mergedOnboarding,
         primaryCurrency: remote.primaryCurrency ?? cachedCurrency,
         profileMeta: { id: p.id, name: p.name, initials: p.initials, color: p.color, emoji: p.emoji },
@@ -378,6 +772,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         tasks: state.tasks,
         finances: state.finances,
         snapshots: state.snapshots,
+        userTools: state.userTools,
         onboarding: state.onboarding,
         primaryCurrency: state.primaryCurrency,
         profileMeta: {
@@ -405,6 +800,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     state.tasks,
     state.finances,
     state.snapshots,
+    state.userTools,
     state.onboarding,
     state.primaryCurrency,
     profile,
@@ -447,6 +843,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "goals", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "money_snapshots", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_tools", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .subscribe();
 
@@ -474,6 +871,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         setState({
           ...defaultState,
           ...parsed,
+          userTools: parsed.userTools?.length ? parsed.userTools : buildDefaultUserTools(p.user_id),
           prioritizing: false,
           aiSource: parsed.aiSource ?? "idle",
           syncStatus: supabaseEnabled ? "syncing" : "offline",
@@ -483,6 +881,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         setState({
           ...defaultState,
           user: { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" },
+          userTools: buildDefaultUserTools(p.user_id),
           syncStatus: supabaseEnabled ? "syncing" : "offline",
           primaryCurrency: profileCurrency,
         });
@@ -491,6 +890,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       setState({
         ...defaultState,
         user: { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" },
+        userTools: buildDefaultUserTools(p.user_id),
         primaryCurrency: profileCurrency,
       });
     }
@@ -813,6 +1213,35 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const addUserTool: RumboContext["addUserTool"] = useCallback((ut) => {
+    setState((state) => ({
+      ...state,
+      userTools: [
+        ...state.userTools,
+        {
+          ...ut,
+          id: uid(),
+          user_id: state.user.id,
+          created_at: new Date().toISOString(),
+        },
+      ],
+    }));
+  }, []);
+
+  const removeUserTool: RumboContext["removeUserTool"] = useCallback((id) => {
+    setState((state) => ({
+      ...state,
+      userTools: state.userTools.filter((ut) => ut.id !== id),
+    }));
+  }, []);
+
+  const updateUserTool: RumboContext["updateUserTool"] = useCallback((id, patch) => {
+    setState((state) => ({
+      ...state,
+      userTools: state.userTools.map((ut) => (ut.id === id ? { ...ut, ...patch } : ut)),
+    }));
+  }, []);
+
   const saveOnboarding: RumboContext["saveOnboarding"] = useCallback((data) => {
     setState((s) => {
       const now = new Date().toISOString();
@@ -888,6 +1317,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       removeFinance,
       addSnapshot,
       removeSnapshot,
+      addUserTool,
+      removeUserTool,
+      updateUserTool,
       saveOnboarding,
       updateOnboarding,
       resetDemo,
@@ -913,6 +1345,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       removeFinance,
       addSnapshot,
       removeSnapshot,
+      addUserTool,
+      removeUserTool,
+      updateUserTool,
       saveOnboarding,
       updateOnboarding,
       resetDemo,
