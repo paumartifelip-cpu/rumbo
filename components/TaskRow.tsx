@@ -21,19 +21,19 @@ export function TaskRow({
 }) {
   const score = task.ai_priority_score;
 
-  const badgeTone =
-    score === undefined
-      ? "bg-slate-100 text-slate-500"
-      : score >= 50
-      ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-      : "bg-rose-100 text-rose-700 border border-rose-200";
-
   const rowTone =
     score === undefined
-      ? "bg-slate-50/30 hover:bg-slate-50"
+      ? "bg-slate-50 border-slate-100"
       : score >= 50
-      ? "bg-emerald-50/30 hover:bg-emerald-50/60"
-      : "bg-rose-50/30 hover:bg-rose-50/60";
+      ? "bg-emerald-50 border-emerald-100"
+      : "bg-rose-50 border-rose-100";
+
+  const textTone =
+    score === undefined
+      ? "text-slate-600"
+      : score >= 50
+      ? "text-emerald-800"
+      : "text-rose-800";
 
   const done = task.status === "completada";
 
@@ -42,9 +42,11 @@ export function TaskRow({
       layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -1, transition: { duration: 0.15 } }}
       className={cn(
-        "group flex items-center gap-4 py-3 px-4 border-b border-slate-100 transition-colors last:border-0",
-        highlight ? "bg-slate-50/50" : rowTone
+        "group flex items-center gap-4 py-3 px-4 border-b transition-colors last:border-0 shadow-sm rounded-xl mb-2 mx-4",
+        highlight ? "ring-2 ring-emerald-300" : "",
+        done ? "bg-slate-50 border-slate-100 opacity-60" : rowTone
       )}
     >
       <div className="shrink-0 flex items-center justify-center w-6">
@@ -54,7 +56,7 @@ export function TaskRow({
             "w-5 h-5 rounded border flex items-center justify-center transition-colors",
             done
               ? "bg-slate-800 border-slate-800 text-white"
-              : "border-slate-300 bg-white hover:border-slate-500"
+              : "border-slate-300 bg-white hover:border-slate-500 shadow-sm"
           )}
           aria-label="Completar tarea"
         >
@@ -80,20 +82,20 @@ export function TaskRow({
         <div className="flex items-center gap-2 flex-wrap">
           <h3
             className={cn(
-              "font-medium text-sm leading-snug text-slate-900",
-              done && "line-through text-slate-400"
+              "font-semibold text-sm leading-snug",
+              done ? "line-through text-slate-400" : textTone
             )}
           >
             {task.title}
           </h3>
           {task.recurrence && (
-            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded flex items-center gap-1 font-medium capitalize">
+            <span className="text-[10px] bg-white/50 text-slate-600 px-1.5 py-0.5 rounded flex items-center gap-1 font-semibold uppercase tracking-wider shadow-sm">
               🔁 {task.recurrence}
             </span>
           )}
           {score === undefined && (
             <motion.span
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-400"
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-500"
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1.4, repeat: Infinity }}
             >
@@ -113,14 +115,14 @@ export function TaskRow({
 
       <div className="shrink-0 flex items-center gap-4">
         {score !== undefined && (
-          <div className="flex flex-col items-end justify-center w-12">
+          <div className="flex flex-col items-center justify-center w-12 bg-white/60 rounded-xl py-1 shadow-sm border border-white/40">
             <div className={cn(
-              "text-sm font-bold px-2.5 py-1 rounded-lg w-full text-center",
-              done ? "bg-slate-100 text-slate-400 border border-slate-200" : badgeTone
+              "text-sm font-black",
+              done ? "text-slate-400" : textTone
             )}>
               {score}
             </div>
-            <div className="text-[9px] font-semibold text-slate-400 uppercase tracking-widest mt-1">
+            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
               Impacto
             </div>
           </div>
@@ -129,7 +131,7 @@ export function TaskRow({
         {onRemove && (
           <button
             onClick={() => onRemove(task.id)}
-            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm"
             aria-label="Eliminar tarea"
           >
             ✕

@@ -60,8 +60,8 @@ export function TaskComposer() {
     setListening(true);
   }
 
-  function submit() {
-    const t = text.trim();
+  function submit(forcedText?: string) {
+    const t = (forcedText ?? text).trim();
     if (!t) return;
     addTask({ title: t, ...(recurrence ? { recurrence } : {}) });
     setText("");
@@ -76,21 +76,44 @@ export function TaskComposer() {
     }
   }
 
+  // Ref to hold the latest text for the unmount/onend handler
+  const textRef = useRef(text);
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
+
+  // Handle auto-submit when listening stops
+  useEffect(() => {
+    if (!listening && textRef.current.trim().length > 0) {
+      // Small delay to allow the user to see the final text before it disappears
+      const timer = setTimeout(() => {
+        if (textRef.current.trim()) {
+          submit(textRef.current);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [listening]);
+
   return (
-    <div className="card p-3">
-      <div className="flex items-end gap-2">
+    <motion.div 
+      className="card p-4 shadow-sm"
+      initial={{ y: -10, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+    >
+      <div className="flex items-center gap-3">
         <textarea
           ref={inputRef}
           rows={1}
-          className="flex-1 resize-none bg-transparent outline-none px-2 py-2 text-base placeholder:text-rumbo-muted"
-          placeholder="¿Qué tienes que hacer? Dilo o escríbelo. La IA lo interpreta."
+          className="flex-1 resize-none bg-slate-50 rounded-xl outline-none px-4 py-3.5 text-lg transition-all focus:bg-white focus:ring-2 focus:ring-emerald-200 placeholder:text-slate-400"
+          placeholder="¿Qué tienes que hacer? Escríbelo o díctalo..."
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          style={{ minHeight: 44, maxHeight: 200 }}
+          style={{ minHeight: 52, maxHeight: 200 }}
         />
         <select
-          className="bg-slate-100 text-xs text-rumbo-ink rounded-lg px-2 h-10 outline-none border-0"
+          className="bg-slate-100 text-sm text-slate-700 font-semibold rounded-xl px-3 h-[52px] outline-none border-0 transition-colors hover:bg-slate-200 cursor-pointer"
           value={recurrence}
           onChange={(e) => setRecurrence(e.target.value as any)}
           title="Hábito recurrente"
@@ -101,46 +124,56 @@ export function TaskComposer() {
           <option value="mensual">Mensual</option>
         </select>
         {supported && (
-          <button
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={toggleMic}
-            className={`btn ${
+            className={`flex items-center justify-center w-[52px] h-[52px] rounded-xl transition-colors shadow-sm ${
               listening
-                ? "bg-rose-100 text-rose-600"
-                : "bg-slate-100 text-rumbo-ink hover:bg-slate-200"
-            } w-10 h-10 p-0 rounded-full`}
+                ? "bg-rose-500 text-white shadow-rose-200"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+            }`}
             title={listening ? "Detener" : "Dictar"}
             aria-label={listening ? "Detener dictado" : "Dictar tarea"}
           >
             {listening ? (
-              <motion.span
+              <motion.div
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ duration: 1, repeat: Infinity }}
-              >
-                ⏹
-              </motion.span>
+                className="w-4 h-4 rounded-sm bg-white"
+              />
             ) : (
-              "🎙"
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+              </svg>
             )}
-          </button>
+          </motion.button>
         )}
-        <button
-          onClick={submit}
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => submit()}
           disabled={!text.trim()}
-          className="btn-primary h-10"
+          className="bg-slate-900 text-white font-bold h-[52px] px-6 rounded-xl shadow-sm hover:bg-slate-800 disabled:opacity-50 disabled:hover:bg-slate-900 transition-all"
         >
           Añadir
-        </button>
+        </motion.button>
       </div>
       {listening && (
-        <div className="text-xs text-rose-600 mt-1 px-2">
-          Escuchando… habla con normalidad.
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="text-sm font-medium text-rose-600 mt-3 px-2 flex items-center gap-2"
+        >
+          <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+          Escuchando... (se añadirá automáticamente al terminar)
+        </motion.div>
       )}
       {!supported && (
-        <div className="text-[11px] text-rumbo-muted mt-1 px-2">
+        <div className="text-[11px] text-slate-400 mt-2 px-2">
           El dictado por voz funciona en Chrome y Safari.
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
