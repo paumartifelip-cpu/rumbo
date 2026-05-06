@@ -456,12 +456,17 @@ const BASE_DEFAULT_TOOLS = [
 ];
 
 export const buildDefaultUserTools = (userId: string): UserTool[] => {
-  return BASE_DEFAULT_TOOLS.map((t, idx) => ({
-    ...t,
-    id: `default-tool-${idx}`,
-    user_id: userId,
-    created_at: new Date().toISOString(),
-  }));
+  // Only ship free tools by default — paid ones are opt-in.
+  // Use a fixed seed timestamp so order is stable across reloads.
+  const seed = "2025-01-01T00:00:00.000Z";
+  return BASE_DEFAULT_TOOLS
+    .filter((t) => t.free === true)
+    .map((t, idx) => ({
+      ...t,
+      id: `default-tool-${idx}`,
+      user_id: userId,
+      created_at: seed,
+    }));
 };
 
 const defaultState: RumboState = {
@@ -507,10 +512,17 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         const raw = localStorage.getItem(storageKeyFor(p.id));
         if (raw) {
           const parsed = JSON.parse(raw);
+          // If userTools key exists in storage, trust it — even if empty
+          // (the user may have intentionally deleted everything).
+          // Only seed defaults when the key is completely absent.
+          const userTools =
+            parsed.userTools !== undefined
+              ? parsed.userTools
+              : buildDefaultUserTools(p.user_id);
           setState({
             ...defaultState,
             ...parsed,
-            userTools: parsed.userTools?.length ? parsed.userTools : buildDefaultUserTools(p.user_id),
+            userTools,
             prioritizing: false,
             aiSource: parsed.aiSource ?? "idle",
             syncStatus: supabaseEnabled ? "syncing" : "offline",
@@ -579,10 +591,15 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const mergedSnapshots = mergeById(cur.snapshots, remote.snapshots);
     const mergedOnboarding = remote.onboarding ?? cur.onboarding;
 
-    let mergedUserTools = mergeById(cur.userTools || [], remote.userTools || []);
-    if (mergedUserTools.length === 0) {
-      mergedUserTools = buildDefaultUserTools(p.user_id);
-    }
+    // Stable sort by created_at (asc), then by name — keeps order identical across syncs
+    const mergedUserTools = mergeById(cur.userTools || [], remote.userTools || []).sort((a, b) => {
+      const ca = a.created_at ?? "";
+      const cb = b.created_at ?? "";
+      if (ca !== cb) return ca < cb ? -1 : 1;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+    // NOTE: do NOT auto-fill defaults if the user has 0 tools — that would
+    // bring back tools they explicitly deleted.
 
     // If the merge added anything the server didn't have, push it back so
     // the next device that pulls sees the same union. Also push if this
@@ -868,10 +885,14 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(storageKeyFor(p.id));
       if (raw) {
         const parsed = JSON.parse(raw);
+        const userTools =
+          parsed.userTools !== undefined
+            ? parsed.userTools
+            : buildDefaultUserTools(p.user_id);
         setState({
           ...defaultState,
           ...parsed,
-          userTools: parsed.userTools?.length ? parsed.userTools : buildDefaultUserTools(p.user_id),
+          userTools,
           prioritizing: false,
           aiSource: parsed.aiSource ?? "idle",
           syncStatus: supabaseEnabled ? "syncing" : "offline",

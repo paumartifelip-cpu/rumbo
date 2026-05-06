@@ -77,6 +77,24 @@ create table if not exists money_snapshots (
 );
 create index if not exists money_snapshots_user_id_idx on money_snapshots(user_id);
 
+create table if not exists user_tools (
+  id text primary key,
+  user_id uuid not null,
+  name text not null,
+  description text,
+  url text,
+  category text not null default 'Productividad',
+  tags text[] default '{}',
+  free boolean default true,
+  cost numeric default 0,
+  billing_period text default 'monthly',
+  rating int default 5 check (rating between 1 and 5),
+  icon text default '🔧',
+  highlight boolean default false,
+  created_at timestamptz default now()
+);
+create index if not exists user_tools_user_id_idx on user_tools(user_id);
+
 -- =============================================
 -- Pre-cargar las dos sesiones (Pau y Michelle)
 -- =============================================
@@ -99,6 +117,7 @@ alter table goals enable row level security;
 alter table tasks enable row level security;
 alter table financial_entries enable row level security;
 alter table money_snapshots enable row level security;
+alter table user_tools enable row level security;
 
 -- Borra políticas previas para que el script sea repetible.
 drop policy if exists "open_all_profiles" on profiles;
@@ -106,9 +125,11 @@ drop policy if exists "open_all_goals" on goals;
 drop policy if exists "open_all_tasks" on tasks;
 drop policy if exists "open_all_financial_entries" on financial_entries;
 drop policy if exists "open_all_money_snapshots" on money_snapshots;
+drop policy if exists "open_all_user_tools" on user_tools;
 
 create policy "open_all_profiles" on profiles for all using (true) with check (true);
 create policy "open_all_goals" on goals for all using (true) with check (true);
 create policy "open_all_tasks" on tasks for all using (true) with check (true);
 create policy "open_all_financial_entries" on financial_entries for all using (true) with check (true);
 create policy "open_all_money_snapshots" on money_snapshots for all using (true) with check (true);
+create policy "open_all_user_tools" on user_tools for all using (true) with check (true);
