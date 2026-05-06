@@ -50,10 +50,14 @@ export default function TasksPage() {
   const distractions = useMemo(() => ordered.filter((t) => (t.ai_priority_score ?? 100) < 30), [ordered]);
   const pending = useMemo(() => ordered.filter((t) => (t.ai_priority_score ?? 100) >= 30), [ordered]);
 
+  // pending = high-impact not completed
+  // distractions = low-score not completed
+  // completed = all completed
+  // 'all' tab = pending + distractions (non-completed)
   const displayedTasks = useMemo(() => {
     switch (filter) {
       case "all":
-        return [...pending, ...distractions, ...completed];
+        return [...pending, ...distractions];
       case "pending":
         return pending;
       case "completed":
@@ -115,9 +119,9 @@ export default function TasksPage() {
           {(
             [
               { id: "pending", label: "Plan de Acción", count: pending.length },
-              { id: "all", label: "Todas", count: tasks.length },
+              { id: "all", label: "Todas", count: ordered.length },
               { id: "distractions", label: "Distracciones", count: distractions.length },
-              { id: "completed", label: "Completadas", count: completed.length },
+              { id: "completed", label: "✓ Completadas", count: completed.length },
             ] as const
           ).map((f) => (
             <button

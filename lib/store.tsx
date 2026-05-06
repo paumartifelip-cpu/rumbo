@@ -169,10 +169,17 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     // the remote version; pure-local items survive.
     const mergeById = <T extends { id: string; created_at?: string }>(local: T[], rem: T[]): T[] => {
       const map = new Map<string, T>();
+      // Remote is authoritative for IDs it knows about
       for (const r of rem) map.set(r.id, r);
+      // Preserve local items not yet on the server:
+      // - if we've never synced (no lastSyncAt), keep all local items
+      // - if we have synced, keep local items created AFTER the last sync
       for (const l of local) {
         if (!map.has(l.id)) {
-          if (!cur.lastSyncAt || (l.created_at && l.created_at > cur.lastSyncAt)) {
+          const createdAfterSync = !cur.lastSyncAt ||
+            !l.created_at ||
+            l.created_at >= cur.lastSyncAt;
+          if (createdAfterSync) {
             map.set(l.id, l);
           }
         }
@@ -277,6 +284,12 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         }
 
         if (shouldGenerate) {
+          // Guard: don't duplicate if a pending copy already exists
+          const alreadyHasPending = newTasks.some(
+            (x) => x.id !== t.id && x.title === t.title && x.status === "pendiente"
+          );
+          if (alreadyHasPending) return;
+
           const idx = newTasks.findIndex(x => x.id === t.id);
           if (idx >= 0) {
             newTasks[idx] = { ...newTasks[idx], last_generated_date: now.toISOString() };
