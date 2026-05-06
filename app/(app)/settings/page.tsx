@@ -192,18 +192,18 @@ export default function SettingsPage() {
             return (
               <div className="grid gap-4">
                 {/* Main AI status card */}
-                <div className={`p-4 rounded-2xl border-2 ${aiActive ? "border-emerald-400 bg-emerald-50" : "border-rose-300 bg-rose-50"}`}>
+                <div className={`p-4 rounded-2xl border-4 ${aiActive ? "border-green-700 bg-green-100" : "border-red-600 bg-red-100"}`}>
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div>
-                      <div className={`text-base font-bold flex items-center gap-2 ${aiActive ? "text-emerald-800" : "text-rose-800"}`}>
+                      <div className={`text-base font-bold flex items-center gap-2 ${aiActive ? "text-green-900" : "text-red-700"}`}>
                         {aiActive ? "✅ IA ACTIVA" : "❌ IA INACTIVA"}
                         {hasBuiltin && (
-                          <span className="text-xs font-normal bg-emerald-200 text-emerald-700 px-2 py-0.5 rounded-full">
+                          <span className="text-xs font-normal bg-green-800 text-white px-2 py-0.5 rounded-full">
                             Incorporada
                           </span>
                         )}
                       </div>
-                      <div className={`text-xs mt-1 ${aiActive ? "text-emerald-700" : "text-rose-700"}`}>
+                      <div className={`text-xs mt-1 font-medium ${aiActive ? "text-green-800" : "text-red-600"}`}>
                         {hasBuiltin
                           ? "OpenAI gpt-4o-mini activo para todos los perfiles. No necesitas hacer nada."
                           : hasManual
@@ -216,7 +216,7 @@ export default function SettingsPage() {
                       disabled={verifyStatus === "loading" || !aiActive}
                       className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                         aiActive
-                          ? "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
+                          ? "bg-green-700 text-white hover:bg-green-800 active:scale-95"
                           : "bg-slate-200 text-slate-400 cursor-not-allowed"
                       }`}
                     >
@@ -224,7 +224,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                   {verifyMsg && (
-                    <div className={`mt-3 text-xs px-3 py-2 rounded-lg font-medium ${verifyStatus === "ok" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                    <div className={`mt-3 text-xs px-3 py-2 rounded-lg font-medium ${verifyStatus === "ok" ? "bg-green-200 text-green-900" : "bg-red-200 text-red-900"}`}>
                       {verifyStatus === "ok" ? "✅ " : "❌ "}{verifyMsg}
                     </div>
                   )}
