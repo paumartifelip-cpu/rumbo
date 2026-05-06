@@ -29,12 +29,12 @@ export function TaskRow({
       ? "bg-slate-50 border-slate-200"
       : isHighImpact
       ? "bg-emerald-700 border-emerald-800 shadow-md"
-      : "bg-rose-50 border-rose-200 shadow-sm";
+      : "bg-rose-700 border-rose-800 shadow-md";
 
   const textTone =
     score === undefined
       ? "text-slate-700"
-      : isHighImpact
+      : isHighImpact || isDistraction
       ? "text-white"
       : "text-rose-950";
 
@@ -65,7 +65,7 @@ export function TaskRow({
               : isHighImpact
               ? "border-emerald-400 bg-emerald-800 text-white hover:bg-emerald-900"
               : isDistraction
-              ? "border-rose-400 bg-white hover:bg-rose-50"
+              ? "border-rose-400 bg-rose-800 text-white hover:bg-rose-900"
               : "border-slate-400 bg-white hover:bg-slate-50"
           )}
           aria-label="Completar tarea"
@@ -86,7 +86,7 @@ export function TaskRow({
 
       <div className={cn(
         "shrink-0 w-8 text-center text-xs font-bold",
-        done ? "text-slate-400" : (isHighImpact ? "text-emerald-200" : "text-rose-600")
+        done ? "text-slate-400" : (isHighImpact ? "text-emerald-200" : (isDistraction ? "text-rose-200" : "text-rose-600"))
       )}>
         {rank !== undefined ? `#${rank + 1}` : "—"}
       </div>
@@ -127,14 +127,14 @@ export function TaskRow({
         </div>
         {task.ai_reason && (
           <p className={cn(
-            "text-xs mt-1.5 line-clamp-1 group-hover:line-clamp-none transition-all",
-            done ? "text-slate-400" : (isHighImpact ? "text-emerald-100" : "text-rose-700")
+            "text-xs mt-1.5 transition-all",
+            done ? "text-slate-400" : (isHighImpact ? "text-emerald-100" : (isDistraction ? "text-rose-100" : "text-rose-700"))
           )}>
             {task.ai_reason}
           </p>
         )}
         {goal && !task.ai_reason && (
-          <p className={cn("text-xs mt-0.5", isHighImpact ? "text-emerald-200" : "text-slate-500")}>{goal.title}</p>
+          <p className={cn("text-xs mt-0.5", isHighImpact ? "text-emerald-200" : (isDistraction ? "text-rose-200" : "text-slate-500"))}>{goal.title}</p>
         )}
       </div>
 
@@ -142,17 +142,17 @@ export function TaskRow({
         {score !== undefined && (
           <div className={cn(
             "flex flex-col items-center justify-center w-14 rounded-xl py-1 shadow-sm border",
-            done ? "bg-slate-100 border-slate-200" : (isHighImpact ? "bg-emerald-800 border-emerald-900 text-white" : "bg-white border-rose-200")
+            done ? "bg-slate-100 border-slate-200" : (isHighImpact ? "bg-emerald-800 border-emerald-900 text-white" : (isDistraction ? "bg-rose-800 border-rose-900 text-white" : "bg-white border-rose-200"))
           )}>
             <div className={cn(
               "text-base font-black",
-              done ? "text-slate-400" : (isHighImpact ? "text-white" : textTone)
+              done ? "text-slate-400" : (isHighImpact || isDistraction ? "text-white" : textTone)
             )}>
               {score}
             </div>
             <div className={cn(
               "text-[9px] font-bold uppercase tracking-widest mt-0.5",
-              done ? "text-slate-400" : (isHighImpact ? "text-emerald-200" : "text-rose-600")
+              done ? "text-slate-400" : (isHighImpact ? "text-emerald-200" : (isDistraction ? "text-rose-200" : "text-rose-600"))
             )}>
               Impacto
             </div>
@@ -164,7 +164,7 @@ export function TaskRow({
             onClick={() => onRemove(task.id)}
             className={cn(
               "w-8 h-8 flex items-center justify-center rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm",
-              isHighImpact ? "text-emerald-200 hover:text-white hover:bg-emerald-600" : "text-slate-400 hover:text-red-600 hover:bg-white"
+              isHighImpact ? "text-emerald-200 hover:text-white hover:bg-emerald-600" : (isDistraction ? "text-rose-200 hover:text-white hover:bg-rose-600" : "text-slate-400 hover:text-red-600 hover:bg-white")
             )}
             aria-label="Eliminar tarea"
           >
