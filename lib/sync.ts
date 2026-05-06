@@ -247,6 +247,8 @@ const stripGoal = (userId: string) => (g: Goal) => ({
   importance: g.importance,
   status: g.status,
   progress: g.progress,
+  timeframe: g.timeframe ?? null,
+  unit: g.unit ?? null,
   created_at: g.created_at,
 });
 
@@ -311,6 +313,8 @@ function normalizeGoal(r: any): Goal {
     importance: Number(r.importance ?? 5),
     status: r.status ?? "activo",
     progress: Number(r.progress ?? 0),
+    timeframe: r.timeframe ?? undefined,
+    unit: r.unit ?? undefined,
     created_at: r.created_at,
   };
 }

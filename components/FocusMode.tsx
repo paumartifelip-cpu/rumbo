@@ -154,6 +154,7 @@ export function FocusMode({ tasks, onExit }: FocusModeProps) {
             {/* The person and flag */}
             <motion.div 
               className="absolute top-0 -ml-4 text-5xl z-10"
+              style={{ display: 'inline-block', transform: 'scaleX(-1)' }}
               animate={{ left: `${progressPercent}%` }}
               transition={{ ease: "linear", duration: 1 }}
             >
@@ -180,12 +181,29 @@ export function FocusMode({ tasks, onExit }: FocusModeProps) {
               <div className="absolute inset-0 pointer-events-none opacity-20 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#000_10px,#000_20px)] mix-blend-overlay"></div>
             </div>
 
-            {/* Time display */}
+            {/* Time display + fine-tune */}
             <div className="absolute -bottom-8 left-0 right-0 flex justify-between px-2 text-slate-400 font-bold">
               <span>{Math.floor(totalTime / 60)}m</span>
               <span className="text-3xl text-white font-black drop-shadow-md tabular-nums -mt-2">{timeString}</span>
               <span>0m</span>
             </div>
+          </div>
+
+          {/* Fine-tune +/- 5 min */}
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={() => { const n = Math.max(60, timeLeft - 5 * 60); setTimeLeft(n); if (n > totalTime) setTotalTime(n); }}
+              className="w-11 h-11 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-black flex items-center justify-center hover:bg-slate-700 transition-colors text-sm"
+            >
+              −5m
+            </button>
+            <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">ajustar</div>
+            <button
+              onClick={() => { const n = Math.min(3 * 3600, timeLeft + 5 * 60); setTimeLeft(n); if (n > totalTime) setTotalTime(n); }}
+              className="w-11 h-11 rounded-full bg-slate-800 border border-slate-700 text-slate-300 font-black flex items-center justify-center hover:bg-slate-700 transition-colors text-sm"
+            >
+              +5m
+            </button>
           </div>
 
           {/* Controls */}

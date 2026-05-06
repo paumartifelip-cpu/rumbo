@@ -34,6 +34,8 @@ export interface Goal {
   importance: number; // 1-10
   status: GoalStatus;
   progress: number; // 0-100
+  timeframe?: "diario" | "semanal" | "mensual" | "anual"; // Periodo de la meta
+  unit?: string; // Unidad de la meta (ej. "vídeos", "sesiones", "km")
   created_at: string;
 }
 
