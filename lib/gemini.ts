@@ -239,6 +239,35 @@ export function heuristicCategorize(title: string): string | null {
   return null; // no match → let AI decide
 }
 
+/**
+ * Makes a minimal 1-token call to verify the OpenAI key works.
+ * Returns "ok", "no_key", or "error:<message>".
+ */
+export async function verifyOpenAI(): Promise<"ok" | "no_key" | string> {
+  const apiKey = getOpenAIKey();
+  if (!apiKey) return "no_key";
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: "di hola" }],
+        max_tokens: 3,
+        temperature: 0,
+      }),
+    });
+    if (res.ok) return "ok";
+    const err = await res.json().catch(() => ({}));
+    return `error:${err?.error?.message ?? res.statusText}`;
+  } catch (e: any) {
+    return `error:${e?.message ?? "network error"}`;
+  }
+}
+
 export async function aiCategorize(input: {
   title: string;
   amount?: number;

@@ -15,6 +15,7 @@ import {
   isPinSet,
   setPin,
 } from "@/lib/pin";
+import { verifyOpenAI } from "@/lib/gemini";
 
 const KEY_STORAGE = "rumbo_gemini_key";
 const KEY_STORAGE_GPT = "rumbo_gpt_key";
@@ -52,6 +53,8 @@ export default function SettingsPage() {
   const [savedGptKey, setSavedGptKey] = useState<string | null>(null);
   const [showGptKey, setShowGptKey] = useState(false);
   const [savedGptHint, setSavedGptHint] = useState<string | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<null | "loading" | "ok" | "error">(null);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [pinModal, setPinModal] = useState<null | "create" | "change">(null);
   const [pinHasValue, setPinHasValue] = useState(false);
   const [pinHint, setPinHint] = useState<string | null>(null);
@@ -160,119 +163,132 @@ export default function SettingsPage() {
           id="ai"
           title="Inteligencia artificial"
           icon="🤖"
-          hint="Configura Gemini u OpenAI para priorizar tareas automáticamente."
+          hint="La IA categoriza tus gastos y prioriza tus tareas automáticamente."
           activeId={activeSection}
           onToggle={toggleSection}
         >
-          <div className="grid gap-5">
-            <div>
-              <label className="label">API key de Gemini</label>
-              <div className="flex gap-2 mt-1">
-                <input
-                  type={showKey ? "text" : "password"}
-                  className="input flex-1 font-mono text-sm"
-                  placeholder="AIzaSy..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-                <button
-                  className="btn-soft"
-                  onClick={() => setShowKey((s) => !s)}
-                >
-                  {showKey ? "Ocultar" : "Mostrar"}
-                </button>
-                <button className="btn-primary" onClick={saveKey}>
-                  Guardar
-                </button>
-              </div>
-              <div className="text-xs text-rumbo-muted mt-2">
-                Se guarda solo en tu navegador (localStorage). Se envía a la
-                ruta API <code>/api/prioritize</code> cuando pides repriorizar.
-                Consigue tu clave en{" "}
-                <a
-                  href="https://aistudio.google.com/app/apikey"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline"
-                >
-                  aistudio.google.com/app/apikey
-                </a>
-                .
-              </div>
-              {savedHint && (
-                <div className="text-xs text-emerald-600 mt-1">{savedHint}</div>
-              )}
-            </div>
+          {(() => {
+            const builtinKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
+            const hasBuiltin = !!builtinKey;
+            const hasManual = !!savedGptKey;
+            const aiActive = hasBuiltin || hasManual;
 
-            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${savedKey ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-              <div>
-                <div className="font-bold flex items-center gap-2 text-sm">
-                  {savedKey ? "✅ IA Activa y Conectada" : "⚠️ IA Inactiva"}
-                </div>
-                <div className="text-xs mt-1 opacity-80">
-                  {savedKey 
-                    ? "Tu clave está guardada. La aplicación priorizará tus tareas y categorizará tus gastos inteligentemente." 
-                    : "Pega una API Key de Gemini válida arriba y pulsa Guardar para activar las funciones inteligentes."}
-                </div>
-              </div>
-              <div className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${savedKey ? 'bg-emerald-200 text-emerald-800' : 'bg-rose-200 text-rose-800'}`}>
-                {savedKey ? "Conectado" : "Desconectado"}
-              </div>
-            </div>
+            async function handleVerify() {
+              setVerifyStatus("loading");
+              setVerifyMsg(null);
+              const result = await verifyOpenAI();
+              if (result === "ok") {
+                setVerifyStatus("ok");
+                setVerifyMsg("Conexión perfecta. La IA está funcionando correctamente.");
+              } else if (result === "no_key") {
+                setVerifyStatus("error");
+                setVerifyMsg("No hay ninguna clave configurada.");
+              } else {
+                setVerifyStatus("error");
+                setVerifyMsg(result.replace("error:", ""));
+              }
+            }
 
-            <div className="border-t border-rumbo-line pt-5">
-              <label className="label">API key de OpenAI (ChatGPT)</label>
-              <div className="flex gap-2 mt-1">
-                <input
-                  type={showGptKey ? "text" : "password"}
-                  className="input flex-1 font-mono text-sm"
-                  placeholder="sk-..."
-                  value={gptKey}
-                  onChange={(e) => setGptKey(e.target.value)}
-                />
-                <button
-                  className="btn-soft"
-                  onClick={() => setShowGptKey((s) => !s)}
-                >
-                  {showGptKey ? "Ocultar" : "Mostrar"}
-                </button>
-                <button className="btn-primary" onClick={saveGptKey}>
-                  Guardar
-                </button>
-              </div>
-              <div className="text-xs text-rumbo-muted mt-2">
-                Opcional. Se guarda solo en tu navegador. Si añades esta clave, la app podrá usar los modelos de OpenAI para funciones compatibles. Consigue tu clave en{" "}
-                <a
-                  href="https://platform.openai.com/api-keys"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="underline"
-                >
-                  platform.openai.com/api-keys
-                </a>
-                .
-              </div>
-              {savedGptHint && (
-                <div className="text-xs text-emerald-600 mt-1">{savedGptHint}</div>
-              )}
-            </div>
+            return (
+              <div className="grid gap-4">
+                {/* Main AI status card */}
+                <div className={`p-4 rounded-2xl border-2 ${aiActive ? "border-emerald-400 bg-emerald-50" : "border-rose-300 bg-rose-50"}`}>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className={`text-base font-bold flex items-center gap-2 ${aiActive ? "text-emerald-800" : "text-rose-800"}`}>
+                        {aiActive ? "✅ IA ACTIVA" : "❌ IA INACTIVA"}
+                        {hasBuiltin && (
+                          <span className="text-xs font-normal bg-emerald-200 text-emerald-700 px-2 py-0.5 rounded-full">
+                            Incorporada
+                          </span>
+                        )}
+                      </div>
+                      <div className={`text-xs mt-1 ${aiActive ? "text-emerald-700" : "text-rose-700"}`}>
+                        {hasBuiltin
+                          ? "OpenAI gpt-4o-mini activo para todos los perfiles. No necesitas hacer nada."
+                          : hasManual
+                          ? "Usando tu clave de OpenAI personal."
+                          : "Añade una API key de OpenAI abajo para activar la IA."}
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleVerify}
+                      disabled={verifyStatus === "loading" || !aiActive}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                        aiActive
+                          ? "bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
+                          : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      }`}
+                    >
+                      {verifyStatus === "loading" ? "Probando…" : "Probar IA"}
+                    </button>
+                  </div>
+                  {verifyMsg && (
+                    <div className={`mt-3 text-xs px-3 py-2 rounded-lg font-medium ${verifyStatus === "ok" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                      {verifyStatus === "ok" ? "✅ " : "❌ "}{verifyMsg}
+                    </div>
+                  )}
+                </div>
 
-            <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${savedGptKey ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-slate-50 border-slate-200 text-slate-900'}`}>
-              <div>
-                <div className="font-bold flex items-center gap-2 text-sm">
-                  {savedGptKey ? "✅ OpenAI Configurado" : "⚪️ OpenAI Opcional"}
+                {/* OpenAI key (personal override) */}
+                <div className="border border-rumbo-line rounded-xl p-4 bg-white">
+                  <label className="label">
+                    {hasBuiltin ? "Tu clave personal de OpenAI (opcional)" : "API key de OpenAI"}
+                  </label>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      type={showGptKey ? "text" : "password"}
+                      className="input flex-1 font-mono text-sm"
+                      placeholder={hasBuiltin ? "sk-… (ya tienes una incorporada)" : "sk-…"}
+                      value={gptKey}
+                      onChange={(e) => setGptKey(e.target.value)}
+                    />
+                    <button className="btn-soft" onClick={() => setShowGptKey((s) => !s)}>
+                      {showGptKey ? "Ocultar" : "Mostrar"}
+                    </button>
+                    <button className="btn-primary" onClick={saveGptKey}>
+                      Guardar
+                    </button>
+                  </div>
+                  <div className="text-xs text-rumbo-muted mt-2">
+                    {hasBuiltin
+                      ? "Tu clave personal tiene prioridad sobre la incorporada si la añades aquí."
+                      : "Consigue tu clave en platform.openai.com/api-keys"}
+                  </div>
+                  {savedGptHint && (
+                    <div className="text-xs text-emerald-600 mt-1">{savedGptHint}</div>
+                  )}
                 </div>
-                <div className="text-xs mt-1 opacity-80">
-                  {savedGptKey 
-                    ? "Tu clave de OpenAI está lista para usarse." 
-                    : "No has configurado OpenAI (puedes seguir usando Gemini como motor principal)."}
+
+                {/* Gemini key */}
+                <div className="border border-rumbo-line rounded-xl p-4 bg-white">
+                  <label className="label">API key de Gemini (opcional)</label>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      type={showKey ? "text" : "password"}
+                      className="input flex-1 font-mono text-sm"
+                      placeholder="AIzaSy…"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                    />
+                    <button className="btn-soft" onClick={() => setShowKey((s) => !s)}>
+                      {showKey ? "Ocultar" : "Mostrar"}
+                    </button>
+                    <button className="btn-primary" onClick={saveKey}>
+                      Guardar
+                    </button>
+                  </div>
+                  <div className="text-xs text-rumbo-muted mt-2">
+                    Usado como respaldo si OpenAI no responde.{" "}
+                    {savedKey && <span className="text-emerald-600 font-medium">Configurado.</span>}
+                  </div>
+                  {savedHint && (
+                    <div className="text-xs text-emerald-600 mt-1">{savedHint}</div>
+                  )}
                 </div>
               </div>
-              <div className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${savedGptKey ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-200 text-slate-800'}`}>
-                {savedGptKey ? "Configurado" : "Sin configurar"}
-              </div>
-            </div>
-          </div>
+            );
+          })()}
         </SettingsAccordion>
 
         <SettingsAccordion
