@@ -28,14 +28,14 @@ export function TaskRow({
     score === undefined
       ? "bg-slate-50 border-slate-200"
       : isHighImpact
-      ? "bg-emerald-100 border-emerald-300"
-      : "bg-rose-100 border-rose-300";
+      ? "bg-emerald-700 border-emerald-800 shadow-md"
+      : "bg-rose-50 border-rose-200 shadow-sm";
 
   const textTone =
     score === undefined
       ? "text-slate-700"
       : isHighImpact
-      ? "text-emerald-950"
+      ? "text-white"
       : "text-rose-950";
 
   const done = task.status === "completada";
@@ -43,11 +43,12 @@ export function TaskRow({
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -1, transition: { duration: 0.15 } }}
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={{ y: -2, scale: 1.01, transition: { type: "spring", stiffness: 400, damping: 25 } }}
+      whileTap={{ scale: 0.98, cursor: "grabbing" }}
       className={cn(
-        "group flex items-center gap-4 py-4 px-5 border transition-all shadow-sm rounded-xl mb-3 mx-4",
+        "group flex items-center gap-4 py-4 px-5 border transition-all shadow-sm rounded-xl mb-3 mx-4 cursor-grab",
         highlight ? "ring-2 ring-emerald-400" : "",
         done ? "bg-slate-100 border-slate-200 opacity-60 grayscale" : rowTone,
         !done && isHighImpact ? "border-l-[6px] border-l-emerald-500" : "",
@@ -62,9 +63,9 @@ export function TaskRow({
             done
               ? "bg-slate-800 border-slate-800 text-white"
               : isHighImpact
-              ? "border-emerald-500 bg-white hover:bg-emerald-50"
+              ? "border-emerald-400 bg-emerald-800 text-white hover:bg-emerald-900"
               : isDistraction
-              ? "border-rose-500 bg-white hover:bg-rose-50"
+              ? "border-rose-400 bg-white hover:bg-rose-50"
               : "border-slate-400 bg-white hover:bg-slate-50"
           )}
           aria-label="Completar tarea"
@@ -85,7 +86,7 @@ export function TaskRow({
 
       <div className={cn(
         "shrink-0 w-8 text-center text-xs font-bold",
-        done ? "text-slate-400" : (isHighImpact ? "text-emerald-600" : "text-rose-600")
+        done ? "text-slate-400" : (isHighImpact ? "text-emerald-200" : "text-rose-600")
       )}>
         {rank !== undefined ? `#${rank + 1}` : "—"}
       </div>
@@ -109,7 +110,7 @@ export function TaskRow({
           {task.recurrence && (
             <span className={cn(
               "text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1 font-bold uppercase tracking-wider shadow-sm",
-              isHighImpact ? "bg-emerald-200/50 text-emerald-800" : "bg-white/50 text-slate-600"
+              isHighImpact ? "bg-emerald-800/80 text-emerald-100" : "bg-white/50 text-slate-600"
             )}>
               🔁 {task.recurrence}
             </span>
@@ -127,13 +128,13 @@ export function TaskRow({
         {task.ai_reason && (
           <p className={cn(
             "text-xs mt-1.5 line-clamp-1 group-hover:line-clamp-none transition-all",
-            done ? "text-slate-400" : (isHighImpact ? "text-emerald-700" : "text-rose-700")
+            done ? "text-slate-400" : (isHighImpact ? "text-emerald-100" : "text-rose-700")
           )}>
             {task.ai_reason}
           </p>
         )}
         {goal && !task.ai_reason && (
-          <p className="text-xs text-slate-500 mt-0.5">{goal.title}</p>
+          <p className={cn("text-xs mt-0.5", isHighImpact ? "text-emerald-200" : "text-slate-500")}>{goal.title}</p>
         )}
       </div>
 
@@ -141,17 +142,17 @@ export function TaskRow({
         {score !== undefined && (
           <div className={cn(
             "flex flex-col items-center justify-center w-14 rounded-xl py-1 shadow-sm border",
-            done ? "bg-slate-100 border-slate-200" : (isHighImpact ? "bg-emerald-50 border-emerald-200" : "bg-rose-50 border-rose-200")
+            done ? "bg-slate-100 border-slate-200" : (isHighImpact ? "bg-emerald-800 border-emerald-900 text-white" : "bg-white border-rose-200")
           )}>
             <div className={cn(
               "text-base font-black",
-              done ? "text-slate-400" : textTone
+              done ? "text-slate-400" : (isHighImpact ? "text-white" : textTone)
             )}>
               {score}
             </div>
             <div className={cn(
               "text-[9px] font-bold uppercase tracking-widest mt-0.5",
-              done ? "text-slate-400" : (isHighImpact ? "text-emerald-600" : "text-rose-600")
+              done ? "text-slate-400" : (isHighImpact ? "text-emerald-200" : "text-rose-600")
             )}>
               Impacto
             </div>
@@ -161,7 +162,10 @@ export function TaskRow({
         {onRemove && (
           <button
             onClick={() => onRemove(task.id)}
-            className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-white rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm"
+            className={cn(
+              "w-8 h-8 flex items-center justify-center rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm",
+              isHighImpact ? "text-emerald-200 hover:text-white hover:bg-emerald-600" : "text-slate-400 hover:text-red-600 hover:bg-white"
+            )}
             aria-label="Eliminar tarea"
           >
             ✕
