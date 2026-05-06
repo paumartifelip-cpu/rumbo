@@ -192,39 +192,39 @@ export default function SettingsPage() {
             return (
               <div className="grid gap-4">
                 {/* Main AI status card */}
-                <div className={`p-4 rounded-2xl border-4 ${aiActive ? "border-green-700 bg-green-100" : "border-red-600 bg-red-100"}`}>
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div>
-                      <div className={`text-base font-bold flex items-center gap-2 ${aiActive ? "text-green-900" : "text-red-700"}`}>
-                        {aiActive ? "✅ IA ACTIVA" : "❌ IA INACTIVA"}
+                <div className={`p-5 rounded-2xl border ${aiActive ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-emerald-100 shadow-sm" : "border-rose-200 bg-gradient-to-br from-rose-50 to-rose-100 shadow-sm"}`}>
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex-1">
+                      <div className={`text-base font-bold flex items-center gap-2 ${aiActive ? "text-emerald-900" : "text-rose-900"}`}>
+                        {aiActive ? "✨ IA Activa y Conectada" : "⚠️ IA Inactiva"}
                         {hasBuiltin && (
-                          <span className="text-xs font-normal bg-green-800 text-white px-2 py-0.5 rounded-full">
-                            Incorporada
+                          <span className="text-[10px] uppercase tracking-wider font-bold bg-emerald-800 text-white px-2 py-0.5 rounded-full shadow-sm">
+                            Motor Integrado
                           </span>
                         )}
                       </div>
-                      <div className={`text-xs mt-1 font-medium ${aiActive ? "text-green-800" : "text-red-600"}`}>
+                      <div className={`text-sm mt-1.5 opacity-90 ${aiActive ? "text-emerald-800" : "text-rose-800"}`}>
                         {hasBuiltin
-                          ? "OpenAI gpt-4o-mini activo para todos los perfiles. No necesitas hacer nada."
+                          ? "El motor OpenAI gpt-4o-mini está activo para todos los perfiles de tu cuenta. No necesitas configurar nada más."
                           : hasManual
-                          ? "Usando tu clave de OpenAI personal."
-                          : "Añade una API key de OpenAI abajo para activar la IA."}
+                          ? "Estás utilizando tu clave personal de OpenAI."
+                          : "Añade una clave de OpenAI o Gemini abajo para activar la inteligencia de la aplicación."}
                       </div>
                     </div>
                     <button
                       onClick={handleVerify}
                       disabled={verifyStatus === "loading" || !aiActive}
-                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                      className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${
                         aiActive
-                          ? "bg-green-700 text-white hover:bg-green-800 active:scale-95"
-                          : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                          ? "bg-emerald-600 text-white hover:bg-emerald-700 hover:shadow active:scale-95 border border-emerald-700"
+                          : "bg-white text-slate-400 border border-slate-200 cursor-not-allowed"
                       }`}
                     >
-                      {verifyStatus === "loading" ? "Probando…" : "Probar IA"}
+                      {verifyStatus === "loading" ? "Verificando..." : "Realizar test de conexión"}
                     </button>
                   </div>
                   {verifyMsg && (
-                    <div className={`mt-3 text-xs px-3 py-2 rounded-lg font-medium ${verifyStatus === "ok" ? "bg-green-200 text-green-900" : "bg-red-200 text-red-900"}`}>
+                    <div className={`mt-4 text-xs px-3 py-2.5 rounded-xl font-medium border ${verifyStatus === "ok" ? "bg-emerald-100 border-emerald-200 text-emerald-900" : "bg-rose-100 border-rose-200 text-rose-900"}`}>
                       {verifyStatus === "ok" ? "✅ " : "❌ "}{verifyMsg}
                     </div>
                   )}
