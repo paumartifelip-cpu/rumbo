@@ -49,6 +49,7 @@ export default function GoalsPage() {
   const formatMoney = useFormatMoney();
   const symbol = CURRENCIES[primaryCurrency].symbol;
   const [open, setOpen] = useState(false);
+  const [editGoal, setEditGoal] = useState<Goal | null>(null);
 
   // Group by timeframe (order: diario, semanal, mensual, anual, general)
   const order = ["diario", "semanal", "mensual", "anual", ""];
@@ -257,21 +258,30 @@ export default function GoalsPage() {
                             </div>
                           ) : <div />}
 
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex gap-1 mt-2">
                             <button
-                              onClick={() => updateGoal(g.id, { status: isComplete ? "activo" : "completado" })}
+                              onClick={() => setEditGoal(g)}
+                              className="flex-1 text-[11px] px-2 py-1.5 rounded-md font-bold transition-colors bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              onClick={() => updateGoal(g.id, {
+                                status: g.status === "completado" ? "activo" : "completado",
+                                progress: g.status === "completado" ? g.progress : 100,
+                              })}
                               className={cn(
-                                "text-[11px] px-2 py-1 rounded-md font-bold transition-colors",
-                                isComplete
+                                "flex-1 text-[11px] px-2 py-1.5 rounded-md font-bold transition-colors",
+                                g.status === "completado"
                                   ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                   : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
                               )}
                             >
-                              {isComplete ? "Reabrir" : "✓ Completar"}
+                              {g.status === "completado" ? "↩ Reabrir" : "✓ Completar"}
                             </button>
                             <button
                               onClick={() => removeGoal(g.id)}
-                              className="text-[11px] px-2 py-1 rounded-md font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                              className="text-[11px] px-2 py-1.5 rounded-md font-bold bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
                             >
                               ✕
                             </button>
@@ -294,6 +304,14 @@ export default function GoalsPage() {
           currencySymbol={symbol}
         />
       )}
+      {editGoal && (
+        <GoalForm
+          initial={editGoal}
+          onClose={() => setEditGoal(null)}
+          onSave={(patch) => { updateGoal(editGoal.id, patch); setEditGoal(null); }}
+          currencySymbol={symbol}
+        />
+      )}
     </div>
   );
 }
@@ -302,22 +320,25 @@ function GoalForm({
   onClose,
   onSave,
   currencySymbol,
+  initial,
 }: {
   onClose: () => void;
-  onSave: ReturnType<typeof useRumbo>["addGoal"];
+  onSave: (g: any) => void;
   currencySymbol: string;
+  initial?: Goal;
 }) {
+  const isEdit = !!initial;
   const [form, setForm] = useState({
-    title: "",
-    description: "",
-    category: "dinero" as GoalCategory,
-    timeframe: "" as "" | "diario" | "semanal" | "mensual" | "anual",
-    unit: "",
-    target_amount: 0,
-    current_amount: 0,
-    deadline: "",
-    importance: 8,
-    status: "activo" as const,
+    title: initial?.title ?? "",
+    description: initial?.description ?? "",
+    category: (initial?.category ?? "dinero") as GoalCategory,
+    timeframe: (initial?.timeframe ?? "") as "" | "diario" | "semanal" | "mensual" | "anual",
+    unit: initial?.unit ?? "",
+    target_amount: initial?.target_amount ?? 0,
+    current_amount: initial?.current_amount ?? 0,
+    deadline: initial?.deadline ? initial.deadline.slice(0, 10) : "",
+    importance: initial?.importance ?? 8,
+    status: (initial?.status ?? "activo") as "activo" | "pausado" | "completado",
   });
 
   const isIncremental = !!form.unit.trim() && form.target_amount > 0;
@@ -339,8 +360,8 @@ function GoalForm({
         {/* Modal header */}
         <div className="px-6 pt-6 pb-4 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-black text-slate-900">Nuevo objetivo</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Define tu meta, elige el periodo y el tipo de seguimiento</p>
+            <h3 className="text-xl font-black text-slate-900">{isEdit ? "Editar objetivo" : "Nuevo objetivo"}</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{isEdit ? "Modifica los detalles de tu objetivo" : "Define tu meta, elige el periodo y el tipo de seguimiento"}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors text-sm font-bold">✕</button>
         </div>
@@ -487,17 +508,37 @@ function GoalForm({
         </div>
 
         {/* Footer actions */}
-        <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-colors">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!form.title.trim()}
-            className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm transition-all shadow-lg"
-          >
-            Crear objetivo
-          </button>
+        <div className="px-6 py-4 border-t border-slate-100 space-y-3">
+          {isEdit && (
+            <div className="flex gap-2">
+              {(["activo", "pausado", "completado"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setForm({ ...form, status: s })}
+                  className={cn(
+                    "flex-1 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors",
+                    form.status === s
+                      ? s === "completado" ? "bg-emerald-500 text-white" : s === "pausado" ? "bg-amber-400 text-white" : "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  )}
+                >
+                  {s === "activo" ? "Activo" : s === "pausado" ? "⏸ Pausado" : "✓ Completado"}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!form.title.trim()}
+              className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm transition-all shadow-lg"
+            >
+              {isEdit ? "Guardar cambios" : "Crear objetivo"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
