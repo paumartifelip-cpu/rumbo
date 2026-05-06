@@ -6,6 +6,9 @@ import { TaskComposer } from "@/components/TaskComposer";
 import { TaskRow } from "@/components/TaskRow";
 import { useRumbo } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { Reorder } from "framer-motion";
+import { FocusMode } from "@/components/FocusMode";
+import { Task } from "@/lib/types";
 
 type TaskFilter = "all" | "pending" | "completed" | "distractions";
 
@@ -15,12 +18,14 @@ export default function TasksPage() {
     tasks,
     removeTask,
     toggleTask,
+    reorderTasks,
     prioritize,
     prioritizing,
     aiSource,
   } = useRumbo();
 
   const [filter, setFilter] = useState<TaskFilter>("pending");
+  const [focusMode, setFocusMode] = useState(false);
   
   useEffect(() => {
     // keeping for potential future use or can be safely removed entirely
@@ -30,10 +35,14 @@ export default function TasksPage() {
     () =>
       tasks
         .filter((t) => t.status !== "completada" && t.status !== "descartada")
-        .sort(
-          (a, b) =>
-            (b.ai_priority_score ?? 100) - (a.ai_priority_score ?? 100)
-        ),
+        .sort((a, b) => {
+          if (a.manual_order_index !== undefined && b.manual_order_index !== undefined) {
+            return a.manual_order_index - b.manual_order_index;
+          }
+          if (a.manual_order_index !== undefined) return -1;
+          if (b.manual_order_index !== undefined) return 1;
+          return (b.ai_priority_score ?? 100) - (a.ai_priority_score ?? 100);
+        }),
     [tasks]
   );
 
@@ -54,29 +63,51 @@ export default function TasksPage() {
     }
   }, [filter, pending, distractions, completed]);
 
+  // Handle reorder
+  const handleReorder = (newOrder: Task[]) => {
+    // Reorder only makes sense within the 'pending' or 'all' list context
+    // We pass the new sorted pending tasks to the store
+    if (filter === "pending") {
+      reorderTasks(newOrder);
+    }
+  };
+
+  if (focusMode && pending.length > 0) {
+    return <FocusMode tasks={pending} onExit={() => setFocusMode(false)} />;
+  }
+
   return (
     <div>
       <PageHeader
         title="Tareas"
         subtitle="Organiza tus acciones por impacto real. La IA puntúa cada tarea para enfocarte en lo que importa."
         action={
-          ordered.length > 0 ? (
-            <button
-              onClick={prioritize}
-              className="btn-soft"
-              disabled={prioritizing}
-            >
-              {prioritizing ? "Pensando…" : "Repriorizar todo"}
-            </button>
-          ) : null
+          <div className="flex items-center gap-2">
+            {pending.length > 0 && (
+              <button
+                onClick={() => setFocusMode(true)}
+                className="bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl shadow-sm hover:bg-emerald-700 transition-colors flex items-center gap-2"
+              >
+                <span>🎯</span> Modo Enfoque
+              </button>
+            )}
+            {ordered.length > 0 ? (
+              <button
+                onClick={prioritize}
+                className="btn-soft"
+                disabled={prioritizing}
+                title="Recalcular impacto de IA y borrar orden manual"
+              >
+                {prioritizing ? "Pensando…" : "Repriorizar todo"}
+              </button>
+            ) : null}
+          </div>
         }
       />
 
       <div className="mb-4">
         <TaskComposer />
       </div>
-
-
 
       <Card className="mb-4 p-0 overflow-hidden">
         {/* Table Header / Filters */}
@@ -119,12 +150,34 @@ export default function TasksPage() {
               description={filter === "pending" ? "Escribe la primera arriba. La IA la puntuar\u00e1 al instante." : ""}
             />
           </div>
-        ) : (
-          <div className="flex flex-col">
+        ) : filter === "pending" ? (
+          <Reorder.Group axis="y" values={displayedTasks} onReorder={handleReorder} className="flex flex-col pt-3">
             {displayedTasks.map((t, i) => {
-              // Only compute rank if we are looking at pending/all ordered lists
               let rank: number | undefined;
               if (filter === "pending" || filter === "all") {
+                rank = ordered.findIndex(ot => ot.id === t.id);
+                if (rank === -1) rank = undefined;
+              }
+              
+              return (
+                <Reorder.Item key={t.id} value={t} className="relative z-0">
+                  <TaskRow
+                    rank={rank !== undefined ? rank : undefined}
+                    task={t}
+                    goal={goals.find((g) => g.id === t.goal_id)}
+                    onToggle={toggleTask}
+                    onRemove={removeTask}
+                    highlight={filter === "pending" && i === 0}
+                  />
+                </Reorder.Item>
+              );
+            })}
+          </Reorder.Group>
+        ) : (
+          <div className="flex flex-col pt-3">
+            {displayedTasks.map((t, i) => {
+              let rank: number | undefined;
+              if (filter === "all") {
                 rank = ordered.findIndex(ot => ot.id === t.id);
                 if (rank === -1) rank = undefined;
               }
@@ -137,7 +190,7 @@ export default function TasksPage() {
                   goal={goals.find((g) => g.id === t.goal_id)}
                   onToggle={toggleTask}
                   onRemove={removeTask}
-                  highlight={filter === "pending" && i === 0}
+                  highlight={false}
                 />
               );
             })}

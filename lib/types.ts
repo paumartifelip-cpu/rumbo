@@ -51,6 +51,7 @@ export interface Task {
   money_impact?: number;
   ai_priority_score?: number;
   ai_reason?: string;
+  manual_order_index?: number; // Overrides AI sorting when user explicitly reorders
   status: TaskStatus;
   recurrence?: "diaria" | "semanal" | "mensual";
   last_generated_date?: string; // ISO date of last duplication

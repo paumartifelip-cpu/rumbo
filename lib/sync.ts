@@ -264,6 +264,7 @@ const stripTask = (userId: string) => (t: Task) => ({
   money_impact: t.money_impact ?? 0,
   ai_priority_score: t.ai_priority_score ?? null,
   ai_reason: t.ai_reason ?? null,
+  manual_order_index: t.manual_order_index ?? null,
   status: t.status,
   recurrence: t.recurrence ?? null,
   last_generated_date: t.last_generated_date ?? null,
@@ -332,6 +333,7 @@ function normalizeTask(r: any): Task {
     ai_priority_score:
       r.ai_priority_score != null ? Number(r.ai_priority_score) : undefined,
     ai_reason: r.ai_reason ?? undefined,
+    manual_order_index: r.manual_order_index != null ? Number(r.manual_order_index) : undefined,
     status: r.status ?? "pendiente",
     recurrence: r.recurrence ?? undefined,
     last_generated_date: r.last_generated_date ?? undefined,

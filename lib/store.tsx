@@ -67,6 +67,7 @@ interface RumboContext extends RumboState {
   updateTask: (id: string, patch: Partial<Task>) => void;
   removeTask: (id: string) => void;
   toggleTask: (id: string) => void;
+  reorderTasks: (reorderedTasks: Task[]) => void;
   addFinance: (f: Omit<FinancialEntry, "id" | "user_id" | "created_at">) => void;
   updateFinance: (id: string, patch: Partial<FinancialEntry>) => void;
   removeFinance: (id: string) => void;
@@ -688,6 +689,24 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const reorderTasks: RumboContext["reorderTasks"] = useCallback((reorderedTasks) => {
+    setState((s) => {
+      // Create a map for quick lookup
+      const orderMap = new Map<string, number>();
+      reorderedTasks.forEach((t, i) => orderMap.set(t.id, i));
+
+      // Update existing tasks with the new manual_order_index
+      const newTasks = s.tasks.map((t) => {
+        if (orderMap.has(t.id)) {
+          return { ...t, manual_order_index: orderMap.get(t.id) };
+        }
+        return t;
+      });
+
+      return { ...s, tasks: newTasks };
+    });
+  }, []);
+
   const addFinance: RumboContext["addFinance"] = useCallback((f) => {
     const id = uid();
     setState((s) => {
@@ -850,6 +869,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       updateTask,
       removeTask,
       toggleTask,
+      reorderTasks,
       addFinance,
       updateFinance,
       removeFinance,
@@ -874,6 +894,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       updateTask,
       removeTask,
       toggleTask,
+      reorderTasks,
       addFinance,
       updateFinance,
       removeFinance,
