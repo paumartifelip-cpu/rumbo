@@ -51,6 +51,7 @@ create table if not exists tasks (
   ai_priority_score int,
   ai_reason text,
   status text default 'pendiente',
+  manual_order_index int,
   created_at timestamptz default now()
 );
 create index if not exists tasks_user_id_idx on tasks(user_id);
@@ -92,6 +93,7 @@ create table if not exists user_tools (
   icon text default '🔧',
   highlight boolean default false,
   created_at timestamptz default now()
+  -- NOTE: no FK to auth.users — app uses custom UUIDs without Supabase Auth
 );
 create index if not exists user_tools_user_id_idx on user_tools(user_id);
 

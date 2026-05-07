@@ -72,12 +72,16 @@ function ActivarPageInner() {
       return;
     }
 
-    createProfile(row, fallbackName, currency);
+    createProfile(row, fallbackName, currency, email);
   }
 
-  function createProfile(row: PaidCode, fallbackName: string, currency: Currency) {
+  function createProfile(row: PaidCode, fallbackName: string, currency: Currency, email: string) {
     if (getCurrentProfileId()) { router.replace("/dashboard"); return; }
-    if (localStorage.getItem(CREATING_LOCK_KEY)) { setStep("pin"); return; }
+    if (localStorage.getItem(CREATING_LOCK_KEY)) {
+      // Another tab is already creating this profile — wait briefly then redirect.
+      setTimeout(() => router.replace("/login"), 1500);
+      return;
+    }
     localStorage.setItem(CREATING_LOCK_KEY, "1");
 
     const name = (row.name || fallbackName || "").trim() || "Usuario";
@@ -90,6 +94,7 @@ function ActivarPageInner() {
       profileMeta: {
         id: created.id, name: created.name,
         initials: created.initials, color: created.color, emoji: created.emoji,
+        email: email || undefined,
       },
     }).catch(() => {});
     markCodeUsed(row.code).catch(() => {});

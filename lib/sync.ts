@@ -18,7 +18,7 @@ export interface SyncSnapshot {
   userTools: UserTool[];
   onboarding?: OnboardingData;
   primaryCurrency?: Currency;
-  profileMeta?: Pick<Profile, "id" | "name" | "initials" | "color" | "emoji">;
+  profileMeta?: Pick<Profile, "id" | "name" | "initials" | "color" | "emoji" | "email">;
 }
 
 const isCurrency = (v: any): v is Currency =>
@@ -157,6 +157,7 @@ export async function pushToSupabase(
         profileRow.initials   = snap.profileMeta.initials;
         profileRow.color      = snap.profileMeta.color;
         profileRow.emoji      = snap.profileMeta.emoji ?? null;
+        profileRow.email      = snap.profileMeta.email ?? null;
       }
       if (snap.onboarding) {
         profileRow.name                    = snap.onboarding.name ?? profileRow.name ?? null;
