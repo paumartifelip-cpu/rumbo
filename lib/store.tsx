@@ -78,6 +78,7 @@ interface RumboContext extends RumboState {
   addUserTool: (ut: Omit<UserTool, "id" | "user_id" | "created_at">) => void;
   removeUserTool: (id: string) => void;
   updateUserTool: (id: string, patch: Partial<UserTool>) => void;
+  reorderUserTools: (orderedIds: string[]) => void;
   saveOnboarding: (data: OnboardingData) => void;
   updateOnboarding: (patch: Partial<OnboardingData>) => void;
   resetDemo: () => void;
@@ -90,514 +91,78 @@ interface RumboContext extends RumboState {
 const STORAGE_PREFIX = "rumbo_state_v5_";
 const storageKeyFor = (profileId: string) => `${STORAGE_PREFIX}${profileId}`;
 
+// Curated default tool list — every new profile starts with these.
+// Order here = default display order; users can drag-and-drop to customize.
 const BASE_DEFAULT_TOOLS = [
-  // Productividad
-  {
-    name: "Notion",
-    icon: "📓",
-    category: "Productividad",
-    description: "Tu segundo cerebro. Notas, wikis, bases de datos y proyectos en un solo lugar.",
-    url: "https://notion.so",
-    tags: ["notas", "wikis", "proyectos"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Obsidian",
-    icon: "🪨",
-    category: "Productividad",
-    description: "Notas en Markdown con grafos de conexión. Perfecto para pensar en red.",
-    url: "https://obsidian.md",
-    tags: ["notas", "PKM", "offline"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Todoist",
-    icon: "☑️",
-    category: "Productividad",
-    description: "Gestor de tareas minimalista con prioridades y vistas de proyecto.",
-    url: "https://todoist.com",
-    tags: ["tareas", "GTD"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "Calendly",
-    icon: "📅",
-    category: "Productividad",
-    description: "Elimina el ping-pong de emails para quedar. Tu cliente elige el hueco directamente.",
-    url: "https://calendly.com",
-    tags: ["agenda", "reuniones"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "Cal.com",
-    icon: "🗓️",
-    category: "Productividad",
-    description: "Alternativa open-source a Calendly. Programación de reuniones moderna, self-host opcional.",
-    url: "https://cal.com",
-    tags: ["agenda", "open-source", "reuniones"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Linear",
-    icon: "📐",
-    category: "Productividad",
-    description: "Gestión de proyectos para equipos modernos. Rapidísimo, con atajos de teclado y enfoque en velocidad.",
-    url: "https://linear.app",
-    tags: ["proyectos", "equipos", "issues"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Raycast",
-    icon: "🚦",
-    category: "Productividad",
-    description: "Lanzador para Mac con IA, snippets, ventanas, calculadora y mil extensiones. Reemplaza Spotlight.",
-    url: "https://raycast.com",
-    tags: ["Mac", "lanzador", "atajos"],
-    free: true,
-    rating: 5,
-  },
-  // Finanzas
-  {
-    name: "Revolut",
-    icon: "💳",
-    category: "Finanzas",
-    description: "Banco digital con cambio de divisas sin comisiones y análisis de gastos automático.",
-    url: "https://revolut.com",
-    tags: ["banco", "divisas", "crypto"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "YNAB",
-    icon: "💰",
-    category: "Finanzas",
-    description: "You Need A Budget. El método de presupuesto por sobres que más resultados da.",
-    url: "https://youneedabudget.com",
-    tags: ["presupuesto", "ahorro"],
-    free: false,
-    rating: 5,
-  },
-  {
-    name: "Wise",
-    icon: "🌍",
-    category: "Finanzas",
-    description: "Transferencias internacionales con el tipo de cambio real. Sin comisiones ocultas.",
-    url: "https://wise.com",
-    tags: ["transferencias", "divisas"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Stripe",
-    icon: "⚡",
-    category: "Finanzas",
-    description: "Cobrar online de forma profesional. Acepta tarjetas, SEPA y más en minutos.",
-    url: "https://stripe.com",
-    tags: ["pagos", "facturación"],
-    free: true,
-    rating: 5,
-  },
-  // IA
-  {
-    name: "Google Gemini",
-    icon: "✨",
-    category: "IA",
-    description: "El modelo multimodal de Google. Razona con texto, imágenes, audio y vídeo. Integrado en todo el ecosistema Google.",
-    url: "https://gemini.google.com",
-    tags: ["chat", "multimodal", "Google"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "v0",
-    icon: "🧱",
-    category: "IA",
-    description: "Genera interfaces React/Next.js con IA. Le describes lo que quieres y obtienes código listo para producción.",
-    url: "https://v0.app",
-    tags: ["código", "UI", "Vercel", "generación"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Lovable",
-    icon: "💖",
-    category: "IA",
-    description: "Construye apps web completas describiéndolas en lenguaje natural. Backend, frontend y base de datos sin tocar código.",
-    url: "https://lovable.dev",
-    tags: ["código", "no-code", "fullstack", "app builder"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Bolt",
-    icon: "⚡",
-    category: "IA",
-    description: "App builder con IA en el navegador. Genera, ejecuta y depura aplicaciones full-stack en tiempo real.",
-    url: "https://bolt.new",
-    tags: ["código", "app builder", "fullstack", "browser"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Replit Agent",
-    icon: "🛠️",
-    category: "IA",
-    description: "Agente IA dentro de Replit que construye, ejecuta y despliega apps automáticamente desde un prompt.",
-    url: "https://replit.com",
-    tags: ["código", "agente", "deploy"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "DeepSeek",
-    icon: "🔬",
-    category: "IA",
-    description: "Modelo de razonamiento abierto, gratis y rapidísimo. Excelente para programación y matemáticas.",
-    url: "https://chat.deepseek.com",
-    tags: ["chat", "razonamiento", "open-source"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Mistral Le Chat",
-    icon: "🐈",
-    category: "IA",
-    description: "Asistente de Mistral AI con búsqueda web, generación de imágenes y código. Alternativa europea a ChatGPT.",
-    url: "https://chat.mistral.ai",
-    tags: ["chat", "Europa", "open-source"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "NotebookLM",
-    icon: "📚",
-    category: "IA",
-    description: "IA de Google que analiza tus documentos y genera resúmenes, preguntas y podcasts de audio con tu contenido.",
-    url: "https://notebooklm.google.com",
-    tags: ["IA", "documentos", "podcast", "Google"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Antigravity",
-    icon: "🚀",
-    category: "IA",
-    description: "Asistente de código IA de Google DeepMind. Pair programming inteligente que entiende tu repositorio entero.",
-    url: "https://antigravity.google/",
-    tags: ["código", "IA", "DeepMind", "programación"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Google Flow",
-    icon: "🎬",
-    category: "IA",
-    description: "Generación de vídeo cinematográfico con IA de Google. Crea escenas de alta calidad a partir de texto o imagen.",
-    url: "https://labs.google/flow",
-    tags: ["vídeo", "generación", "Google", "cinematográfico"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Google Whisk",
-    icon: "🎨",
-    category: "IA",
-    description: "Generación de imágenes por IA de Google que combina sujeto + escena + estilo de otras imágenes como referencia.",
-    url: "https://labs.google/whisk",
-    tags: ["imágenes", "estilo", "Google", "referencias"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "Suno AI",
-    icon: "🎵",
-    category: "IA",
-    description: "Genera canciones completas con letra y música a partir de un prompt de texto. Estudio musical en tu bolsillo.",
-    url: "https://suno.com",
-    tags: ["música", "canciones", "audio", "generación"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "ChatGPT",
-    icon: "🤖",
-    category: "IA",
-    description: "El asistente más conocido. Ideal para redactar, resumir, generar ideas y código.",
-    url: "https://chat.openai.com",
-    tags: ["chat", "texto", "código"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Claude",
-    icon: "🧠",
-    category: "IA",
-    description: "El rival de ChatGPT con ventana de contexto enorme. Mejor para documentos largos.",
-    url: "https://claude.ai",
-    tags: ["chat", "análisis", "documentos"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Perplexity",
-    icon: "🔍",
-    category: "IA",
-    description: "Buscador con IA que cita fuentes. Sustituye a Google para investigación rápida.",
-    url: "https://perplexity.ai",
-    tags: ["búsqueda", "investigación"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "Midjourney",
-    icon: "🖼️",
-    category: "IA",
-    description: "El mejor generador de imágenes IA para crear contenido visual de alta calidad.",
-    url: "https://midjourney.com",
-    tags: ["imágenes", "diseño", "arte"],
-    free: false,
-    rating: 5,
-  },
-  {
-    name: "ElevenLabs",
-    icon: "🎙️",
-    category: "IA",
-    description: "Texto a voz ultra-realista. Clona tu voz o elige entre cientos de voces.",
-    url: "https://elevenlabs.io",
-    tags: ["voz", "audio", "podcast"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Runway",
-    icon: "🎞️",
-    category: "IA",
-    description: "Generación y edición de vídeo con IA de última generación. Modelos Gen-3 / Gen-4 para vídeo cinematográfico.",
-    url: "https://runwayml.com",
-    tags: ["vídeo", "generación", "edición"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "HeyGen",
-    icon: "👤",
-    category: "IA",
-    description: "Vídeos con avatares hiperrealistas a partir de texto. Tu avatar habla en cualquier idioma sin grabar.",
-    url: "https://heygen.com",
-    tags: ["vídeo", "avatar", "doblaje"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "Higgsfield",
-    icon: "🎥",
-    category: "IA",
-    description: "Movimiento de cámara cinematográfico con IA. Convierte una imagen estática en planos dinámicos profesionales.",
-    url: "https://higgsfield.ai",
-    tags: ["vídeo", "cinematográfico", "cámara"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "Krea",
-    icon: "🖼️",
-    category: "IA",
-    description: "Estudio de generación de imagen y vídeo en tiempo real. Combina Flux, SDXL y otros modelos en una sola interfaz.",
-    url: "https://krea.ai",
-    tags: ["imágenes", "vídeo", "tiempo real"],
-    free: true,
-    rating: 4,
-  },
-  // Contenido
-  {
-    name: "Pomelli",
-    icon: "🍅",
-    category: "Contenido",
-    description: "Herramienta de productividad estilo Pomodoro diseñada para creadores. Sesiones de trabajo + descansos con seguimiento.",
-    url: "https://pomelli.com",
-    tags: ["pomodoro", "enfoque", "creadores"],
-    free: true,
-    rating: 4,
-    highlight: true,
-  },
-  {
-    name: "Canva",
-    icon: "✏️",
-    category: "Contenido",
-    description: "Diseño gráfico para no diseñadores. Plantillas profesionales para redes, vídeos y más.",
-    url: "https://canva.com",
-    tags: ["diseño", "redes sociales", "plantillas"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "CapCut",
-    icon: "🎬",
-    category: "Contenido",
-    description: "Editor de vídeo para móvil y web optimizado para formato vertical. Imprescindible para Reels y TikTok.",
-    url: "https://capcut.com",
-    tags: ["vídeo", "reels", "tiktok"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Descript",
-    icon: "🎞️",
-    category: "Contenido",
-    description: "Edita vídeo editando el texto de la transcripción. Perfecto para podcasters y YouTubers.",
-    url: "https://descript.com",
-    tags: ["podcast", "vídeo", "transcripción"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "Figma",
-    icon: "🖌️",
-    category: "Contenido",
-    description: "Diseño de interfaces colaborativo en tiempo real. El estándar de la industria.",
-    url: "https://figma.com",
-    tags: ["UI/UX", "diseño", "colaborativo"],
-    free: true,
-    rating: 5,
-  },
-  // Automatización
-  {
-    name: "n8n",
-    icon: "⚙️",
-    category: "Automatización",
-    description: "Automatización de flujos open-source y self-hosteable. Conecta cualquier app con lógica visual y código.",
-    url: "https://n8n.io",
-    tags: ["automatización", "workflows", "open-source", "self-host"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Make",
-    icon: "🔄",
-    category: "Automatización",
-    description: "La alternativa visual a Zapier. Flujos de trabajo con cientos de integraciones y lógica avanzada sin código.",
-    url: "https://make.com",
-    tags: ["automatización", "no-code", "integraciones"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  // Código
-  {
-    name: "Cursor",
-    icon: "⌨️",
-    category: "Código",
-    description: "El editor de código con IA más potente. Basado en VS Code con autocompletado inteligente.",
-    url: "https://cursor.sh",
-    tags: ["IDE", "IA", "programación"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Vercel",
-    icon: "▲",
-    category: "Código",
-    description: "Deploy de apps Next.js en segundos. La infraestructura preferida de startups.",
-    url: "https://vercel.com",
-    tags: ["deploy", "hosting", "Next.js"],
-    free: true,
-    rating: 5,
-  },
-  {
-    name: "Supabase",
-    icon: "🟢",
-    category: "Código",
-    description: "Firebase open-source. Base de datos PostgreSQL + Auth + Storage sin backend propio.",
-    url: "https://supabase.com",
-    tags: ["base de datos", "auth", "backend"],
-    free: true,
-    rating: 5,
-  },
-  // Marketing
-  {
-    name: "Beehiiv",
-    icon: "🐝",
-    category: "Marketing",
-    description: "La plataforma de newsletters que usan los mejores creadores. Crece y monetiza.",
-    url: "https://beehiiv.com",
-    tags: ["newsletter", "monetización"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Kit (ConvertKit)",
-    icon: "📧",
-    category: "Marketing",
-    description: "Email marketing para creadores. Automatizaciones sencillas y páginas de suscripción.",
-    url: "https://kit.com",
-    tags: ["email", "newsletter", "automatización"],
-    free: true,
-    rating: 4,
-  },
-  {
-    name: "Buffer",
-    icon: "📲",
-    category: "Marketing",
-    description: "Programa publicaciones en todas tus redes sociales desde un solo lugar.",
-    url: "https://buffer.com",
-    tags: ["redes sociales", "programación"],
-    free: true,
-    rating: 4,
-  },
-  // Comunicación
-  {
-    name: "Loom",
-    icon: "🎥",
-    category: "Comunicación",
-    description: "Graba tu pantalla + cámara y comparte en segundos. Sustituye miles de reuniones.",
-    url: "https://loom.com",
-    tags: ["vídeo", "asincrónico", "reuniones"],
-    free: true,
-    rating: 5,
-    highlight: true,
-  },
-  {
-    name: "Slack",
-    icon: "💬",
-    category: "Comunicación",
-    description: "Chat de equipos con canales temáticos e integraciones con todo tu stack.",
-    url: "https://slack.com",
-    tags: ["chat", "equipos", "integraciones"],
-    free: true,
-    rating: 4,
-  },
+  // ── IA ────────────────────────────────────────────────────────────────────
+  { name: "Gemini",                  icon: "✨",  category: "IA",     url: "https://gemini.google.com/app", description: "Asistente IA de Google. Multimodal y rápido.",                                       free: true, rating: 5, highlight: true },
+  { name: "Claude",                  icon: "🧠",  category: "IA",     url: "https://claude.ai",            description: "El modelo de Anthropic. Para análisis profundo y código.",                            free: true, rating: 5, highlight: true },
+  { name: "ChatGPT",                 icon: "🤖",  category: "IA",     url: "https://chatgpt.com",          description: "Asistente IA de OpenAI. Texto, imágenes y código.",                                   free: true, rating: 5, highlight: true },
+  { name: "DeepSeek",                icon: "🔬",  category: "IA",     url: "https://chat.deepseek.com",    description: "Razonamiento y código. Alternativa potente y económica.",                              free: true, rating: 5 },
+  { name: "Grok",                    icon: "🦾",  category: "IA",     url: "https://grok.com",             description: "Asistente IA de X con tendencias de internet en tiempo real.",                         free: true, rating: 4 },
+  { name: "Perplexity",              icon: "🔍",  category: "IA",     url: "https://www.perplexity.ai",    description: "Buscador IA con fuentes citadas. Investigación rápida.",                               free: true, rating: 5 },
+  { name: "Codex",                   icon: "💻",  category: "IA",     url: "https://openai.com/es-419/codex/", description: "Agente de código de OpenAI.",                                                       free: true, rating: 5 },
+  { name: "Investigaciones profundas", icon: "🧪", category: "IA",     url: "https://gemini.google.com/app", description: "Modo Deep Research de Gemini. Para informes largos con fuentes.",                  free: true, rating: 5 },
+  { name: "Canvas o Lienzo",         icon: "🖼️",  category: "IA",     url: "https://chatgpt.com",          description: "Modo Canvas de ChatGPT para escribir y editar en colaboración con la IA.",            free: true, rating: 4 },
+  { name: "Max Prompt",              icon: "🎯",  category: "IA",     url: "https://chatgpt.com/g/g-688089637d1c8191bbf0c2a936580018-max-prompt", description: "GPT especializado en optimizar prompts.",  free: true, rating: 5 },
+  { name: "Articulero",              icon: "📰",  category: "IA",     url: "https://chatgpt.com/g/g-691a768560748191a76e32f2f960eb1e-articulero-2-0", description: "GPT para redactar artículos optimizados.", free: true, rating: 4 },
+  { name: "IA para niños",           icon: "🧸",  category: "IA",     url: "https://chatgpt.com/g/g-68711f8bed148191b3391b1f24652b1d-ia-para-ninos", description: "GPT educativo y seguro para niños.",      free: true, rating: 4 },
+
+  // ── Imagen / Vídeo / Audio ────────────────────────────────────────────────
+  { name: "Midjourney",              icon: "🎨",  category: "Imagen", url: "https://www.midjourney.com",   description: "Generación de imágenes IA de calidad cinematográfica.",                                free: false, rating: 5, highlight: true },
+  { name: "Nanobanana",              icon: "🍌",  category: "Imagen", url: "https://gemini.google.com/app", description: "Generador de imágenes de Google integrado en Gemini.",                              free: true, rating: 4 },
+  { name: "Whisk",                   icon: "🥣",  category: "Imagen", url: "https://labs.google/fx/tools/whisk", description: "Combina sujeto + escena + estilo desde imágenes de referencia.",               free: true, rating: 4 },
+  { name: "Recraft",                 icon: "🎯",  category: "Imagen", url: "https://www.recraft.ai",       description: "Diseño gráfico, branding y vectores con IA.",                                          free: true, rating: 5 },
+  { name: "Google Flow",             icon: "🎬",  category: "Vídeo",  url: "https://labs.google/flow/about", description: "Generación de vídeo cinematográfico con IA.",                                       free: true, rating: 5, highlight: true },
+  { name: "Runway",                  icon: "🎞️",  category: "Vídeo",  url: "https://runwayml.com",         description: "Vídeo generativo y edición. Modelos Gen-3/Gen-4.",                                     free: true, rating: 5 },
+  { name: "Kling AI",                icon: "🎥",  category: "Vídeo",  url: "https://app.klingai.com/global/", description: "Generación de vídeo IA de alta calidad.",                                            free: true, rating: 4 },
+  { name: "Opus Clip",               icon: "✂️",  category: "Vídeo",  url: "https://www.opus.pro/es-es",   description: "Convierte vídeos largos en clips virales para redes.",                                 free: true, rating: 5 },
+  { name: "Suno",                    icon: "🎵",  category: "Audio",  url: "https://suno.com",             description: "Genera canciones completas con letra y música a partir de texto.",                     free: true, rating: 5 },
+
+  // ── No-code / Automatización / Web ────────────────────────────────────────
+  { name: "Lovable",                 icon: "💖",  category: "No-code", url: "https://lovable.dev",         description: "Construye apps web completas con lenguaje natural.",                                  free: true, rating: 5, highlight: true },
+  { name: "Google Antigravity",      icon: "🚀",  category: "No-code", url: "https://antigravity.google",  description: "Asistente de código IA de Google DeepMind.",                                          free: true, rating: 5 },
+  { name: "Google Opal",             icon: "💠",  category: "No-code", url: "https://opal.google",         description: "Apps mini sin código por Google Labs.",                                                free: true, rating: 4 },
+  { name: "n8n",                     icon: "⚙️",  category: "No-code", url: "https://n8n.io",              description: "Automatización open-source. Conecta apps con lógica visual.",                          free: true, rating: 5 },
+  { name: "Make",                    icon: "🔄",  category: "No-code", url: "https://www.make.com",        description: "Automatización visual con cientos de integraciones.",                                  free: true, rating: 5 },
+  { name: "Napkin AI",               icon: "📋",  category: "No-code", url: "https://www.napkin.ai",       description: "Convierte texto en gráficos visuales automáticamente.",                                free: true, rating: 4 },
+
+  // ── Google Workspace ──────────────────────────────────────────────────────
+  { name: "Google",                  icon: "🔎",  category: "Google", url: "https://www.google.com",      description: "El buscador.",                                                                          free: true, rating: 5 },
+  { name: "Gmail",                   icon: "📧",  category: "Google", url: "https://mail.google.com",     description: "Correo de Google.",                                                                     free: true, rating: 5 },
+  { name: "Google Calendar",         icon: "📅",  category: "Google", url: "https://calendar.google.com", description: "Tu agenda.",                                                                            free: true, rating: 5 },
+  { name: "Google Drive",            icon: "📁",  category: "Google", url: "https://drive.google.com",    description: "Almacenamiento en la nube.",                                                            free: true, rating: 5 },
+  { name: "Google Docs",             icon: "📄",  category: "Google", url: "https://docs.google.com",     description: "Documentos en la nube.",                                                                free: true, rating: 5 },
+  { name: "Google Sheets",           icon: "📊",  category: "Google", url: "https://sheets.google.com",   description: "Hojas de cálculo en la nube.",                                                          free: true, rating: 5 },
+  { name: "Google Slides",           icon: "🖥️",  category: "Google", url: "https://slides.google.com",   description: "Presentaciones en la nube.",                                                            free: true, rating: 5 },
+  { name: "Google Forms",            icon: "📝",  category: "Google", url: "https://forms.google.com",    description: "Formularios y encuestas.",                                                              free: true, rating: 4 },
+  { name: "Google Meet",             icon: "📹",  category: "Google", url: "https://meet.google.com",     description: "Videollamadas.",                                                                        free: true, rating: 5 },
+  { name: "Google Keep",             icon: "📌",  category: "Google", url: "https://keep.google.com",     description: "Notas rápidas.",                                                                        free: true, rating: 4 },
+  { name: "Google Tasks",            icon: "✅",  category: "Google", url: "https://tasks.google.com",    description: "Tareas integradas con Gmail y Calendar.",                                               free: true, rating: 4 },
+  { name: "Google Photos",           icon: "🖼️",  category: "Google", url: "https://photos.google.com",   description: "Tus fotos en la nube.",                                                                 free: true, rating: 5 },
+  { name: "Google Maps",             icon: "🗺️",  category: "Google", url: "https://maps.google.com",     description: "Mapas y rutas.",                                                                        free: true, rating: 5 },
+  { name: "Google Vids",             icon: "🎬",  category: "Google", url: "https://workspace.google.com/intl/es-419/products/vids/", description: "Editor de vídeo online de Google.",                          free: true, rating: 4 },
+  { name: "NotebookLM",              icon: "📚",  category: "Google", url: "https://notebooklm.google",   description: "Analiza documentos y genera podcasts y resúmenes.",                                     free: true, rating: 5 },
+  { name: "Google AI Studio",        icon: "🧪",  category: "Google", url: "https://aistudio.google.com", description: "Estudio para probar y construir con modelos Gemini.",                                   free: true, rating: 5 },
+  { name: "YouTube",                 icon: "📺",  category: "Google", url: "https://youtube.com",         description: "Vídeo a la carta.",                                                                     free: true, rating: 5 },
+  { name: "YouTube Studio",          icon: "🎬",  category: "Google", url: "https://studio.youtube.com",  description: "Panel de creador de YouTube.",                                                          free: true, rating: 5 },
+  { name: "Google Trends",           icon: "📈",  category: "Google", url: "https://trends.google.com",   description: "Tendencias de búsqueda en tiempo real.",                                                free: true, rating: 4 },
+  { name: "Google Ads",              icon: "📣",  category: "Google", url: "https://ads.google.com",      description: "Plataforma de publicidad de Google.",                                                   free: true, rating: 4 },
 ];
 
+// Bump this on every curated-list change to force a one-time reset of cached
+// user_tools across all profiles. Read by the hydration logic below.
+export const TOOLS_VERSION = "v2";
+
 export const buildDefaultUserTools = (userId: string): UserTool[] => {
-  // Only ship free tools by default — paid ones are opt-in.
-  // Use a fixed seed timestamp so order is stable across reloads.
-  const seed = "2025-01-01T00:00:00.000Z";
-  return BASE_DEFAULT_TOOLS
-    .filter((t) => t.free === true)
-    .map((t, idx) => ({
-      ...t,
-      id: `default-tool-${idx}`,
-      user_id: userId,
-      created_at: seed,
-    }));
+  const seed = "2026-05-07T00:00:00.000Z";
+  return BASE_DEFAULT_TOOLS.map((t, idx) => ({
+    ...t,
+    id: `default-tool-${idx}`,
+    user_id: userId,
+    created_at: seed,
+    order_index: idx,
+  }));
 };
 
 const defaultState: RumboState = {
@@ -643,11 +208,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         const raw = localStorage.getItem(storageKeyFor(p.id));
         if (raw) {
           const parsed = JSON.parse(raw);
-          // Seed defaults whenever the list is empty or missing — IDs and
-          // timestamps are stable so this won't cause visual shifting on
-          // subsequent renders.
+          // One-time migration: replace tools when the curated list has been
+          // bumped, so every existing profile picks up the new defaults.
+          const needsToolsReset = parsed._toolsVersion !== TOOLS_VERSION;
           const userTools =
-            Array.isArray(parsed.userTools) && parsed.userTools.length > 0
+            !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
               ? parsed.userTools
               : buildDefaultUserTools(p.user_id);
           setState({
@@ -722,8 +287,14 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const mergedSnapshots = mergeById(cur.snapshots, remote.snapshots);
     const mergedOnboarding = remote.onboarding ?? cur.onboarding;
 
-    // Stable sort by created_at (asc), then by name — keeps order identical across syncs
+    // Sort by user-defined order_index first, then fall back to created_at + name
+    // for tools that don't have an order yet.
     let mergedUserTools = mergeById(cur.userTools || [], remote.userTools || []).sort((a, b) => {
+      const ai = a.order_index;
+      const bi = b.order_index;
+      if (ai != null && bi != null) return ai - bi;
+      if (ai != null) return -1;
+      if (bi != null) return 1;
       const ca = a.created_at ?? "";
       const cb = b.created_at ?? "";
       if (ca !== cb) return ca < cb ? -1 : 1;
@@ -896,7 +467,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       const { prioritizing, syncStatus, ...persisted } = state;
       localStorage.setItem(
         storageKeyFor(profile.id),
-        JSON.stringify(persisted)
+        JSON.stringify({ ...persisted, _toolsVersion: TOOLS_VERSION })
       );
     } catch {
       // ignore
@@ -1020,8 +591,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(storageKeyFor(p.id));
       if (raw) {
         const parsed = JSON.parse(raw);
+        const needsToolsReset = parsed._toolsVersion !== TOOLS_VERSION;
         const userTools =
-          Array.isArray(parsed.userTools) && parsed.userTools.length > 0
+          !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
             ? parsed.userTools
             : buildDefaultUserTools(p.user_id);
         setState({
@@ -1370,18 +942,25 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addUserTool: RumboContext["addUserTool"] = useCallback((ut) => {
-    setState((state) => ({
-      ...state,
-      userTools: [
-        ...state.userTools,
-        {
-          ...ut,
-          id: uid(),
-          user_id: state.user.id,
-          created_at: new Date().toISOString(),
-        },
-      ],
-    }));
+    setState((state) => {
+      const maxOrder = state.userTools.reduce(
+        (m, t) => (t.order_index != null && t.order_index > m ? t.order_index : m),
+        -1
+      );
+      return {
+        ...state,
+        userTools: [
+          ...state.userTools,
+          {
+            ...ut,
+            id: uid(),
+            user_id: state.user.id,
+            created_at: new Date().toISOString(),
+            order_index: maxOrder + 1,
+          },
+        ],
+      };
+    });
   }, []);
 
   const removeUserTool: RumboContext["removeUserTool"] = useCallback((id) => {
@@ -1396,6 +975,22 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       ...state,
       userTools: state.userTools.map((ut) => (ut.id === id ? { ...ut, ...patch } : ut)),
     }));
+  }, []);
+
+  const reorderUserTools: RumboContext["reorderUserTools"] = useCallback((orderedIds) => {
+    setState((state) => {
+      const byId = new Map(state.userTools.map((t) => [t.id, t]));
+      const reordered: UserTool[] = [];
+      orderedIds.forEach((id, idx) => {
+        const t = byId.get(id);
+        if (t) reordered.push({ ...t, order_index: idx });
+      });
+      // Append any tool that wasn't in the ordered list (shouldn't happen, defensive)
+      state.userTools.forEach((t) => {
+        if (!orderedIds.includes(t.id)) reordered.push(t);
+      });
+      return { ...state, userTools: reordered };
+    });
   }, []);
 
   const saveOnboarding: RumboContext["saveOnboarding"] = useCallback((data) => {
@@ -1476,6 +1071,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       addUserTool,
       removeUserTool,
       updateUserTool,
+      reorderUserTools,
       saveOnboarding,
       updateOnboarding,
       resetDemo,
@@ -1504,6 +1100,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       addUserTool,
       removeUserTool,
       updateUserTool,
+      reorderUserTools,
       saveOnboarding,
       updateOnboarding,
       resetDemo,

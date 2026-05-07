@@ -121,5 +121,6 @@ export interface UserTool {
   rating: number; // 1-5
   icon: string;
   highlight?: boolean;
+  order_index?: number; // user-defined order via drag-and-drop
   created_at: string;
 }

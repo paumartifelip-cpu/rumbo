@@ -1,253 +1,132 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useRumbo, useFormatMoney } from "@/lib/store";
+import { useRumbo } from "@/lib/store";
 import { UserTool } from "@/lib/types";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Categories ───────────────────────────────────────────────────────────────
 
-type ToolCategory =
-  | "Productividad"
-  | "Finanzas"
-  | "IA"
-  | "Contenido"
-  | "Código"
-  | "Automatización"
-  | "Marketing"
-  | "Comunicación";
+const CATEGORIES = ["IA", "Imagen", "Vídeo", "Audio", "No-code", "Google"] as const;
+type Category = (typeof CATEGORIES)[number];
 
-const CATEGORIES: ToolCategory[] = [
-  "Productividad",
-  "Finanzas",
-  "IA",
-  "Contenido",
-  "Automatización",
-  "Código",
-  "Marketing",
-  "Comunicación",
-];
-
-const CAT_COLORS: Record<ToolCategory, { text: string; bg: string }> = {
-  Productividad: { text: "text-violet-600", bg: "bg-violet-50" },
-  Finanzas:      { text: "text-emerald-600", bg: "bg-emerald-50" },
-  IA:            { text: "text-blue-600", bg: "bg-blue-50" },
-  Contenido:     { text: "text-orange-600", bg: "bg-orange-50" },
-  Automatización:{ text: "text-amber-600", bg: "bg-amber-50" },
-  Código:        { text: "text-slate-600", bg: "bg-slate-100" },
-  Marketing:     { text: "text-pink-600", bg: "bg-pink-50" },
-  Comunicación:  { text: "text-cyan-600", bg: "bg-cyan-50" },
+const CAT_ACCENT: Record<string, string> = {
+  IA:        "text-violet-700  bg-violet-50",
+  Imagen:    "text-pink-700    bg-pink-50",
+  "Vídeo":   "text-orange-700  bg-orange-50",
+  Audio:     "text-amber-700   bg-amber-50",
+  "No-code": "text-emerald-700 bg-emerald-50",
+  Google:    "text-blue-700    bg-blue-50",
 };
 
-// Curated emoji options for the icon picker — grouped for browsing.
 const ICON_OPTIONS: { group: string; icons: string[] }[] = [
-  {
-    group: "Trabajo",
-    icons: ["🔧", "🛠️", "⚙️", "📊", "📈", "📉", "📋", "📌", "📎", "🗂️", "🗃️", "📁"],
-  },
-  {
-    group: "Productividad",
-    icons: ["📓", "📔", "📒", "📕", "📗", "📘", "📙", "📚", "✏️", "🖊️", "🖋️", "✒️", "📝", "🗒️", "🗓️", "📅", "☑️", "✅"],
-  },
-  {
-    group: "Tech / IA",
-    icons: ["🤖", "🧠", "✨", "🚀", "⚡", "💡", "🔮", "🛸", "👾", "🎛️", "🖥️", "⌨️", "🖱️", "💾", "💿", "🧬"],
-  },
-  {
-    group: "Comunicación",
-    icons: ["💬", "💭", "🗣️", "📞", "☎️", "📱", "📲", "📨", "📩", "📧", "📤", "📥", "📡"],
-  },
-  {
-    group: "Diseño / Contenido",
-    icons: ["🎨", "🖌️", "🖍️", "🎬", "🎞️", "📹", "📷", "📸", "🎥", "🎙️", "🎧", "🎵", "🎶", "🖼️"],
-  },
-  {
-    group: "Finanzas",
-    icons: ["💰", "💵", "💴", "💶", "💷", "💸", "💳", "💎", "🏦", "📊", "📈", "🪙", "🧾"],
-  },
-  {
-    group: "Web / Plataformas",
-    icons: ["🌍", "🌐", "🔗", "🔍", "🔎", "🛒", "🏷️", "📦", "🚚", "🛍️", "🐝", "🟢", "🔴", "🟡", "🔵", "🟣", "🟠", "▲", "▼"],
-  },
-  {
-    group: "Otros",
-    icons: ["⭐", "🌟", "🌈", "🔥", "❤️", "💯", "🎯", "🏆", "🪨", "🌱", "🍅", "🦊", "🐙", "🦄", "🍀"],
-  },
+  { group: "Trabajo",       icons: ["🔧", "🛠️", "⚙️", "📊", "📈", "📉", "📋", "📌", "📎", "🗂️", "🗃️", "📁"] },
+  { group: "Productividad", icons: ["📓", "📔", "📒", "📕", "📗", "📘", "📙", "📚", "✏️", "🖊️", "📝", "🗒️", "🗓️", "📅", "☑️", "✅"] },
+  { group: "Tech / IA",     icons: ["🤖", "🧠", "✨", "🚀", "⚡", "💡", "🔮", "🛸", "👾", "🎛️", "🖥️", "⌨️", "💾"] },
+  { group: "Comunicación",  icons: ["💬", "💭", "🗣️", "📞", "📱", "📨", "📧", "📡"] },
+  { group: "Diseño",        icons: ["🎨", "🖌️", "🎬", "🎞️", "📹", "📷", "🎥", "🎙️", "🎧", "🎵", "🖼️"] },
+  { group: "Otros",         icons: ["⭐", "🌟", "🌈", "🔥", "🎯", "🏆", "🌱", "🍌", "🦊", "🦄", "🍀"] },
 ];
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StackPage() {
-  const { userTools, addUserTool, removeUserTool, updateUserTool } = useRumbo();
+  const { userTools, addUserTool, removeUserTool, updateUserTool, reorderUserTools } = useRumbo();
 
-  const [activeCategory, setActiveCategory] = useState<ToolCategory | "Todas">("Todas");
+  const [activeCat, setActiveCat] = useState<Category | "Todas">("Todas");
   const [search, setSearch] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingTool, setEditingTool] = useState<UserTool | null>(null);
-  const [detailTool, setDetailTool] = useState<UserTool | null>(null);
+  const [editing, setEditing] = useState<UserTool | null>(null);
+  const [creating, setCreating] = useState(false);
 
-  // Form State
-  const [formState, setFormState] = useState({
-    name: "",
-    icon: "🔧",
-    category: "Productividad" as ToolCategory,
-    description: "",
-    url: "",
-    free: true,
-    cost: 0,
-    billing_period: "monthly" as "monthly" | "yearly",
-    highlight: false,
-  });
+  // Sort tools by order_index, fallback to original array order.
+  const sorted = useMemo(() => {
+    const arr = [...(userTools || [])];
+    arr.sort((a, b) => {
+      const ai = a.order_index ?? 9999;
+      const bi = b.order_index ?? 9999;
+      return ai - bi;
+    });
+    return arr;
+  }, [userTools]);
 
-  const displayed = useMemo(() => {
-    return (userTools || []).filter((t) => {
-      if (activeCategory !== "Todas" && t.category !== activeCategory) return false;
-      if (
-        search &&
-        !t.name.toLowerCase().includes(search.toLowerCase()) &&
-        !(t.description || "").toLowerCase().includes(search.toLowerCase())
-      )
-        return false;
+  const visible = useMemo(() => {
+    return sorted.filter((t) => {
+      if (activeCat !== "Todas" && t.category !== activeCat) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!t.name.toLowerCase().includes(q) && !(t.description || "").toLowerCase().includes(q)) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [userTools, activeCategory, search]);
+  }, [sorted, activeCat, search]);
 
-  const highlights = displayed.filter((t) => t.highlight);
-  const rest       = displayed.filter((t) => !t.highlight);
+  // Reorder uses the full sorted list (drag-and-drop only enabled when no
+  // filters are active so the user is always reordering the canonical list).
+  const canReorder = activeCat === "Todas" && !search;
 
-  const openAddModal = () => {
-    setEditingTool(null);
-    setFormState({
-      name: "",
-      icon: "🔧",
-      category: "Productividad",
-      description: "",
-      url: "",
-      free: true,
-      cost: 0,
-      billing_period: "monthly",
-      highlight: false,
-    });
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (tool: UserTool) => {
-    setEditingTool(tool);
-    setFormState({
-      name: tool.name,
-      icon: tool.icon || "🔧",
-      category: (tool.category as ToolCategory) || "Productividad",
-      description: tool.description || "",
-      url: tool.url || "",
-      free: tool.free,
-      cost: tool.cost || 0,
-      billing_period: tool.billing_period || "monthly",
-      highlight: !!tool.highlight,
-    });
-    setDetailTool(null);
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formState.name.trim()) return;
-
-    const payload = {
-      name: formState.name,
-      icon: formState.icon || "🔧",
-      category: formState.category,
-      description: formState.description || undefined,
-      url: formState.url || undefined,
-      free: formState.free,
-      cost: formState.free ? 0 : Number(formState.cost || 0),
-      billing_period: formState.free ? "monthly" as const : formState.billing_period,
-      highlight: formState.highlight,
-      rating: editingTool ? editingTool.rating : 5,
-    };
-
-    if (editingTool) {
-      updateUserTool(editingTool.id, payload);
-    } else {
-      addUserTool(payload);
-    }
-
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (tool: UserTool) => {
-    if (!confirm(`¿Eliminar ${tool.name}?`)) return;
-    removeUserTool(tool.id);
-    setDetailTool(null);
-  };
+  function handleReorder(newOrder: UserTool[]) {
+    reorderUserTools(newOrder.map((t) => t.id));
+  }
 
   return (
-    <div className="pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-      {/* ── YouTube banner ───────────────────────────────────────────────────── */}
+    <div className="pb-16 max-w-7xl mx-auto">
+      {/* YouTube banner */}
       <a
         href="https://www.youtube.com/@paumartifelip"
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-center gap-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-red-500 text-white p-4 mb-8 shadow-md overflow-hidden relative cursor-pointer border border-red-500/20"
       >
-        <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-2xl shrink-0">
-          ▶️
-        </div>
+        <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-2xl shrink-0">▶️</div>
         <div className="flex-1 min-w-0">
           <div className="font-black text-base leading-tight">@paumartifelip</div>
-          <div className="text-white/80 text-xs mt-0.5 truncate">
-            YouTube · Productividad, IA y negocios online
-          </div>
+          <div className="text-white/80 text-xs mt-0.5 truncate">YouTube · Productividad, IA y negocios online</div>
         </div>
-        <div className="shrink-0 flex items-center gap-2">
-          <span className="hidden sm:inline text-xs font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-full">
-            Suscríbete
-          </span>
-          <span className="text-white/80 text-xl font-bold">›</span>
-        </div>
+        <span className="hidden sm:inline text-xs font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-full">Suscríbete</span>
       </a>
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Stack de Herramientas</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Tu directorio personal. Solo herramientas gratuitas por defecto — añade las de pago si las necesitas.
+          <h1 className="text-3xl font-semibold tracking-tight">Stack de herramientas</h1>
+          <p className="text-rumbo-muted text-sm mt-1">
+            Click en una herramienta para abrirla. Arrástralas para reordenar. La X las elimina.
           </p>
         </div>
         <button
-          onClick={openAddModal}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-sm self-start md:self-auto"
+          onClick={() => setCreating(true)}
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rumbo-ink text-white text-sm font-medium hover:bg-slate-800 transition-colors shadow-sm self-start md:self-auto"
         >
-          <span>+ Añadir Herramienta</span>
+          + Añadir herramienta
         </button>
       </div>
 
-      {/* ── Search ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="relative flex-1">
+      {/* Search */}
+      <div className="mb-4">
+        <div className="relative">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
           <input
-            className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all"
-            placeholder="Buscar por nombre o descripción..."
+            className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 transition-all"
+            placeholder="Buscar herramienta…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
       </div>
 
-      {/* ── Category pills ───────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-2 mb-8 border-b border-slate-100 pb-4">
+      {/* Category pills */}
+      <div className="flex flex-wrap gap-2 mb-8">
         {(["Todas", ...CATEGORIES] as const).map((cat) => (
           <button
             key={cat}
-            onClick={() => setActiveCategory(cat as ToolCategory | "Todas")}
+            onClick={() => setActiveCat(cat as Category | "Todas")}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-widest border transition-all",
-              activeCategory === cat
-                ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-800"
+              "px-3 py-1.5 rounded-full text-xs font-semibold transition-all border",
+              activeCat === cat
+                ? "bg-rumbo-ink text-white border-rumbo-ink"
+                : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
             )}
           >
             {cat}
@@ -255,327 +134,137 @@ export default function StackPage() {
         ))}
       </div>
 
-      {/* ── Destacadas ───────────────────────────────────────────────────────── */}
-      {highlights.length > 0 && (
-        <div className="mb-10">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs font-black uppercase tracking-widest text-amber-600">⭐ Destacadas</span>
-            <div className="flex-1 h-px bg-slate-100" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {highlights.map((tool) => (
-              <ToolCard
-                key={tool.id}
-                tool={tool}
-                onMoreInfo={() => setDetailTool(tool)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Todas las demás ──────────────────────────────────────────────────── */}
-      {rest.length > 0 && (
-        <div>
-          {highlights.length > 0 && (
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-xs font-black uppercase tracking-widest text-slate-400">Herramientas</span>
-              <div className="flex-1 h-px bg-slate-100" />
-            </div>
-          )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {rest.map((tool) => (
-              <ToolCard
-                key={tool.id}
-                tool={tool}
-                onMoreInfo={() => setDetailTool(tool)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {displayed.length === 0 && (
+      {/* Grid */}
+      {visible.length === 0 ? (
         <div className="text-center py-20 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
           <div className="text-4xl mb-3">🔎</div>
           <p className="font-bold text-slate-700">Sin resultados</p>
-          <p className="text-sm mt-1">Prueba con otro término, categoría o añade tu propia herramienta.</p>
+          <p className="text-sm mt-1">Cambia los filtros o añade una herramienta.</p>
+        </div>
+      ) : canReorder ? (
+        <Reorder.Group
+          axis="y"
+          values={visible}
+          onReorder={handleReorder}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
+          {visible.map((tool) => (
+            <Reorder.Item
+              key={tool.id}
+              value={tool}
+              className="cursor-grab active:cursor-grabbing"
+              whileDrag={{ scale: 1.04, zIndex: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.18)" }}
+            >
+              <ToolCard
+                tool={tool}
+                onEdit={() => setEditing(tool)}
+                onRemove={() => removeUserTool(tool.id)}
+              />
+            </Reorder.Item>
+          ))}
+        </Reorder.Group>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {visible.map((tool) => (
+            <ToolCard
+              key={tool.id}
+              tool={tool}
+              onEdit={() => setEditing(tool)}
+              onRemove={() => removeUserTool(tool.id)}
+            />
+          ))}
         </div>
       )}
 
-      {/* ── Detail Modal ─────────────────────────────────────────────────────── */}
+      {/* Add / Edit modal */}
       <AnimatePresence>
-        {detailTool && (
-          <DetailModal
-            tool={detailTool}
-            onClose={() => setDetailTool(null)}
-            onEdit={() => openEditModal(detailTool)}
-            onDelete={() => handleDelete(detailTool)}
+        {(creating || editing) && (
+          <ToolModal
+            initial={editing}
+            onClose={() => { setCreating(false); setEditing(null); }}
+            onSave={(payload) => {
+              if (editing) updateUserTool(editing.id, payload);
+              else addUserTool({ ...payload, rating: 5 });
+              setCreating(false);
+              setEditing(null);
+            }}
           />
-        )}
-      </AnimatePresence>
-
-      {/* ── Add/Edit Tool Modal ──────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
-            />
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ type: "spring", duration: 0.4 }}
-              className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden relative z-10 border border-slate-100 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
-                <h3 className="font-black text-slate-900 text-lg tracking-tight uppercase">
-                  {editingTool ? "Editar Herramienta" : "Nueva Herramienta"}
-                </h3>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all text-sm font-bold"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                {/* Name */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                    Nombre *
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shrink-0">
-                      {formState.icon}
-                    </div>
-                    <input
-                      type="text"
-                      required
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-                      value={formState.name}
-                      onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                      placeholder="Ej. Canva, Notion..."
-                    />
-                  </div>
-                </div>
-
-                {/* Icon picker */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                    Icono — elige uno
-                  </label>
-                  <div className="border border-slate-200 rounded-xl bg-slate-50/50 p-3 max-h-56 overflow-y-auto">
-                    {ICON_OPTIONS.map((g) => (
-                      <div key={g.group} className="mb-3 last:mb-0">
-                        <div className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1.5">
-                          {g.group}
-                        </div>
-                        <div className="grid grid-cols-9 sm:grid-cols-12 gap-1">
-                          {g.icons.map((ic) => (
-                            <button
-                              key={ic}
-                              type="button"
-                              onClick={() => setFormState({ ...formState, icon: ic })}
-                              className={cn(
-                                "aspect-square rounded-lg text-xl flex items-center justify-center transition-all",
-                                formState.icon === ic
-                                  ? "bg-slate-900 ring-2 ring-slate-900 scale-105"
-                                  : "bg-white hover:bg-slate-100 border border-slate-100"
-                              )}
-                            >
-                              {ic}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Category + Free/Paid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                      Categoría
-                    </label>
-                    <select
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-                      value={formState.category}
-                      onChange={(e) => setFormState({ ...formState, category: e.target.value as ToolCategory })}
-                    >
-                      {CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                      Tipo
-                    </label>
-                    <select
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all font-bold"
-                      value={formState.free ? "free" : "paid"}
-                      onChange={(e) => setFormState({ ...formState, free: e.target.value === "free" })}
-                    >
-                      <option value="free">Gratuita</option>
-                      <option value="paid">De pago</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Cost (only when paid) */}
-                {!formState.free && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                        Coste
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-                        value={formState.cost}
-                        onChange={(e) => setFormState({ ...formState, cost: Number(e.target.value || 0) })}
-                        placeholder="0.00"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                        Frecuencia
-                      </label>
-                      <select
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-                        value={formState.billing_period}
-                        onChange={(e) => setFormState({ ...formState, billing_period: e.target.value as "monthly" | "yearly" })}
-                      >
-                        <option value="monthly">Al mes</option>
-                        <option value="yearly">Al año</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {/* URL */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                    URL
-                  </label>
-                  <input
-                    type="url"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all"
-                    value={formState.url}
-                    onChange={(e) => setFormState({ ...formState, url: e.target.value })}
-                    placeholder="https://ejemplo.com"
-                  />
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
-                    Descripción
-                  </label>
-                  <textarea
-                    rows={2}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-all resize-none"
-                    value={formState.description}
-                    onChange={(e) => setFormState({ ...formState, description: e.target.value })}
-                    placeholder="Breve explicación de para qué sirve..."
-                  />
-                </div>
-
-                {/* Highlight */}
-                <div className="flex items-center gap-4 py-1">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 w-4 h-4"
-                      checked={formState.highlight}
-                      onChange={(e) => setFormState({ ...formState, highlight: e.target.checked })}
-                    />
-                    <span className="text-xs font-black text-slate-700 uppercase tracking-wider">Destacar arriba</span>
-                  </label>
-                </div>
-
-                <div className="flex gap-3 pt-4 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 px-4 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-xs font-black uppercase tracking-widest"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-3 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors text-xs font-black uppercase tracking-widest"
-                  >
-                    Guardar
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-// ─── ToolCard ─────────────────────────────────────────────────────────────────
+// ─── Tool Card ────────────────────────────────────────────────────────────────
 
-interface ToolCardProps {
+function ToolCard({
+  tool, onEdit, onRemove,
+}: {
   tool: UserTool;
-  onMoreInfo: () => void;
-}
+  onEdit: () => void;
+  onRemove: () => void;
+}) {
+  const accent = CAT_ACCENT[tool.category] || "text-slate-700 bg-slate-100";
 
-function ToolCard({ tool, onMoreInfo }: ToolCardProps) {
-  const colors = CAT_COLORS[tool.category as ToolCategory] || { text: "text-slate-600", bg: "bg-slate-100" };
-  const isPaid = !tool.free;
+  function open() {
+    if (!tool.url) return;
+    window.open(tool.url, "_blank", "noopener,noreferrer");
+  }
+
+  function handleRemove(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (confirm(`¿Quitar "${tool.name}" de tu stack?`)) onRemove();
+  }
+
+  function handleEdit(e: React.MouseEvent) {
+    e.stopPropagation();
+    onEdit();
+  }
 
   return (
-    <div
+    <motion.div
+      onClick={open}
+      whileHover={{ scale: 1.03, y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 280, damping: 22 }}
       className={cn(
-        "flex flex-col rounded-2xl border p-4 transition-colors",
-        isPaid
-          ? "bg-slate-900 text-white border-slate-950"
-          : "bg-white border-slate-200 text-slate-900"
+        "relative group rounded-2xl bg-white border border-slate-200 p-5 select-none",
+        "shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]",
+        "transition-shadow",
+        tool.url ? "cursor-pointer" : "cursor-default"
       )}
     >
-      {/* Header: icon + name + category */}
-      <div className="flex items-center gap-3 mb-3">
-        <div
-          className={cn(
-            "w-11 h-11 rounded-xl border flex items-center justify-center text-2xl shrink-0",
-            isPaid ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100"
-          )}
-        >
+      {/* Remove button (top-right) */}
+      <button
+        onClick={handleRemove}
+        title="Quitar"
+        className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-sm shadow-sm"
+        aria-label="Quitar herramienta"
+      >
+        ✕
+      </button>
+      {/* Edit button (top-right, just left of remove) */}
+      <button
+        onClick={handleEdit}
+        title="Editar"
+        className="absolute -top-2 right-7 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs shadow-sm"
+        aria-label="Editar herramienta"
+      >
+        ✎
+      </button>
+
+      <div className="flex items-start gap-3">
+        <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl shrink-0">
           {tool.icon}
         </div>
         <div className="min-w-0 flex-1">
-          <h3
-            className={cn(
-              "font-black text-sm leading-tight truncate",
-              isPaid ? "text-white" : "text-slate-900"
-            )}
-          >
+          <div className="font-semibold text-slate-900 text-base leading-tight truncate">
             {tool.name}
-          </h3>
+          </div>
           <span
             className={cn(
-              "inline-block text-[9px] font-black uppercase tracking-wider mt-0.5 px-1.5 py-0.5 rounded",
-              isPaid ? "bg-white/10 text-slate-300" : `${colors.text} ${colors.bg}`
+              "inline-block text-[10px] font-bold uppercase tracking-wider mt-1.5 px-2 py-0.5 rounded-full",
+              accent
             )}
           >
             {tool.category}
@@ -583,153 +272,218 @@ function ToolCard({ tool, onMoreInfo }: ToolCardProps) {
         </div>
       </div>
 
-      {/* Buttons row */}
-      <div className="flex gap-2 mt-auto">
-        {tool.url ? (
-          <a
-            href={tool.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              "flex-1 text-center px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest transition-colors",
-              isPaid
-                ? "bg-white text-slate-900 hover:bg-slate-100"
-                : "bg-slate-900 text-white hover:bg-slate-800"
-            )}
-          >
-            Visitar →
-          </a>
-        ) : (
-          <span
-            className={cn(
-              "flex-1 text-center px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest cursor-not-allowed",
-              isPaid ? "bg-slate-800 text-slate-500" : "bg-slate-100 text-slate-400"
-            )}
-          >
-            Sin URL
-          </span>
-        )}
-        <button
-          onClick={onMoreInfo}
-          className={cn(
-            "flex-1 text-center px-3 py-2 rounded-lg text-[11px] font-black uppercase tracking-widest border transition-colors",
-            isPaid
-              ? "border-slate-700 text-slate-200 hover:bg-slate-800"
-              : "border-slate-200 text-slate-700 hover:bg-slate-50"
-          )}
-        >
-          Más info
-        </button>
-      </div>
-    </div>
+      {tool.description && (
+        <p className="text-xs text-slate-500 leading-relaxed mt-3 line-clamp-2">
+          {tool.description}
+        </p>
+      )}
+    </motion.div>
   );
 }
 
-// ─── Detail Modal ─────────────────────────────────────────────────────────────
+// ─── Modal ────────────────────────────────────────────────────────────────────
 
-interface DetailModalProps {
-  tool: UserTool;
+function ToolModal({
+  initial,
+  onClose,
+  onSave,
+}: {
+  initial: UserTool | null;
   onClose: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}
+  onSave: (data: {
+    name: string;
+    icon: string;
+    category: string;
+    description?: string;
+    url?: string;
+    free: boolean;
+    cost?: number;
+    billing_period?: "monthly" | "yearly";
+    highlight?: boolean;
+  }) => void;
+}) {
+  const [name, setName] = useState(initial?.name || "");
+  const [icon, setIcon] = useState(initial?.icon || "🔧");
+  const [category, setCategory] = useState<string>(initial?.category || "IA");
+  const [description, setDescription] = useState(initial?.description || "");
+  const [url, setUrl] = useState(initial?.url || "");
+  const [free, setFree] = useState(initial?.free ?? true);
+  const [cost, setCost] = useState<number>(initial?.cost ?? 0);
+  const [billing, setBilling] = useState<"monthly" | "yearly">(initial?.billing_period || "monthly");
+  const [error, setError] = useState<string | null>(null);
 
-function DetailModal({ tool, onClose, onEdit, onDelete }: DetailModalProps) {
-  const formatMoney = useFormatMoney();
-  const colors = CAT_COLORS[tool.category as ToolCategory] || { text: "text-slate-600", bg: "bg-slate-100" };
-  const isPaid = !tool.free;
+  // Lock body scroll while modal open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) { setError("Pon un nombre."); return; }
+    onSave({
+      name: name.trim(),
+      icon,
+      category,
+      description: description.trim() || undefined,
+      url: url.trim() || undefined,
+      free,
+      cost: free ? 0 : Number(cost) || 0,
+      billing_period: free ? "monthly" : billing,
+    });
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
       />
-
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ type: "spring", duration: 0.4 }}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative z-10 border border-slate-100"
+        exit={{ opacity: 0, scale: 0.96, y: 8 }}
+        className="relative bg-white rounded-3xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto z-10"
       >
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl shrink-0">
-              {tool.icon}
-            </div>
-            <div className="min-w-0">
-              <h3 className="font-black text-slate-900 text-base tracking-tight truncate">
-                {tool.name}
-              </h3>
-              <span className={`inline-block text-[10px] font-black uppercase tracking-wider mt-0.5 px-2 py-0.5 rounded ${colors.text} ${colors.bg}`}>
-                {tool.category}
-              </span>
-            </div>
-          </div>
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white">
+          <h3 className="font-semibold text-slate-900">
+            {initial ? "Editar herramienta" : "Nueva herramienta"}
+          </h3>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all text-sm font-bold shrink-0"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             ✕
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          {tool.description && (
-            <p className="text-sm text-slate-600 leading-relaxed">
-              {tool.description}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            {isPaid ? (
-              <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-                {tool.cost && tool.cost > 0
-                  ? `${formatMoney(tool.cost)} / ${tool.billing_period === "yearly" ? "año" : "mes"}`
-                  : "De pago"}
-              </span>
-            ) : (
-              <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
-                Gratis
-              </span>
-            )}
-            {tool.highlight && (
-              <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
-                ⭐ Destacada
-              </span>
-            )}
+        <form onSubmit={submit} className="p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-2xl shrink-0">
+              {icon}
+            </div>
+            <input
+              autoFocus
+              className="input flex-1"
+              placeholder="Nombre"
+              value={name}
+              maxLength={40}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
 
-          {tool.url && (
-            <a
-              href={tool.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full text-center px-4 py-3 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors"
-            >
-              Visitar sitio web →
-            </a>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1.5">Icono</label>
+            <div className="border border-slate-200 rounded-xl bg-slate-50/50 p-3 max-h-44 overflow-y-auto">
+              {ICON_OPTIONS.map((g) => (
+                <div key={g.group} className="mb-3 last:mb-0">
+                  <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-1">{g.group}</div>
+                  <div className="grid grid-cols-9 sm:grid-cols-12 gap-1">
+                    {g.icons.map((ic) => (
+                      <button
+                        key={ic}
+                        type="button"
+                        onClick={() => setIcon(ic)}
+                        className={cn(
+                          "aspect-square rounded-lg text-lg flex items-center justify-center transition-all",
+                          icon === ic
+                            ? "bg-rumbo-ink ring-2 ring-rumbo-ink scale-105"
+                            : "bg-white hover:bg-slate-100 border border-slate-100"
+                        )}
+                      >
+                        {ic}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Categoría</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              >
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="Otras">Otras</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Tipo</label>
+              <select
+                value={free ? "free" : "paid"}
+                onChange={(e) => setFree(e.target.value === "free")}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              >
+                <option value="free">Gratis</option>
+                <option value="paid">De pago</option>
+              </select>
+            </div>
+          </div>
+
+          {!free && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Coste</label>
+                <input
+                  type="number" min="0" step="0.01"
+                  value={cost}
+                  onChange={(e) => setCost(Number(e.target.value) || 0)}
+                  className="input w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Frecuencia</label>
+                <select
+                  value={billing}
+                  onChange={(e) => setBilling(e.target.value as "monthly" | "yearly")}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                >
+                  <option value="monthly">Al mes</option>
+                  <option value="yearly">Al año</option>
+                </select>
+              </div>
+            </div>
           )}
 
-          <div className="flex gap-2 pt-3 border-t border-slate-100">
-            <button
-              onClick={onEdit}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors text-xs font-black uppercase tracking-widest"
-            >
-              ✏️ Editar
-            </button>
-            <button
-              onClick={onDelete}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors text-xs font-black uppercase tracking-widest"
-            >
-              🗑️ Eliminar
-            </button>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">URL</label>
+            <input
+              type="url" placeholder="https://…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="input w-full"
+            />
           </div>
-        </div>
+
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Descripción</label>
+            <textarea
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-none"
+              placeholder="Para qué sirve…"
+            />
+          </div>
+
+          {error && (
+            <div className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancelar</button>
+            <button type="submit" className="btn-primary flex-1">Guardar</button>
+          </div>
+        </form>
       </motion.div>
     </div>
   );

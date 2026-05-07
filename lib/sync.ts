@@ -323,6 +323,7 @@ const stripUserTool = (userId: string) => (ut: UserTool) => ({
   rating: ut.rating,
   icon: ut.icon,
   highlight: ut.highlight ?? false,
+  order_index: ut.order_index ?? null,
   created_at: ut.created_at,
 });
 
@@ -417,6 +418,7 @@ function normalizeUserTool(r: any): UserTool {
     rating: Number(r.rating ?? 5),
     icon: r.icon ?? "🔧",
     highlight: !!r.highlight,
+    order_index: r.order_index != null ? Number(r.order_index) : undefined,
     created_at: r.created_at,
   };
 }
