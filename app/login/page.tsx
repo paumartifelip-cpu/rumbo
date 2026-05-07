@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { PinModal } from "@/components/PinModal";
@@ -11,6 +11,7 @@ import {
   Profile,
   addCustomProfile,
   getAllProfiles,
+  getCurrentProfileId,
   removeCustomProfile,
   syncRegistryLocally,
 } from "@/lib/profiles";
@@ -31,6 +32,7 @@ import {
   generateCode,
   getPendingPayment,
   markCodeUsed,
+  PaidCode,
   pollForPaymentByEmail,
   savePendingPayment,
 } from "@/lib/payment";
@@ -45,11 +47,10 @@ export default function LoginPage() {
 
 // Flow states:
 // null        → profile grid
-// "start"     → collect name + email, then redirect to Stripe
-// "verifying" → polling Supabase after Stripe redirect
-// "recover"   → user enters their email to recover a lost purchase
-// "create"    → payment confirmed, set final name + currency
-type CreateStep = null | "start" | "verifying" | "recover" | "create";
+// "start"     → collect name + email + currency, then open Stripe in new tab
+// "verifying" → polling Supabase while Stripe tab is open
+// "recover"   → enter email to recover a lost / timed-out purchase
+type CreateStep = null | "start" | "verifying" | "recover";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -60,18 +61,20 @@ function LoginPageInner() {
   const [pinMode, setPinMode] = useState<"enter" | "create">("enter");
 
   const [createStep, setCreateStep] = useState<CreateStep>(null);
-  const [accessCode, setAccessCode] = useState("");
   const [paywallError, setPaywallError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newCurrency, setNewCurrency] = useState<Currency>("EUR");
+
+  // Reference to the Stripe tab so we can close it when payment is confirmed.
+  const stripeTabRef = useRef<Window | null>(null);
 
   useEffect(() => {
     if (profile) router.replace("/dashboard");
   }, [profile, router]);
 
   useEffect(() => {
-    const refreshProfiles = () => {
+    const refresh = () => {
       pullProfileRegistry().then((remote) => {
         if (!remote) return;
         syncRegistryLocally(remote);
@@ -80,27 +83,31 @@ function LoginPageInner() {
     };
 
     setProfiles(getAllProfiles());
-    refreshProfiles();
+    refresh();
 
     const supa = getSupabase();
     if (!supa) return;
 
     const channel = supa
       .channel("public:profiles")
-      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, refreshProfiles)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, refresh)
       .subscribe();
 
     return () => { supa.removeChannel(channel); };
   }, []);
 
-  // Detect return from Stripe (?from_stripe=1) and auto-verify by email.
+  // Handle return from Stripe in the *same* or a *new* tab (?from_stripe=1).
   useEffect(() => {
     if (searchParams.get("from_stripe") !== "1") return;
 
-    const pending = getPendingPayment();
+    // If the original tab already created the profile (cross-tab), go to dashboard.
+    if (getCurrentProfileId()) {
+      router.replace("/dashboard");
+      return;
+    }
 
+    const pending = getPendingPayment();
     if (!pending?.email) {
-      // localStorage lost (different device / browser) — ask for email
       setCreateStep("recover");
       return;
     }
@@ -111,13 +118,11 @@ function LoginPageInner() {
 
     pollForPaymentByEmail(pending.email).then((row) => {
       if (!row) {
-        setPaywallError("No hemos recibido la confirmación de tu pago. Introduce tu email para buscarlo.");
+        setPaywallError("No hemos recibido confirmación del pago. Introduce tu email para buscarlo.");
         setCreateStep("recover");
         return;
       }
-      setAccessCode(row.code);
-      setNewName(row.name || pending.name || "");
-      setCreateStep("create");
+      finishOnboarding(row, pending.name, pending.email, "EUR");
       router.replace("/login");
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -126,16 +131,8 @@ function LoginPageInner() {
   // ── Profile selection ───────────────────────────────────────────────────────
 
   function pick(p: Profile) {
-    if (!isPinSet(p.id)) {
-      setPendingProfile(p);
-      setPinMode("create");
-      return;
-    }
-    if (needsPinPrompt(p.id)) {
-      setPendingProfile(p);
-      setPinMode("enter");
-      return;
-    }
+    if (!isPinSet(p.id)) { setPendingProfile(p); setPinMode("create"); return; }
+    if (needsPinPrompt(p.id)) { setPendingProfile(p); setPinMode("enter"); return; }
     enter(p);
   }
 
@@ -154,11 +151,41 @@ function LoginPageInner() {
     setPendingProfile(null);
   }
 
-  // ── Paywall ─────────────────────────────────────────────────────────────────
+  // ── Payment helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Called once payment is confirmed.
+   * Creates the profile automatically and opens the PIN modal.
+   * The user only needs to set their PIN — then they land on /onboarding.
+   */
+  function finishOnboarding(row: PaidCode, fallbackName: string, _email: string, currency: Currency) {
+    stripeTabRef.current?.close();
+    stripeTabRef.current = null;
+
+    const name = (row.name || fallbackName || "").trim() || "Usuario";
+    const created = addCustomProfile(name, currency);
+    setProfiles(getAllProfiles());
+    setCreateStep(null);
+    clearPendingPayment();
+
+    pushToSupabase(created.user_id, {
+      goals: [], tasks: [], finances: [], snapshots: [], userTools: [],
+      primaryCurrency: currency,
+      profileMeta: {
+        id: created.id, name: created.name,
+        initials: created.initials, color: created.color, emoji: created.emoji,
+      },
+    }).catch(() => {});
+    markCodeUsed(row.code).catch(() => {});
+
+    setPendingProfile(created);
+    setPinMode("create");
+  }
+
+  // ── Paywall flow ────────────────────────────────────────────────────────────
 
   function startPaywall() {
     setPaywallError(null);
-    // Pre-fill from any interrupted pending checkout so the user doesn't retype
     const pending = getPendingPayment();
     setNewName(pending?.name || "");
     setNewEmail(pending?.email || "");
@@ -167,6 +194,8 @@ function LoginPageInner() {
   }
 
   function closePaywall() {
+    stripeTabRef.current?.close();
+    stripeTabRef.current = null;
     setCreateStep(null);
     setPaywallError(null);
   }
@@ -176,51 +205,45 @@ function LoginPageInner() {
     const email = newEmail.trim().toLowerCase();
     if (!name)  { setPaywallError("Escribe tu nombre."); return; }
     if (!email || !email.includes("@")) { setPaywallError("Introduce un email válido."); return; }
+
     setPaywallError(null);
     const code = generateCode();
-    setAccessCode(code);
     savePendingPayment(code, name, email);
-    window.location.href = buildStripeUrl(code, email);
+
+    // Open Stripe in a new tab so this tab stays alive and can poll for payment.
+    const tab = window.open(buildStripeUrl(code, email), "_blank");
+    if (!tab) {
+      // Popup blocked — fall back to same tab (Stripe will redirect back via ?from_stripe=1).
+      window.location.href = buildStripeUrl(code, email);
+      return;
+    }
+    stripeTabRef.current = tab;
+    setCreateStep("verifying");
+
+    // Poll from this tab; as soon as payment lands, create the profile automatically.
+    pollForPaymentByEmail(email, { timeoutMs: 300000 }).then((row) => {
+      if (!row) {
+        setPaywallError("No hemos recibido confirmación del pago. Introduce tu email para buscarlo.");
+        setCreateStep("recover");
+        return;
+      }
+      finishOnboarding(row, name, email, newCurrency);
+    });
   }
 
   async function verifyByEmail() {
     const email = newEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) {
-      setPaywallError("Introduce un email válido.");
-      return;
-    }
+    if (!email || !email.includes("@")) { setPaywallError("Introduce un email válido."); return; }
     setPaywallError(null);
     setCreateStep("verifying");
-    const row = await pollForPaymentByEmail(email, { timeoutMs: 12000 });
+
+    const row = await pollForPaymentByEmail(email, { timeoutMs: 15000 });
     if (!row) {
       setCreateStep("recover");
       setPaywallError("No encontramos ningún pago con ese email. Si acabas de pagar, espera unos segundos e inténtalo de nuevo.");
       return;
     }
-    setAccessCode(row.code);
-    setNewName(row.name || newName);
-    setCreateStep("create");
-  }
-
-  async function createUser() {
-    const name = newName.trim();
-    const code = accessCode;
-    if (!name || !code) return;
-    const created = addCustomProfile(name, newCurrency);
-    setProfiles(getAllProfiles());
-    setCreateStep(null);
-    clearPendingPayment();
-    pushToSupabase(created.user_id, {
-      goals: [], tasks: [], finances: [], snapshots: [], userTools: [],
-      primaryCurrency: newCurrency,
-      profileMeta: {
-        id: created.id, name: created.name,
-        initials: created.initials, color: created.color, emoji: created.emoji,
-      },
-    }).catch(() => {});
-    markCodeUsed(code).catch(() => {});
-    setPendingProfile(created);
-    setPinMode("create");
+    finishOnboarding(row, newName, email, newCurrency);
   }
 
   function deleteUser(p: Profile, e: React.MouseEvent) {
@@ -253,21 +276,13 @@ function LoginPageInner() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-12"
         >
-          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">
-            ¿Quién eres?
-          </h1>
+          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight">¿Quién eres?</h1>
           <p className="text-rumbo-muted mt-3">Elige tu perfil para continuar.</p>
         </motion.div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6 md:gap-8 w-full max-w-4xl">
           {profiles.map((p, i) => (
-            <ProfileCard
-              key={p.id}
-              profile={p}
-              index={i}
-              onPick={() => pick(p)}
-              onDelete={(e) => deleteUser(p, e)}
-            />
+            <ProfileCard key={p.id} profile={p} index={i} onPick={() => pick(p)} onDelete={(e) => deleteUser(p, e)} />
           ))}
           <CreateCard index={profiles.length} onClick={startPaywall} />
         </div>
@@ -292,16 +307,18 @@ function LoginPageInner() {
           <StartCheckoutModal
             name={newName}
             email={newEmail}
+            currency={newCurrency}
             error={paywallError}
             onNameChange={setNewName}
             onEmailChange={setNewEmail}
+            onCurrencyChange={setNewCurrency}
             onPay={goToStripe}
             onCancel={closePaywall}
           />
         )}
 
         {createStep === "verifying" && (
-          <VerifyingModal email={newEmail} />
+          <VerifyingModal email={newEmail} onCancel={closePaywall} />
         )}
 
         {createStep === "recover" && (
@@ -313,31 +330,21 @@ function LoginPageInner() {
             onCancel={closePaywall}
           />
         )}
-
-        {createStep === "create" && (
-          <CreateProfileModal
-            name={newName}
-            currency={newCurrency}
-            onNameChange={setNewName}
-            onCurrencyChange={setNewCurrency}
-            onCancel={closePaywall}
-            onCreate={createUser}
-          />
-        )}
       </AnimatePresence>
     </div>
   );
 }
 
-// ─── Step 1: Collect name + email ─────────────────────────────────────────────
+// ─── Step 1: Name + email + currency ─────────────────────────────────────────
 
 function StartCheckoutModal({
-  name, email, error,
-  onNameChange, onEmailChange,
+  name, email, currency, error,
+  onNameChange, onEmailChange, onCurrencyChange,
   onPay, onCancel,
 }: {
-  name: string; email: string; error: string | null;
+  name: string; email: string; currency: Currency; error: string | null;
   onNameChange: (s: string) => void; onEmailChange: (s: string) => void;
+  onCurrencyChange: (c: Currency) => void;
   onPay: () => void; onCancel: () => void;
 }) {
   return (
@@ -349,13 +356,13 @@ function StartCheckoutModal({
         <h2 className="text-xl font-semibold tracking-tight">Crea tu cuenta</h2>
       </div>
       <p className="text-sm text-rumbo-muted">
-        Rumbo es premium. El pago es único y el acceso es para siempre.
+        Pago único · Acceso ilimitado para siempre.
       </p>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-5 space-y-3">
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">
-            Tu nombre
+            Nombre
           </label>
           <input
             autoFocus
@@ -369,7 +376,7 @@ function StartCheckoutModal({
         </div>
         <div>
           <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">
-            Tu email
+            Email
           </label>
           <input
             type="email"
@@ -379,9 +386,33 @@ function StartCheckoutModal({
             onChange={(e) => onEmailChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") onPay(); if (e.key === "Escape") onCancel(); }}
           />
-          <p className="text-[11px] text-rumbo-muted mt-1.5">
-            Lo usamos para vincular tu pago con tu cuenta. Sin spam.
+          <p className="text-[11px] text-rumbo-muted mt-1">
+            Lo usamos para vincular tu pago. Sin spam.
           </p>
+        </div>
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-2">
+            Moneda principal
+          </label>
+          <div className="grid grid-cols-4 gap-2">
+            {(Object.keys(CURRENCIES) as Currency[]).map((c) => {
+              const active = currency === c;
+              return (
+                <button
+                  key={c}
+                  onClick={() => onCurrencyChange(c)}
+                  className={`flex flex-col items-center py-2 rounded-xl border transition-all text-sm ${
+                    active
+                      ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <span className="text-xl">{CURRENCIES[c].flag}</span>
+                  <span className="text-[11px] font-semibold mt-0.5">{CURRENCIES[c].code}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -393,20 +424,16 @@ function StartCheckoutModal({
       >
         Ir a pagar →
       </button>
-
-      <button
-        onClick={onCancel}
-        className="mt-2 w-full text-xs text-rumbo-muted hover:text-rumbo-ink py-2"
-      >
+      <button onClick={onCancel} className="mt-2 w-full text-xs text-rumbo-muted hover:text-rumbo-ink py-2">
         Cancelar
       </button>
     </Overlay>
   );
 }
 
-// ─── Step 2: Verifying (spinner) ──────────────────────────────────────────────
+// ─── Step 2: Waiting for payment (polling) ────────────────────────────────────
 
-function VerifyingModal({ email }: { email: string }) {
+function VerifyingModal({ email, onCancel }: { email: string; onCancel: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -423,12 +450,21 @@ function VerifyingModal({ email }: { email: string }) {
         <div className="w-14 h-14 rounded-full mx-auto bg-emerald-50 flex items-center justify-center mb-4">
           <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
-        <h2 className="text-lg font-semibold">Confirmando tu pago…</h2>
+        <h2 className="text-lg font-semibold">Esperando tu pago…</h2>
         <p className="text-sm text-rumbo-muted mt-2">
-          Buscando el pago de{" "}
-          <span className="font-medium text-rumbo-ink">{email}</span>.{" "}
-          Suele tardar unos segundos.
+          En cuanto Stripe confirme el pago de{" "}
+          <span className="font-medium text-rumbo-ink">{email}</span>,
+          tu cuenta se creará automáticamente aquí.
         </p>
+        <p className="text-xs text-rumbo-muted mt-3">
+          Completa el pago en la otra pestaña y vuelve aquí.
+        </p>
+        <button
+          onClick={onCancel}
+          className="mt-5 text-xs text-rumbo-muted hover:text-rumbo-ink underline"
+        >
+          Cancelar
+        </button>
       </motion.div>
     </motion.div>
   );
@@ -447,9 +483,8 @@ function RecoverModal({
     <Overlay onClose={onCancel}>
       <h2 className="text-xl font-semibold tracking-tight">Recuperar acceso</h2>
       <p className="text-sm text-rumbo-muted mt-1">
-        Introduce el email con el que realizaste el pago y localizaremos tu compra.
+        Introduce el email con el que pagaste y localizaremos tu compra.
       </p>
-
       <input
         autoFocus
         type="email"
@@ -459,99 +494,16 @@ function RecoverModal({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") onVerify(); if (e.key === "Escape") onCancel(); }}
       />
-
       {error && <ErrorBox message={error} />}
-
       <button
         onClick={onVerify}
         className="mt-5 w-full px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors"
       >
         Recuperar mi acceso →
       </button>
-
-      <button
-        onClick={onCancel}
-        className="mt-2 w-full text-xs text-rumbo-muted hover:text-rumbo-ink py-2"
-      >
+      <button onClick={onCancel} className="mt-2 w-full text-xs text-rumbo-muted hover:text-rumbo-ink py-2">
         Cancelar
       </button>
-    </Overlay>
-  );
-}
-
-// ─── Step 3: Create profile (after payment confirmed) ─────────────────────────
-
-function CreateProfileModal({
-  name, currency,
-  onNameChange, onCurrencyChange,
-  onCancel, onCreate,
-}: {
-  name: string; currency: Currency;
-  onNameChange: (s: string) => void; onCurrencyChange: (c: Currency) => void;
-  onCancel: () => void; onCreate: () => void;
-}) {
-  return (
-    <Overlay onClose={onCancel}>
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-2xl">✅</span>
-        <span className="text-xs font-bold uppercase tracking-widest text-emerald-600">
-          Pago confirmado
-        </span>
-      </div>
-      <h2 className="text-xl font-semibold tracking-tight">Configura tu perfil</h2>
-      <p className="text-sm text-rumbo-muted mt-1">
-        Confirma tu nombre y elige tu moneda. Después elegirás un PIN de acceso.
-      </p>
-
-      <input
-        autoFocus
-        className="input mt-5 w-full"
-        placeholder="Tu nombre"
-        value={name}
-        onChange={(e) => onNameChange(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") onCreate(); if (e.key === "Escape") onCancel(); }}
-        maxLength={24}
-      />
-
-      <div className="mt-4">
-        <div className="text-xs uppercase tracking-wider text-rumbo-muted mb-2">
-          Moneda principal
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {(Object.keys(CURRENCIES) as Currency[]).map((c) => {
-            const meta = CURRENCIES[c];
-            const active = currency === c;
-            return (
-              <button
-                key={c}
-                onClick={() => onCurrencyChange(c)}
-                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all text-left text-sm ${
-                  active
-                    ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
-                    : "border-slate-200 bg-white hover:border-slate-300"
-                }`}
-              >
-                <span className="text-xl">{meta.flag}</span>
-                <div className="min-w-0">
-                  <div className="font-semibold leading-tight">{meta.code}</div>
-                  <div className="text-[10px] text-rumbo-muted truncate">{meta.name}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex gap-2 mt-5 justify-end">
-        <button className="btn-ghost" onClick={onCancel}>Cancelar</button>
-        <button
-          className="btn-primary"
-          onClick={onCreate}
-          disabled={!name.trim()}
-        >
-          Crear y poner PIN →
-        </button>
-      </div>
     </Overlay>
   );
 }
