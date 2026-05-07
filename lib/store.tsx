@@ -153,7 +153,7 @@ const BASE_DEFAULT_TOOLS = [
 
 // Bump this on every curated-list change to force a one-time reset of cached
 // user_tools across all profiles. Read by the hydration logic below.
-export const TOOLS_VERSION = "v4";
+export const TOOLS_VERSION = "v5";
 const TOOLS_SEED = "2026-05-07T00:00:00.000Z";
 
 // Names from the previous default list. If any of these are found in the
@@ -307,9 +307,29 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const mergedSnapshots = mergeById(cur.snapshots, remote.snapshots);
     const mergedOnboarding = remote.onboarding ?? cur.onboarding;
 
-    // Sort by user-defined order_index first, then fall back to created_at + name
-    // for tools that don't have an order yet.
-    let mergedUserTools = mergeById(cur.userTools || [], remote.userTools || []).sort((a, b) => {
+    // Tools merge: same union as mergeById but for IDs in BOTH, take the row
+    // whose updated_at is newer. Local mutations bump updated_at to now() so
+    // a heart-toggle that hasn't been pushed yet still wins over a stale
+    // remote pull. Falls back to created_at if no updated_at exists.
+    const mergeToolsByUpdated = (local: UserTool[], rem: UserTool[]): UserTool[] => {
+      const map = new Map<string, UserTool>();
+      const ts = (t: UserTool) => t.updated_at || t.created_at || "";
+      for (const r of rem) map.set(r.id, r);
+      for (const l of local) {
+        const r = map.get(l.id);
+        if (!r) {
+          const createdAfterSync = !cur.lastSyncAt ||
+            !l.created_at ||
+            l.created_at >= cur.lastSyncAt;
+          if (createdAfterSync) map.set(l.id, l);
+        } else if (ts(l) > ts(r)) {
+          map.set(l.id, l);
+        }
+      }
+      return Array.from(map.values());
+    };
+
+    let mergedUserTools = mergeToolsByUpdated(cur.userTools || [], remote.userTools || []).sort((a, b) => {
       const ai = a.order_index;
       const bi = b.order_index;
       if (ai != null && bi != null) return ai - bi;
@@ -969,6 +989,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         (m, t) => (t.order_index != null && t.order_index > m ? t.order_index : m),
         -1
       );
+      const now = new Date().toISOString();
       return {
         ...state,
         userTools: [
@@ -977,7 +998,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
             ...ut,
             id: uid(),
             user_id: state.user.id,
-            created_at: new Date().toISOString(),
+            created_at: now,
+            updated_at: now,
             order_index: maxOrder + 1,
           },
         ],
@@ -995,7 +1017,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   const updateUserTool: RumboContext["updateUserTool"] = useCallback((id, patch) => {
     setState((state) => ({
       ...state,
-      userTools: state.userTools.map((ut) => (ut.id === id ? { ...ut, ...patch } : ut)),
+      userTools: state.userTools.map((ut) =>
+        ut.id === id ? { ...ut, ...patch, updated_at: new Date().toISOString() } : ut
+      ),
     }));
   }, []);
 
@@ -1003,7 +1027,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     setState((state) => ({
       ...state,
       userTools: state.userTools.map((ut) =>
-        ut.id === id ? { ...ut, is_favorite: !ut.is_favorite } : ut
+        ut.id === id
+          ? { ...ut, is_favorite: !ut.is_favorite, updated_at: new Date().toISOString() }
+          : ut
       ),
     }));
   }, []);

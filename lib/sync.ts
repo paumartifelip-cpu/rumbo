@@ -363,6 +363,7 @@ const stripUserTool = (userId: string) => (ut: UserTool) => ({
   highlight: ut.highlight ?? false,
   is_favorite: ut.is_favorite ?? false,
   order_index: ut.order_index ?? null,
+  updated_at: ut.updated_at ?? new Date().toISOString(),
   created_at: ut.created_at,
 });
 
@@ -459,6 +460,7 @@ function normalizeUserTool(r: any): UserTool {
     highlight: !!r.highlight,
     is_favorite: !!r.is_favorite,
     order_index: r.order_index != null ? Number(r.order_index) : undefined,
+    updated_at: r.updated_at ?? undefined,
     created_at: r.created_at,
   };
 }

@@ -123,5 +123,6 @@ export interface UserTool {
   highlight?: boolean;
   is_favorite?: boolean; // user-marked favorites (heart icon)
   order_index?: number;  // legacy, kept for round-trip but no longer surfaced in UI
+  updated_at?: string;   // ISO; bumped on every local mutation, used as merge tiebreaker
   created_at: string;
 }

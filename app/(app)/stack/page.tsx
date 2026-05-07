@@ -356,21 +356,25 @@ function ToolCard({
         </h3>
       </div>
 
-      {/* Heart (always visible if favorite, fades-in on hover otherwise) */}
+      {/* Heart — always visible. Filled red when favorited; outlined and
+          slightly faded when not. Click anywhere on the button toggles. */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggleFav(); }}
         title={fav ? "Quitar de favoritos" : "Marcar como favorita"}
+        aria-pressed={fav}
         className={cn(
           "absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all",
           fav
-            ? "text-rose-500 opacity-100 scale-100"
-            : "text-slate-300 opacity-0 group-hover:opacity-100 hover:text-rose-500"
+            ? "text-rose-500"
+            : "text-slate-400 hover:text-rose-500 opacity-70 group-hover:opacity-100"
         )}
       >
         <motion.span
-          animate={{ scale: fav ? [1, 1.4, 1] : 1 }}
-          transition={{ duration: 0.32, ease: "easeOut" }}
-          className="text-base"
+          key={String(fav)}
+          initial={{ scale: 1 }}
+          animate={{ scale: fav ? [1, 1.4, 1] : [1, 0.85, 1] }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="text-lg leading-none"
         >
           {fav ? "♥" : "♡"}
         </motion.span>
