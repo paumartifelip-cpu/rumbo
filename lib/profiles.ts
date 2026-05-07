@@ -114,12 +114,20 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+/** Returns true if a profile with the given name (case-insensitive) already exists. */
+export function isNameTaken(name: string): boolean {
+  const lower = name.trim().toLowerCase();
+  if (!lower) return false;
+  return getAllProfiles().some((p) => p.name.trim().toLowerCase() === lower);
+}
+
 export function addCustomProfile(
   name: string,
   primary_currency: "EUR" | "USD" | "MXN" | "ARS" = "EUR"
 ): Profile {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Nombre vacío");
+  if (isNameTaken(trimmed)) throw new Error("Ya existe un perfil con ese nombre");
   const existing = getCustomProfiles();
   const taken = new Set([
     ...DEFAULT_PROFILES.map((p) => p.id),

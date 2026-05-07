@@ -83,8 +83,27 @@ function ActivarPageInner() {
     }
     localStorage.setItem(CREATING_LOCK_KEY, "1");
 
-    const cleanName = name.trim() || "Usuario";
-    const created = addCustomProfile(cleanName, currency);
+    let cleanName = name.trim() || "Usuario";
+    let created;
+    try {
+      created = addCustomProfile(cleanName, currency);
+    } catch (e: any) {
+      // Name collision (rare race across devices) — append a numeric suffix.
+      let attempt = 2;
+      while (attempt < 99) {
+        try {
+          created = addCustomProfile(`${cleanName} ${attempt}`, currency);
+          cleanName = `${cleanName} ${attempt}`;
+          break;
+        } catch { attempt++; }
+      }
+      if (!created) {
+        localStorage.removeItem(CREATING_LOCK_KEY);
+        setErrorMsg("No pudimos crear tu perfil. Vuelve a intentarlo desde la pantalla de perfiles.");
+        setStep("error");
+        return;
+      }
+    }
     clearPendingPayment();
 
     pushToSupabase(created.user_id, {

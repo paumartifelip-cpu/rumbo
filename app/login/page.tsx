@@ -11,6 +11,7 @@ import {
   Profile,
   getAllProfiles,
   getCurrentProfileId,
+  isNameTaken,
   removeCustomProfile,
   syncRegistryLocally,
 } from "@/lib/profiles";
@@ -132,11 +133,20 @@ function LoginPageInner() {
     setFormError(null);
   }
 
-  function goToStripe() {
+  async function goToStripe() {
     const name  = newName.trim();
     const email = newEmail.trim().toLowerCase();
     if (!name)  { setFormError("Escribe tu nombre."); return; }
     if (!email || !email.includes("@")) { setFormError("Introduce un email válido."); return; }
+
+    // Refresh from Supabase so we catch profiles created on other devices.
+    const remote = await pullProfileRegistry().catch(() => null);
+    if (remote) syncRegistryLocally(remote);
+
+    if (isNameTaken(name)) {
+      setFormError(`Ya existe un perfil con el nombre "${name}". Elige otro distinto.`);
+      return;
+    }
 
     setFormError(null);
     localStorage.removeItem("rumbo_profile_creating");
