@@ -35,6 +35,7 @@ export default function SettingsPage() {
   } = useRumbo();
 
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState<"idle" | "asking" | "wiping">("idle");
 
   function toggleSection(id: string) {
     setActiveSection((prev) => (prev === id ? null : id));
@@ -365,9 +366,56 @@ export default function SettingsPage() {
                 Cerrar sesión
               </button>
             )}
-            <button onClick={resetDemo} className="btn-ghost text-rose-600">
-              Borrar todos mis datos
-            </button>
+            {confirmReset === "idle" && (
+              <button
+                onClick={() => setConfirmReset("asking")}
+                className="btn-ghost text-rose-600"
+              >
+                Borrar todos mis datos
+              </button>
+            )}
+            {confirmReset === "asking" && (
+              <div className="w-full mt-2 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl shrink-0">⚠️</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-rose-900 text-sm">
+                      ¿De verdad vas a perder todo?
+                    </div>
+                    <p className="text-xs text-rose-800/80 mt-1 leading-relaxed">
+                      Borraremos todos tus objetivos, tareas, dinero, gastos,
+                      snapshots y herramientas — tanto en este dispositivo como
+                      en la nube. Esta acción no se puede deshacer. Tu perfil
+                      seguirá activo, pero empezará desde cero.
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button
+                        onClick={async () => {
+                          setConfirmReset("wiping");
+                          await resetDemo();
+                          setConfirmReset("idle");
+                        }}
+                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider transition-colors"
+                      >
+                        Sí, borrar TODO
+                      </button>
+                      <button
+                        onClick={() => setConfirmReset("idle")}
+                        className="px-4 py-2 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold uppercase tracking-wider transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {confirmReset === "wiping" && (
+              <div className="w-full mt-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 flex items-center gap-3">
+                <div className="w-5 h-5 border-2 border-rose-400 border-t-transparent rounded-full animate-spin" />
+                <span className="text-sm text-rose-900 font-medium">Borrando todos tus datos…</span>
+              </div>
+            )}
           </div>
         </SettingsAccordion>
 

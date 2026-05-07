@@ -28,7 +28,7 @@ import {
   updateProfileCurrency,
   updateProfileLocally,
 } from "./profiles";
-import { pullFromSupabase, pushToSupabase, SyncSnapshot } from "./sync";
+import { pullFromSupabase, pushToSupabase, SyncSnapshot, wipeProfileData } from "./sync";
 import { getSupabase, supabaseEnabled } from "./supabase";
 import {
   FinancialEntry,
@@ -82,7 +82,7 @@ interface RumboContext extends RumboState {
   reorderUserTools: (orderedIds: string[]) => void;
   saveOnboarding: (data: OnboardingData) => void;
   updateOnboarding: (patch: Partial<OnboardingData>) => void;
-  resetDemo: () => void;
+  resetDemo: () => Promise<void> | void;
   prioritize: () => Promise<void>;
   setPrimaryCurrency: (c: Currency) => void;
   /** Returns the entry's amount converted into the user's primary currency. */
@@ -1066,18 +1066,37 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     []
   );
 
-  const resetDemo = useCallback(() => {
-    setState((s) => ({
-      ...defaultState,
-      user: profile
-        ? { ...mockUser, name: profile.name, email: profile.email ?? "" }
-        : s.user,
-    }));
-    try {
-      if (profile) localStorage.removeItem(storageKeyFor(profile.id));
-    } catch {
-      // ignore
+  /**
+   * Wipe ALL of the active profile's data — locally AND in Supabase.
+   * The profile itself stays alive (still signed in, name/email preserved),
+   * but goals, tasks, finances, snapshots, tools and onboarding all reset.
+   * Defaults (tools, etc.) are re-seeded on the next mount.
+   */
+  const resetDemo = useCallback(async () => {
+    if (!profile) return;
+    // Mark this state push as a clean wipe so the debounced push doesn't
+    // race the delete (and re-create rows we're trying to remove).
+    pushPendingRef.current = true;
+
+    // 1) Server-side wipe.
+    if (supabaseEnabled) {
+      await wipeProfileData(profile.user_id).catch(() => {});
     }
+
+    // 2) Local cache wipe.
+    try { localStorage.removeItem(storageKeyFor(profile.id)); } catch {}
+
+    // 3) Reset in-memory state to defaults (with fresh default tools).
+    setState({
+      ...defaultState,
+      user: { ...mockUser, id: profile.user_id, name: profile.name, email: profile.email ?? "" },
+      userTools: buildDefaultUserTools(profile.user_id),
+      primaryCurrency: getProfileCurrency(profile.id),
+      syncStatus: "synced",
+      lastSyncAt: new Date().toISOString(),
+    });
+
+    pushPendingRef.current = false;
   }, [profile]);
 
   const value = useMemo<RumboContext>(

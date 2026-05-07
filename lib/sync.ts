@@ -223,6 +223,44 @@ async function syncTable(userId: string, table: string, rows: any[]) {
 }
 
 /**
+ * Wipe all of a user's data (goals, tasks, finances, snapshots, tools) AND
+ * reset their profile row's onboarding fields back to zero — but keep the
+ * profile itself alive so the session continues.
+ * Used by the "Borrar todos mis datos" action in Ajustes.
+ */
+export async function wipeProfileData(userId: string): Promise<boolean> {
+  const supa = getSupabase();
+  if (!supa) return false;
+  try {
+    await Promise.all([
+      supa.from("financial_entries").delete().eq("user_id", userId),
+      supa.from("goals").delete().eq("user_id", userId),
+      supa.from("tasks").delete().eq("user_id", userId),
+      supa.from("money_snapshots").delete().eq("user_id", userId),
+      supa.from("user_tools").delete().eq("user_id", userId),
+    ]);
+    // Reset onboarding-derived numeric fields on the profile row, but leave
+    // the identity columns (profile_id, name, email, color, emoji, currency).
+    await supa
+      .from("profiles")
+      .update({
+        current_money: 0,
+        total_target: 0,
+        current_monthly_income: 0,
+        monthly_target: 0,
+        target_date: null,
+        income_type: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+    return true;
+  } catch (e) {
+    console.warn("wipeProfileData threw", e);
+    return false;
+  }
+}
+
+/**
  * Delete ALL data for a user from every Supabase table.
  * Called when a custom profile is removed from the app.
  */
