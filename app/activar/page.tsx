@@ -143,9 +143,9 @@ function ActivarPageInner() {
     setErrorMsg("No localizamos tu pago. Si acabas de pagar, espera unos segundos e inténtalo de nuevo, o vuelve a perfiles para empezar de cero.");
   }
 
-  function handlePinSuccess(pin: string) {
+  async function handlePinSuccess(pin: string) {
     if (!newProfile) return;
-    setPin(newProfile.id, pin);
+    await setPin(newProfile.id, newProfile.user_id, pin);
     markVerified(newProfile.id);
     signIn(newProfile.id);
     // The user already supplied their name + currency before checkout, so we
@@ -231,7 +231,7 @@ function ActivarPageInner() {
           mode="create"
           onSuccess={handlePinSuccess}
           onCancel={() => router.push("/login")}
-          verify={(pin) => checkPin(newProfile.id, pin)}
+          verify={(pin) => checkPin(newProfile.id, newProfile.user_id, pin)}
         />
       )}
     </div>

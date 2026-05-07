@@ -76,19 +76,19 @@ export default function SettingsPage() {
     if (profile) setPinHasValue(isPinSet(profile.id));
   }, [profile]);
 
-  function handleSetPin(pin: string) {
+  async function handleSetPin(pin: string) {
     if (!profile) return;
-    setPin(profile.id, pin);
+    await setPin(profile.id, profile.user_id, pin);
     setPinHasValue(true);
     setPinModal(null);
     setPinHint("PIN guardado");
     setTimeout(() => setPinHint(null), 2500);
   }
 
-  function handleRemovePin() {
+  async function handleRemovePin() {
     if (!profile) return;
     if (!confirm("¿Quitar el PIN de esta cuenta? Cualquiera podrá entrar.")) return;
-    clearPin(profile.id);
+    await clearPin(profile.id, profile.user_id);
     setPinHasValue(false);
     setPinHint("PIN eliminado");
     setTimeout(() => setPinHint(null), 2500);
@@ -515,7 +515,7 @@ export default function SettingsPage() {
           mode="create"
           onSuccess={handleSetPin}
           onCancel={() => setPinModal(null)}
-          verify={(pin) => checkPin(profile.id, pin)}
+          verify={(pin) => checkPin(profile.id, profile.user_id, pin)}
         />
       )}
       {showWrapped && <RumboWrapped onClose={() => setShowWrapped(false)} />}

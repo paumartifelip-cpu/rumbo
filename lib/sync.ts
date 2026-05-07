@@ -36,7 +36,7 @@ export async function pullProfileRegistry(): Promise<Profile[] | null> {
   try {
     const { data, error } = await supa
       .from("profiles")
-      .select("user_id, profile_id, name, initials, emoji, color, primary_currency")
+      .select("user_id, profile_id, name, initials, emoji, color, primary_currency, pin_hash")
       .not("profile_id", "is", null);
     if (error || !data) return null;
     return (data as any[]).map((r): Profile => ({
@@ -47,6 +47,7 @@ export async function pullProfileRegistry(): Promise<Profile[] | null> {
       color: r.color ?? "from-slate-200 to-slate-400",
       emoji: r.emoji ?? undefined,
       primary_currency: isCurrency(r.primary_currency) ? r.primary_currency : undefined,
+      pin_hash: r.pin_hash ?? undefined,
       custom: !DEFAULT_PROFILE_IDS.has(r.profile_id),
     }));
   } catch {

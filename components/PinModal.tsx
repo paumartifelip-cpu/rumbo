@@ -17,7 +17,7 @@ export function PinModal({
   mode: Mode;
   onSuccess: (pin: string) => void;
   onCancel: () => void;
-  verify?: (pin: string) => boolean;
+  verify?: (pin: string) => boolean | Promise<boolean>;
 }) {
   const [step, setStep] = useState<"first" | "confirm">("first");
   const [pin, setPin] = useState("");
@@ -43,9 +43,10 @@ export function PinModal({
     }
   }
 
-  function submit(value: string) {
+  async function submit(value: string) {
     if (mode === "enter") {
-      if (verify && verify(value)) {
+      const ok = verify ? await Promise.resolve(verify(value)) : false;
+      if (ok) {
         onSuccess(value);
       } else {
         setError("PIN incorrecto");

@@ -85,8 +85,20 @@ function LoginPageInner() {
 
   // ── Existing profile selection ──────────────────────────────────────────────
 
-  function pick(p: Profile) {
-    if (!isPinSet(p.id)) { setPendingProfile(p); setPinMode("create"); return; }
+  async function pick(p: Profile) {
+    // If the local cache says no PIN, double-check Supabase before opening
+    // the "Create PIN" modal — otherwise a fresh device/browser would offer
+    // to overwrite a PIN the user has already set elsewhere.
+    let hasPin = isPinSet(p.id);
+    if (!hasPin) {
+      const remote = await pullProfileRegistry().catch(() => null);
+      if (remote) {
+        syncRegistryLocally(remote);
+        setProfiles(getAllProfiles());
+        hasPin = isPinSet(p.id);
+      }
+    }
+    if (!hasPin) { setPendingProfile(p); setPinMode("create"); return; }
     if (needsPinPrompt(p.id)) { setPendingProfile(p); setPinMode("enter"); return; }
     enter(p);
   }
@@ -97,10 +109,10 @@ function LoginPageInner() {
     router.push(isNew ? "/onboarding" : "/dashboard");
   }
 
-  function handlePinSuccess(pin: string) {
+  async function handlePinSuccess(pin: string) {
     if (!pendingProfile) return;
     const isNew = pinMode === "create";
-    if (isNew) setPin(pendingProfile.id, pin);
+    if (isNew) await setPin(pendingProfile.id, pendingProfile.user_id, pin);
     else markVerified(pendingProfile.id);
     enter(pendingProfile, isNew);
     setPendingProfile(null);
@@ -110,7 +122,7 @@ function LoginPageInner() {
     e.stopPropagation();
     if (!confirm(`¿Borrar el perfil "${p.name}"? Se eliminarán sus datos locales y de la nube.`)) return;
     removeCustomProfile(p.id);
-    clearPin(p.id);
+    clearPin(p.id, p.user_id).catch(() => {});
     deleteProfileFromSupabase(p.user_id).catch(() => {});
     setProfiles(getAllProfiles());
   }
@@ -218,7 +230,7 @@ function LoginPageInner() {
           mode={pinMode}
           onSuccess={handlePinSuccess}
           onCancel={() => setPendingProfile(null)}
-          verify={(pin) => checkPin(pendingProfile.id, pin)}
+          verify={(pin) => checkPin(pendingProfile.id, pendingProfile.user_id, pin)}
         />
       )}
 

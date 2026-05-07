@@ -8,6 +8,7 @@ export interface Profile {
   email?: string;
   custom?: boolean;
   primary_currency?: "EUR" | "USD" | "MXN" | "ARS";
+  pin_hash?: string; // SHA-256 hash of the PIN, synced from Supabase
 }
 
 export const DEFAULT_PROFILES: Profile[] = [
@@ -206,6 +207,16 @@ export function syncRegistryLocally(remoteProfiles: Profile[]) {
     .filter((p) => !DEFAULT_PROFILES.some((d) => d.id === p.id))
     .map((p) => ({ ...p, custom: true }));
   writeCustomProfiles(customs);
+
+  // Mirror each profile's PIN hash into localStorage so the gate works
+  // immediately on this device (including default profiles like Pau/Michelle).
+  if (typeof window !== "undefined") {
+    for (const p of remoteProfiles) {
+      if (p.pin_hash) {
+        try { localStorage.setItem(`rumbo_pin_${p.id}`, p.pin_hash); } catch {}
+      }
+    }
+  }
 }
 
 export function updateProfileLocally(patch: Partial<Profile> & { id: string }) {
