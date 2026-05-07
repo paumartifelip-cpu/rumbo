@@ -9,7 +9,6 @@ import { PinModal } from "@/components/PinModal";
 import { useRumbo } from "@/lib/store";
 import {
   Profile,
-  addCustomProfile,
   getAllProfiles,
   getCurrentProfileId,
   removeCustomProfile,
@@ -17,22 +16,12 @@ import {
 } from "@/lib/profiles";
 import { CURRENCIES, Currency } from "@/lib/currency";
 import { getSupabase } from "@/lib/supabase";
-import { deleteProfileFromSupabase, pullProfileRegistry, pushToSupabase } from "@/lib/sync";
-import {
-  checkPin,
-  clearPin,
-  isPinSet,
-  markVerified,
-  needsPinPrompt,
-  setPin,
-} from "@/lib/pin";
+import { deleteProfileFromSupabase, pullProfileRegistry } from "@/lib/sync";
+import { checkPin, clearPin, isPinSet, markVerified, needsPinPrompt, setPin } from "@/lib/pin";
 import {
   buildStripeUrl,
-  clearPendingPayment,
   generateCode,
   getPendingPayment,
-  markCodeUsed,
-  PaidCode,
   pollForPaymentByEmail,
   savePendingPayment,
 } from "@/lib/payment";
@@ -45,15 +34,7 @@ export default function LoginPage() {
   );
 }
 
-// Flow states:
-// null        → profile grid
-// "start"     → collect name + email + currency, then open Stripe in new tab
-// "verifying" → polling Supabase while Stripe tab is open (or after redirect)
-// "recover"   → enter email to recover a lost / timed-out purchase
-type CreateStep = null | "start" | "verifying" | "recover";
-
-// localStorage key used as a cross-tab lock to prevent duplicate profile creation.
-const CREATING_LOCK_KEY = "rumbo_profile_creating";
+type CreateStep = null | "start" | "verifying";
 
 function LoginPageInner() {
   const router = useRouter();
@@ -64,7 +45,7 @@ function LoginPageInner() {
   const [pinMode, setPinMode] = useState<"enter" | "create">("enter");
 
   const [createStep, setCreateStep] = useState<CreateStep>(null);
-  const [paywallError, setPaywallError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newCurrency, setNewCurrency] = useState<Currency>("EUR");
@@ -74,6 +55,13 @@ function LoginPageInner() {
   useEffect(() => {
     if (profile) router.replace("/dashboard");
   }, [profile, router]);
+
+  // If Stripe redirected back here, forward straight to /activar.
+  useEffect(() => {
+    if (searchParams.get("from_stripe") !== "1") return;
+    if (getCurrentProfileId()) { router.replace("/dashboard"); return; }
+    router.replace("/activar");
+  }, [searchParams, router]);
 
   useEffect(() => {
     const refresh = () => {
@@ -95,34 +83,7 @@ function LoginPageInner() {
     return () => { supa.removeChannel(channel); };
   }, []);
 
-  // Handle Stripe redirect (?from_stripe=1) — works whether Stripe opened in a
-  // new tab (and redirected there) or in the same tab.
-  useEffect(() => {
-    if (searchParams.get("from_stripe") !== "1") return;
-
-    // Another tab already created the profile — just go home.
-    if (getCurrentProfileId()) { router.replace("/dashboard"); return; }
-
-    const pending = getPendingPayment();
-    if (!pending?.email) { setCreateStep("recover"); return; }
-
-    setNewEmail(pending.email);
-    setNewName(pending.name);
-    setCreateStep("verifying");
-
-    pollForPaymentByEmail(pending.email).then((row) => {
-      if (!row) {
-        setPaywallError("No recibimos confirmación del pago. Introduce tu email para buscarlo.");
-        setCreateStep("recover");
-        return;
-      }
-      finishOnboarding(row, pending.name, (pending.currency as Currency) ?? "EUR");
-      router.replace("/login");
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  // ── Profile selection ───────────────────────────────────────────────────────
+  // ── Existing profile selection ──────────────────────────────────────────────
 
   function pick(p: Profile) {
     if (!isPinSet(p.id)) { setPendingProfile(p); setPinMode("create"); return; }
@@ -145,46 +106,19 @@ function LoginPageInner() {
     setPendingProfile(null);
   }
 
-  // ── Payment core ────────────────────────────────────────────────────────────
-
-  /**
-   * Called once payment is confirmed in ANY tab.
-   * Creates the profile automatically — user only has to set a PIN.
-   */
-  function finishOnboarding(row: PaidCode, fallbackName: string, currency: Currency) {
-    // Cross-tab guard: if another tab already started creation, bail out.
-    if (getCurrentProfileId()) { router.replace("/dashboard"); return; }
-    if (localStorage.getItem(CREATING_LOCK_KEY)) return;
-    localStorage.setItem(CREATING_LOCK_KEY, "1");
-
-    stripeTabRef.current?.close();
-    stripeTabRef.current = null;
-
-    const name = (row.name || fallbackName || "").trim() || "Usuario";
-    const created = addCustomProfile(name, currency);
+  function deleteUser(p: Profile, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm(`¿Borrar el perfil "${p.name}"? Se eliminarán sus datos locales y de la nube.`)) return;
+    removeCustomProfile(p.id);
+    clearPin(p.id);
+    deleteProfileFromSupabase(p.user_id).catch(() => {});
     setProfiles(getAllProfiles());
-    setCreateStep(null);
-    clearPendingPayment();
-
-    pushToSupabase(created.user_id, {
-      goals: [], tasks: [], finances: [], snapshots: [], userTools: [],
-      primaryCurrency: currency,
-      profileMeta: {
-        id: created.id, name: created.name,
-        initials: created.initials, color: created.color, emoji: created.emoji,
-      },
-    }).catch(() => {});
-    markCodeUsed(row.code).catch(() => {});
-
-    setPendingProfile(created);
-    setPinMode("create");
   }
 
-  // ── Paywall flow ────────────────────────────────────────────────────────────
+  // ── New profile (paywall) ───────────────────────────────────────────────────
 
   function startPaywall() {
-    setPaywallError(null);
-    localStorage.removeItem(CREATING_LOCK_KEY);
+    setFormError(null);
     const pending = getPendingPayment();
     setNewName(pending?.name || "");
     setNewEmail(pending?.email || "");
@@ -196,65 +130,38 @@ function LoginPageInner() {
     stripeTabRef.current?.close();
     stripeTabRef.current = null;
     setCreateStep(null);
-    setPaywallError(null);
+    setFormError(null);
   }
 
   function goToStripe() {
     const name  = newName.trim();
     const email = newEmail.trim().toLowerCase();
-    if (!name)  { setPaywallError("Escribe tu nombre."); return; }
-    if (!email || !email.includes("@")) { setPaywallError("Introduce un email válido."); return; }
+    if (!name)  { setFormError("Escribe tu nombre."); return; }
+    if (!email || !email.includes("@")) { setFormError("Introduce un email válido."); return; }
 
-    setPaywallError(null);
-    localStorage.removeItem(CREATING_LOCK_KEY);
+    setFormError(null);
+    localStorage.removeItem("rumbo_profile_creating");
     const code = generateCode();
     savePendingPayment(code, name, email, newCurrency);
 
-    // Open Stripe in a new tab. The tab will be redirected back to
-    // /login?from_stripe=1 (once the Stripe Payment Link redirect is configured).
-    // Meanwhile this tab polls so it handles creation if the redirect fires here.
+    // Open Stripe in a new tab.
+    // When Stripe is configured to redirect to /activar?from_stripe=1 that tab
+    // handles the full activation. Meanwhile this tab polls as backup.
     const tab = window.open(buildStripeUrl(code, email), "_blank");
     if (!tab) {
-      // Popup blocked — navigate this tab directly to Stripe.
+      // Popup blocked — go to Stripe in this tab (will return via redirect).
       window.location.href = buildStripeUrl(code, email);
       return;
     }
     stripeTabRef.current = tab;
     setCreateStep("verifying");
 
-    // Poll from this tab as well, so the profile is created automatically
-    // even if Stripe redirects in the new tab or the user closes it.
+    // Backup polling: if payment found here, navigate to /activar.
     pollForPaymentByEmail(email, { timeoutMs: 300000 }).then((row) => {
-      if (!row) {
-        setPaywallError("No recibimos confirmación del pago. Introduce tu email para buscarlo.");
-        setCreateStep("recover");
-        return;
-      }
-      finishOnboarding(row, name, newCurrency);
+      if (!row) return; // timeout or user cancelled — they can go to /activar manually
+      stripeTabRef.current?.close();
+      router.push("/activar");
     });
-  }
-
-  async function verifyByEmail() {
-    const email = newEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) { setPaywallError("Introduce un email válido."); return; }
-    setPaywallError(null);
-    setCreateStep("verifying");
-    const row = await pollForPaymentByEmail(email, { timeoutMs: 15000 });
-    if (!row) {
-      setCreateStep("recover");
-      setPaywallError("No encontramos ningún pago con ese email. Si acabas de pagar, espera unos segundos e inténtalo de nuevo.");
-      return;
-    }
-    finishOnboarding(row, newName, newCurrency);
-  }
-
-  function deleteUser(p: Profile, e: React.MouseEvent) {
-    e.stopPropagation();
-    if (!confirm(`¿Borrar el perfil "${p.name}"? Se eliminarán sus datos locales y de la nube.`)) return;
-    removeCustomProfile(p.id);
-    clearPin(p.id);
-    deleteProfileFromSupabase(p.user_id).catch(() => {});
-    setProfiles(getAllProfiles());
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -299,26 +206,20 @@ function LoginPageInner() {
       <AnimatePresence>
         {createStep === "start" && (
           <StartCheckoutModal
-            name={newName} email={newEmail} currency={newCurrency} error={paywallError}
+            name={newName} email={newEmail} currency={newCurrency} error={formError}
             onNameChange={setNewName} onEmailChange={setNewEmail} onCurrencyChange={setNewCurrency}
             onPay={goToStripe} onCancel={closePaywall}
           />
         )}
         {createStep === "verifying" && (
-          <VerifyingModal email={newEmail} onCancel={closePaywall} />
-        )}
-        {createStep === "recover" && (
-          <RecoverModal
-            email={newEmail} error={paywallError}
-            onChange={setNewEmail} onVerify={verifyByEmail} onCancel={closePaywall}
-          />
+          <VerifyingModal email={newEmail} onCancel={closePaywall} onActivar={() => router.push("/activar")} />
         )}
       </AnimatePresence>
     </div>
   );
 }
 
-// ─── Step 1: Name + email + currency ─────────────────────────────────────────
+// ─── Checkout form ────────────────────────────────────────────────────────────
 
 function StartCheckoutModal({
   name, email, currency, error,
@@ -363,8 +264,7 @@ function StartCheckoutModal({
           <div className="grid grid-cols-4 gap-2">
             {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
               <button
-                key={c}
-                onClick={() => onCurrencyChange(c)}
+                key={c} onClick={() => onCurrencyChange(c)}
                 className={`flex flex-col items-center py-2 rounded-xl border transition-all text-sm ${
                   currency === c
                     ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
@@ -389,9 +289,11 @@ function StartCheckoutModal({
   );
 }
 
-// ─── Step 2: Waiting for payment ──────────────────────────────────────────────
+// ─── Waiting modal ────────────────────────────────────────────────────────────
 
-function VerifyingModal({ email, onCancel }: { email: string; onCancel: () => void }) {
+function VerifyingModal({ email, onCancel, onActivar }: {
+  email: string; onCancel: () => void; onActivar: () => void;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -406,47 +308,24 @@ function VerifyingModal({ email, onCancel }: { email: string; onCancel: () => vo
         <div className="w-14 h-14 rounded-full mx-auto bg-emerald-50 flex items-center justify-center mb-4">
           <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
         </div>
-        <h2 className="text-lg font-semibold">Esperando confirmación…</h2>
+        <h2 className="text-lg font-semibold">Esperando tu pago…</h2>
         <p className="text-sm text-rumbo-muted mt-2">
-          Paga en la otra pestaña. En cuanto Stripe confirme el pago de{" "}
-          <span className="font-medium text-rumbo-ink">{email}</span>, esta pantalla pasará
-          automáticamente a la creación de tu PIN.
+          Paga en la otra pestaña con{" "}
+          <span className="font-medium text-rumbo-ink">{email}</span>. En cuanto
+          Stripe confirme, esta pantalla avanzará sola.
         </p>
         <p className="text-xs text-rumbo-muted mt-3">No cierres esta ventana.</p>
-        <button onClick={onCancel} className="mt-5 text-xs text-rumbo-muted hover:text-rumbo-ink underline">
+        <button
+          onClick={onActivar}
+          className="mt-5 w-full px-4 py-2.5 rounded-xl border border-rumbo-line text-sm font-medium text-rumbo-ink hover:bg-slate-50 transition-colors"
+        >
+          Ya pagué → Continuar aquí
+        </button>
+        <button onClick={onCancel} className="mt-2 text-xs text-rumbo-muted hover:text-rumbo-ink underline">
           Cancelar
         </button>
       </motion.div>
     </motion.div>
-  );
-}
-
-// ─── Fallback: recover by email ───────────────────────────────────────────────
-
-function RecoverModal({
-  email, error, onChange, onVerify, onCancel,
-}: {
-  email: string; error: string | null;
-  onChange: (s: string) => void; onVerify: () => void; onCancel: () => void;
-}) {
-  return (
-    <Overlay onClose={onCancel}>
-      <h2 className="text-xl font-semibold tracking-tight">Recuperar acceso</h2>
-      <p className="text-sm text-rumbo-muted mt-1">
-        Introduce el email con el que pagaste y localizaremos tu suscripción.
-      </p>
-      <input
-        autoFocus type="email" className="input mt-5 w-full" placeholder="nombre@ejemplo.com"
-        value={email}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") onVerify(); if (e.key === "Escape") onCancel(); }}
-      />
-      {error && <ErrorBox message={error} />}
-      <button onClick={onVerify} className="mt-5 w-full px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors">
-        Recuperar mi acceso →
-      </button>
-      <button onClick={onCancel} className="mt-2 w-full text-xs text-rumbo-muted hover:text-rumbo-ink py-2">Cancelar</button>
-    </Overlay>
   );
 }
 
