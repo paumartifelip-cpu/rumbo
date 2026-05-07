@@ -22,7 +22,6 @@ import {
   buildStripeUrl,
   generateCode,
   getPendingPayment,
-  pollForPaymentByEmail,
   savePendingPayment,
 } from "@/lib/payment";
 
@@ -144,25 +143,32 @@ function LoginPageInner() {
     const code = generateCode();
     savePendingPayment(code, name, email, newCurrency);
 
-    // Open Stripe in a new tab.
-    // When Stripe is configured to redirect to /activar?from_stripe=1 that tab
-    // handles the full activation. Meanwhile this tab polls as backup.
+    // Open Stripe in a new tab. When Stripe redirects back to
+    // /activar?from_stripe=1, that page provisions the account immediately
+    // (no webhook polling needed).
     const tab = window.open(buildStripeUrl(code, email), "_blank");
     if (!tab) {
-      // Popup blocked — go to Stripe in this tab (will return via redirect).
+      // Popup blocked — go to Stripe in this tab (Stripe will redirect back).
       window.location.href = buildStripeUrl(code, email);
       return;
     }
     stripeTabRef.current = tab;
     setCreateStep("verifying");
-
-    // Backup polling: if payment found here, navigate to /activar.
-    pollForPaymentByEmail(email, { timeoutMs: 300000 }).then((row) => {
-      if (!row) return; // timeout or user cancelled — they can go to /activar manually
-      stripeTabRef.current?.close();
-      router.push("/activar");
-    });
   }
+
+  // While "verifying", listen for the other tab to sign in. As soon as
+  // localStorage gets a current profile (set by /activar), redirect.
+  useEffect(() => {
+    if (createStep !== "verifying") return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "rumbo_current_profile" && e.newValue) {
+        stripeTabRef.current?.close();
+        router.replace("/dashboard");
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [createStep, router]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
