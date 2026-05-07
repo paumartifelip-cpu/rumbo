@@ -4,7 +4,7 @@
 
 html,
 body {
-  background: #f7f8fa;
+  background: #FAF7F2;
   color: #0b1220;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -30,6 +30,11 @@ body {
            disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none;
   }
   .btn-primary {
+    @apply btn bg-emerald-500 text-white shadow-[0_8px_18px_-6px_rgba(16,185,129,0.55)]
+           hover:bg-emerald-600 hover:shadow-[0_10px_22px_-6px_rgba(16,185,129,0.65)]
+           active:scale-[0.96] active:shadow-[0_4px_10px_-4px_rgba(16,185,129,0.45)];
+  }
+  .btn-dark {
     @apply btn bg-rumbo-ink text-white hover:bg-slate-800;
   }
   .btn-accent {

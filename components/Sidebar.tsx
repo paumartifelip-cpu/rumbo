@@ -7,14 +7,16 @@ import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
 import { useRumbo } from "@/lib/store";
 
+// Each section gets its own pastel chip color for the icon — same palette as
+// the Stack page so the language is consistent across the app.
 const items = [
-  { href: "/dashboard", label: "Inicio",       icon: "🏠" },
-  { href: "/money",     label: "Dinero",       icon: "💸" },
-  { href: "/gastos",    label: "Gastos",       icon: "🧾" },
-  { href: "/tasks",     label: "Tareas",       icon: "✅" },
-  { href: "/goals",     label: "Objetivos",    icon: "🚩" },
-  { href: "/stack",     label: "Stack",        icon: "🧰" },
-  { href: "/settings",  label: "Ajustes",      icon: "⚙️" },
+  { href: "/dashboard", label: "Inicio",    icon: "🏠", chip: "bg-amber-100"   },
+  { href: "/money",     label: "Dinero",    icon: "💸", chip: "bg-lime-100"    },
+  { href: "/gastos",    label: "Gastos",    icon: "🧾", chip: "bg-cyan-100"    },
+  { href: "/tasks",     label: "Tareas",    icon: "✅", chip: "bg-emerald-100" },
+  { href: "/goals",     label: "Objetivos", icon: "🚩", chip: "bg-rose-100"    },
+  { href: "/stack",     label: "Stack",     icon: "🧰", chip: "bg-violet-100"  },
+  { href: "/settings",  label: "Ajustes",   icon: "⚙️", chip: "bg-slate-100"   },
 ];
 
 export function Sidebar() {
@@ -53,11 +55,13 @@ export function Sidebar() {
                   transition={{ type: "spring", stiffness: 380, damping: 30 }}
                 />
               )}
-              <motion.span 
-                whileHover={{ scale: 1.2, rotate: 5 }}
+              <motion.span
+                whileHover={{ scale: 1.1, rotate: -3 }}
+                whileTap={{ scale: 0.92 }}
+                transition={{ type: "spring", stiffness: 320, damping: 18 }}
                 className={cn(
-                  "text-lg leading-none transition-colors",
-                  active ? "text-white" : "text-rumbo-muted group-hover:text-rumbo-ink"
+                  "w-7 h-7 rounded-lg flex items-center justify-center text-base leading-none shrink-0",
+                  active ? "bg-white/15" : it.chip
                 )}
               >
                 {it.icon}
@@ -161,7 +165,12 @@ export function MobileNav() {
                 : "text-rumbo-muted hover:text-rumbo-ink"
             )}
           >
-            <span className="text-xl leading-none mb-0.5">{it.icon}</span>
+            <span className={cn(
+              "w-7 h-7 rounded-lg flex items-center justify-center text-base leading-none mb-0.5",
+              active ? "bg-white/15" : it.chip
+            )}>
+              {it.icon}
+            </span>
             <span className="opacity-80">{it.label}</span>
           </Link>
         );
