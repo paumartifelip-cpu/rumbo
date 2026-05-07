@@ -157,13 +157,16 @@ function LoginPageInner() {
   }
 
   // While "verifying", listen for the other tab to sign in. As soon as
-  // localStorage gets a current profile (set by /activar), redirect.
+  // localStorage gets a current profile (set by /activar), force a full
+  // page reload to /dashboard so the store re-hydrates with the new profile.
+  // (router.replace is a soft nav — the store of this tab would still have
+  // profile=null because signIn was called in the OTHER tab's instance.)
   useEffect(() => {
     if (createStep !== "verifying") return;
     const onStorage = (e: StorageEvent) => {
       if (e.key === "rumbo_current_profile" && e.newValue) {
         stripeTabRef.current?.close();
-        router.replace("/dashboard");
+        window.location.replace("/dashboard");
       }
     };
     window.addEventListener("storage", onStorage);

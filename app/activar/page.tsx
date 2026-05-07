@@ -129,7 +129,10 @@ function ActivarPageInner() {
     setPin(newProfile.id, pin);
     markVerified(newProfile.id);
     signIn(newProfile.id);
-    router.push("/onboarding");
+    // The user already supplied their name + currency before checkout, so we
+    // skip the onboarding wizard and drop them straight into the dashboard.
+    // They can fill in financial goals later from /money or /settings.
+    router.push("/dashboard");
   }
 
   return (
