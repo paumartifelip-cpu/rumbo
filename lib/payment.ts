@@ -5,9 +5,10 @@ export const STRIPE_PAYMENT_URL =
   process.env.NEXT_PUBLIC_STRIPE_PAYMENT_URL ||
   "https://buy.stripe.com/fZu14perIavbc5mf015Ne0n";
 
-const PENDING_CODE_KEY  = "rumbo_pending_code";
-const PENDING_NAME_KEY  = "rumbo_pending_name";
-const PENDING_EMAIL_KEY = "rumbo_pending_email";
+const PENDING_CODE_KEY     = "rumbo_pending_code";
+const PENDING_NAME_KEY     = "rumbo_pending_name";
+const PENDING_EMAIL_KEY    = "rumbo_pending_email";
+const PENDING_CURRENCY_KEY = "rumbo_pending_currency";
 
 const PRIVILEGED_PROFILE_IDS = new Set(DEFAULT_PROFILES.map((p) => p.id));
 
@@ -36,20 +37,22 @@ export function normalizeCode(input: string): string {
 
 // ── Pending purchase state (localStorage) ────────────────────────────────────
 
-export function savePendingPayment(code: string, name: string, email: string) {
+export function savePendingPayment(code: string, name: string, email: string, currency = "EUR") {
   if (typeof window === "undefined") return;
-  localStorage.setItem(PENDING_CODE_KEY,  normalizeCode(code));
-  localStorage.setItem(PENDING_NAME_KEY,  name.trim());
-  localStorage.setItem(PENDING_EMAIL_KEY, email.trim().toLowerCase());
+  localStorage.setItem(PENDING_CODE_KEY,     normalizeCode(code));
+  localStorage.setItem(PENDING_NAME_KEY,     name.trim());
+  localStorage.setItem(PENDING_EMAIL_KEY,    email.trim().toLowerCase());
+  localStorage.setItem(PENDING_CURRENCY_KEY, currency);
 }
 
-export function getPendingPayment(): { code: string; name: string; email: string } | null {
+export function getPendingPayment(): { code: string; name: string; email: string; currency: string } | null {
   if (typeof window === "undefined") return null;
-  const code  = localStorage.getItem(PENDING_CODE_KEY);
-  const name  = localStorage.getItem(PENDING_NAME_KEY)  || "";
-  const email = localStorage.getItem(PENDING_EMAIL_KEY) || "";
+  const code     = localStorage.getItem(PENDING_CODE_KEY);
+  const name     = localStorage.getItem(PENDING_NAME_KEY)     || "";
+  const email    = localStorage.getItem(PENDING_EMAIL_KEY)    || "";
+  const currency = localStorage.getItem(PENDING_CURRENCY_KEY) || "EUR";
   if (!code) return null;
-  return { code, name, email };
+  return { code, name, email, currency };
 }
 
 export function clearPendingPayment() {
@@ -57,6 +60,7 @@ export function clearPendingPayment() {
   localStorage.removeItem(PENDING_CODE_KEY);
   localStorage.removeItem(PENDING_NAME_KEY);
   localStorage.removeItem(PENDING_EMAIL_KEY);
+  localStorage.removeItem(PENDING_CURRENCY_KEY);
 }
 
 // ── Supabase types ────────────────────────────────────────────────────────────
