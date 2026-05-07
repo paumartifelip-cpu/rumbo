@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useRumbo } from "@/lib/store";
 import { UserTool } from "@/lib/types";
@@ -11,68 +11,50 @@ import { UserTool } from "@/lib/types";
 const CATEGORIES = ["IA", "Imagen", "Vídeo", "Audio", "No-code", "Google"] as const;
 type Category = (typeof CATEGORIES)[number];
 
-const CAT_ACCENT: Record<string, string> = {
-  IA:        "text-violet-700  bg-violet-50",
-  Imagen:    "text-pink-700    bg-pink-50",
-  "Vídeo":   "text-orange-700  bg-orange-50",
-  Audio:     "text-amber-700   bg-amber-50",
-  "No-code": "text-emerald-700 bg-emerald-50",
-  Google:    "text-blue-700    bg-blue-50",
+// Soft, distinct color theme per section. Used for the section header AND the
+// card background tint so each category feels visually distinct.
+const SECTION_THEME: Record<string, { bg: string; border: string; chip: string; chipText: string; text: string }> = {
+  IA:        { bg: "bg-violet-50/70",  border: "border-violet-100",  chip: "bg-violet-100",  chipText: "text-violet-700",  text: "text-violet-700"  },
+  Imagen:    { bg: "bg-pink-50/70",    border: "border-pink-100",    chip: "bg-pink-100",    chipText: "text-pink-700",    text: "text-pink-700"    },
+  "Vídeo":   { bg: "bg-orange-50/70",  border: "border-orange-100",  chip: "bg-orange-100",  chipText: "text-orange-700",  text: "text-orange-700"  },
+  Audio:     { bg: "bg-amber-50/70",   border: "border-amber-100",   chip: "bg-amber-100",   chipText: "text-amber-700",   text: "text-amber-700"   },
+  "No-code": { bg: "bg-emerald-50/70", border: "border-emerald-100", chip: "bg-emerald-100", chipText: "text-emerald-700", text: "text-emerald-700" },
+  Google:    { bg: "bg-sky-50/70",     border: "border-sky-100",     chip: "bg-sky-100",     chipText: "text-sky-700",     text: "text-sky-700"     },
+  Otras:     { bg: "bg-slate-50",      border: "border-slate-100",   chip: "bg-slate-100",   chipText: "text-slate-700",   text: "text-slate-700"   },
 };
 
 const ICON_OPTIONS: { group: string; icons: string[] }[] = [
-  { group: "Trabajo",       icons: ["🔧", "🛠️", "⚙️", "📊", "📈", "📉", "📋", "📌", "📎", "🗂️", "🗃️", "📁"] },
-  { group: "Productividad", icons: ["📓", "📔", "📒", "📕", "📗", "📘", "📙", "📚", "✏️", "🖊️", "📝", "🗒️", "🗓️", "📅", "☑️", "✅"] },
-  { group: "Tech / IA",     icons: ["🤖", "🧠", "✨", "🚀", "⚡", "💡", "🔮", "🛸", "👾", "🎛️", "🖥️", "⌨️", "💾"] },
-  { group: "Comunicación",  icons: ["💬", "💭", "🗣️", "📞", "📱", "📨", "📧", "📡"] },
-  { group: "Diseño",        icons: ["🎨", "🖌️", "🎬", "🎞️", "📹", "📷", "🎥", "🎙️", "🎧", "🎵", "🖼️"] },
-  { group: "Otros",         icons: ["⭐", "🌟", "🌈", "🔥", "🎯", "🏆", "🌱", "🍌", "🦊", "🦄", "🍀"] },
+  { group: "Trabajo",      icons: ["🔧", "🛠️", "⚙️", "📊", "📈", "📋", "📌", "📁"] },
+  { group: "Tech / IA",    icons: ["🤖", "🧠", "✨", "🚀", "⚡", "💡", "🔮", "🛸"] },
+  { group: "Comunicación", icons: ["💬", "📞", "📱", "📨", "📧", "📡"] },
+  { group: "Diseño",       icons: ["🎨", "🖌️", "🎬", "📹", "📷", "🎙️", "🎧", "🎵", "🖼️"] },
+  { group: "Otros",        icons: ["⭐", "🌟", "🌈", "🔥", "🎯", "🏆", "🌱", "🍌", "🦊"] },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function StackPage() {
-  const { userTools, addUserTool, removeUserTool, updateUserTool, reorderUserTools } = useRumbo();
+type Tab = "Todas" | "Favoritos" | Category;
+const TABS: Tab[] = ["Todas", "Favoritos", ...CATEGORIES];
 
-  const [activeCat, setActiveCat] = useState<Category | "Todas">("Todas");
+export default function StackPage() {
+  const { userTools, addUserTool, removeUserTool, updateUserTool, toggleToolFavorite } = useRumbo();
+
+  const [activeTab, setActiveTab] = useState<Tab>("Todas");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<UserTool | null>(null);
   const [creating, setCreating] = useState(false);
 
-  // Sort tools by order_index, fallback to original array order.
-  const sorted = useMemo(() => {
-    const arr = [...(userTools || [])];
-    arr.sort((a, b) => {
-      const ai = a.order_index ?? 9999;
-      const bi = b.order_index ?? 9999;
-      return ai - bi;
-    });
-    return arr;
-  }, [userTools]);
+  // Apply search filter across the full list.
+  const searched = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return userTools || [];
+    return (userTools || []).filter((t) => t.name.toLowerCase().includes(q));
+  }, [userTools, search]);
 
-  const visible = useMemo(() => {
-    return sorted.filter((t) => {
-      if (activeCat !== "Todas" && t.category !== activeCat) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        if (!t.name.toLowerCase().includes(q) && !(t.description || "").toLowerCase().includes(q)) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [sorted, activeCat, search]);
-
-  // Reorder uses the full sorted list (drag-and-drop only enabled when no
-  // filters are active so the user is always reordering the canonical list).
-  const canReorder = activeCat === "Todas" && !search;
-
-  function handleReorder(newOrder: UserTool[]) {
-    reorderUserTools(newOrder.map((t) => t.id));
-  }
+  const favCount = (userTools || []).filter((t) => t.is_favorite).length;
 
   return (
-    <div className="pb-16 max-w-7xl mx-auto">
+    <div className="pb-16 max-w-6xl mx-auto">
       {/* YouTube banner */}
       <a
         href="https://www.youtube.com/@paumartifelip"
@@ -92,7 +74,7 @@ export default function StackPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Stack de herramientas</h1>
           <p className="text-rumbo-muted text-sm mt-1">
-            Click en una herramienta para abrirla. Arrástralas para reordenar. La X las elimina.
+            Click en una tarjeta para abrirla. El corazón la marca como favorita.
           </p>
         </div>
         <button
@@ -116,59 +98,55 @@ export default function StackPage() {
         </div>
       </div>
 
-      {/* Category pills */}
+      {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-8">
-        {(["Todas", ...CATEGORIES] as const).map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCat(cat as Category | "Todas")}
-            className={cn(
-              "px-3 py-1.5 rounded-full text-xs font-semibold transition-all border",
-              activeCat === cat
-                ? "bg-rumbo-ink text-white border-rumbo-ink"
-                : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
-            )}
-          >
-            {cat}
-          </button>
-        ))}
+        {TABS.map((tab) => {
+          const active = activeTab === tab;
+          const isFav = tab === "Favoritos";
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all border inline-flex items-center gap-1.5",
+                active
+                  ? "bg-rumbo-ink text-white border-rumbo-ink"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
+              )}
+            >
+              {isFav && <span className={active ? "text-rose-300" : "text-rose-500"}>♥</span>}
+              {tab}
+              {isFav && favCount > 0 && (
+                <span className={cn("text-[10px] px-1.5 py-px rounded-full", active ? "bg-white/20" : "bg-rose-100 text-rose-700")}>{favCount}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Grid */}
-      {visible.length === 0 ? (
-        <div className="text-center py-20 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-          <div className="text-4xl mb-3">🔎</div>
-          <p className="font-bold text-slate-700">Sin resultados</p>
-          <p className="text-sm mt-1">Cambia los filtros o añade una herramienta.</p>
-        </div>
-      ) : canReorder ? (
-        <Reorder.Group
-          axis="y"
-          values={visible}
-          onReorder={handleReorder}
-          className="flex flex-col gap-3 max-w-3xl mx-auto"
-        >
-          {visible.map((tool) => (
-            <DraggableRow
-              key={tool.id}
-              tool={tool}
-              onEdit={() => setEditing(tool)}
-              onRemove={() => removeUserTool(tool.id)}
-            />
-          ))}
-        </Reorder.Group>
+      {/* Body */}
+      {activeTab === "Todas" ? (
+        <SectionedView
+          tools={searched}
+          onEdit={setEditing}
+          onRemove={removeUserTool}
+          onToggleFav={toggleToolFavorite}
+        />
+      ) : activeTab === "Favoritos" ? (
+        <FavoritesView
+          tools={searched.filter((t) => t.is_favorite)}
+          onEdit={setEditing}
+          onRemove={removeUserTool}
+          onToggleFav={toggleToolFavorite}
+        />
       ) : (
-        <div className="flex flex-col gap-3 max-w-3xl mx-auto">
-          {visible.map((tool) => (
-            <ToolRow
-              key={tool.id}
-              tool={tool}
-              onEdit={() => setEditing(tool)}
-              onRemove={() => removeUserTool(tool.id)}
-              draggable={false}
-            />
-          ))}
-        </div>
+        <CategoryView
+          category={activeTab}
+          tools={searched.filter((t) => t.category === activeTab)}
+          onEdit={setEditing}
+          onRemove={removeUserTool}
+          onToggleFav={toggleToolFavorite}
+        />
       )}
 
       {/* Add / Edit modal */}
@@ -190,128 +168,225 @@ export default function StackPage() {
   );
 }
 
-// ─── Tool Row (single-column wide card) ───────────────────────────────────────
+// ─── Views ────────────────────────────────────────────────────────────────────
 
-interface ToolRowProps {
-  tool: UserTool;
-  onEdit: () => void;
-  onRemove: () => void;
-  draggable?: boolean;
-}
+function SectionedView({
+  tools, onEdit, onRemove, onToggleFav,
+}: {
+  tools: UserTool[];
+  onEdit: (t: UserTool) => void;
+  onRemove: (id: string) => void;
+  onToggleFav: (id: string) => void;
+}) {
+  // Group by category, preserving CATEGORIES order. Other categories (e.g.
+  // user-added "Otras") appear at the end.
+  const groups: { name: string; tools: UserTool[] }[] = [];
+  for (const cat of CATEGORIES) {
+    const list = tools.filter((t) => t.category === cat);
+    if (list.length) groups.push({ name: cat, tools: list });
+  }
+  const knownCats = new Set<string>(CATEGORIES);
+  const extras = tools.filter((t) => !knownCats.has(t.category));
+  if (extras.length) {
+    const extraCats = Array.from(new Set(extras.map((t) => t.category)));
+    for (const cat of extraCats) {
+      groups.push({ name: cat, tools: extras.filter((t) => t.category === cat) });
+    }
+  }
 
-function ToolRow({ tool, onEdit, onRemove, draggable }: ToolRowProps) {
+  if (groups.length === 0) {
+    return <Empty />;
+  }
+
   return (
-    <RowInner tool={tool} onEdit={onEdit} onRemove={onRemove} dragControls={null} />
+    <div className="space-y-10">
+      {groups.map((g) => (
+        <SectionBlock
+          key={g.name}
+          title={g.name}
+          tools={g.tools}
+          onEdit={onEdit}
+          onRemove={onRemove}
+          onToggleFav={onToggleFav}
+        />
+      ))}
+    </div>
   );
 }
 
-/** Wraps a row in a Reorder.Item with a drag handle that starts the drag. */
-function DraggableRow({
-  tool, onEdit, onRemove,
-}: { tool: UserTool; onEdit: () => void; onRemove: () => void }) {
-  const dragControls = useDragControls();
+function CategoryView({
+  category, tools, onEdit, onRemove, onToggleFav,
+}: {
+  category: string;
+  tools: UserTool[];
+  onEdit: (t: UserTool) => void;
+  onRemove: (id: string) => void;
+  onToggleFav: (id: string) => void;
+}) {
+  if (tools.length === 0) return <Empty />;
   return (
-    <Reorder.Item
-      value={tool}
-      dragListener={false}
-      dragControls={dragControls}
-      className="list-none"
-      whileDrag={{ scale: 1.02, boxShadow: "0 12px 32px rgba(0,0,0,0.15)", zIndex: 10 }}
-    >
-      <RowInner tool={tool} onEdit={onEdit} onRemove={onRemove} dragControls={dragControls} />
-    </Reorder.Item>
+    <SectionBlock
+      title={category}
+      tools={tools}
+      onEdit={onEdit}
+      onRemove={onRemove}
+      onToggleFav={onToggleFav}
+    />
   );
 }
 
-function RowInner({
-  tool, onEdit, onRemove, dragControls,
+function FavoritesView({
+  tools, onEdit, onRemove, onToggleFav,
+}: {
+  tools: UserTool[];
+  onEdit: (t: UserTool) => void;
+  onRemove: (id: string) => void;
+  onToggleFav: (id: string) => void;
+}) {
+  if (tools.length === 0) {
+    return (
+      <div className="text-center py-20 text-slate-400 bg-rose-50/40 rounded-2xl border border-dashed border-rose-200">
+        <div className="text-4xl mb-3">♥</div>
+        <p className="font-semibold text-rose-700">Aún no tienes favoritas</p>
+        <p className="text-sm mt-1 text-rose-700/70">Pulsa el corazón en cualquier herramienta para añadirla aquí.</p>
+      </div>
+    );
+  }
+  return (
+    <CardGrid tools={tools} onEdit={onEdit} onRemove={onRemove} onToggleFav={onToggleFav} />
+  );
+}
+
+function SectionBlock({
+  title, tools, onEdit, onRemove, onToggleFav,
+}: {
+  title: string;
+  tools: UserTool[];
+  onEdit: (t: UserTool) => void;
+  onRemove: (id: string) => void;
+  onToggleFav: (id: string) => void;
+}) {
+  const theme = SECTION_THEME[title] || SECTION_THEME.Otras;
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-3">
+        <span className={cn("text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full", theme.chip, theme.chipText)}>
+          {title}
+        </span>
+        <div className="flex-1 h-px bg-slate-100" />
+        <span className="text-xs text-slate-400">{tools.length}</span>
+      </div>
+      <CardGrid tools={tools} onEdit={onEdit} onRemove={onRemove} onToggleFav={onToggleFav} />
+    </div>
+  );
+}
+
+function CardGrid({
+  tools, onEdit, onRemove, onToggleFav,
+}: {
+  tools: UserTool[];
+  onEdit: (t: UserTool) => void;
+  onRemove: (id: string) => void;
+  onToggleFav: (id: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {tools.map((t) => (
+        <ToolCard
+          key={t.id}
+          tool={t}
+          onEdit={() => onEdit(t)}
+          onRemove={() => {
+            if (confirm(`¿Quitar "${t.name}"?`)) onRemove(t.id);
+          }}
+          onToggleFav={() => onToggleFav(t.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function Empty() {
+  return (
+    <div className="text-center py-20 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+      <div className="text-4xl mb-3">🔎</div>
+      <p className="font-bold text-slate-700">Sin resultados</p>
+      <p className="text-sm mt-1">Prueba con otra búsqueda o categoría.</p>
+    </div>
+  );
+}
+
+// ─── Tool Card (compact tile) ─────────────────────────────────────────────────
+
+function ToolCard({
+  tool, onEdit, onRemove, onToggleFav,
 }: {
   tool: UserTool;
   onEdit: () => void;
   onRemove: () => void;
-  dragControls: ReturnType<typeof useDragControls> | null;
+  onToggleFav: () => void;
 }) {
-  const accent = CAT_ACCENT[tool.category] || "text-slate-700 bg-slate-100";
+  const theme = SECTION_THEME[tool.category] || SECTION_THEME.Otras;
+  const fav = !!tool.is_favorite;
 
   function open(e: React.MouseEvent) {
-    // Don't open if the click landed on a button inside the card.
-    const target = e.target as HTMLElement;
-    if (target.closest("button")) return;
+    if ((e.target as HTMLElement).closest("button")) return;
     if (!tool.url) return;
     window.open(tool.url, "_blank", "noopener,noreferrer");
-  }
-
-  function handleRemove(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (confirm(`¿Quitar "${tool.name}" de tu stack?`)) onRemove();
-  }
-
-  function handleEdit(e: React.MouseEvent) {
-    e.stopPropagation();
-    onEdit();
   }
 
   return (
     <motion.div
       onClick={open}
-      whileHover={{ scale: 1.015, y: -1 }}
-      transition={{ type: "spring", stiffness: 320, damping: 24 }}
+      whileHover={{ y: -2, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: "spring", stiffness: 320, damping: 22 }}
       className={cn(
-        "group relative flex items-center gap-4 rounded-2xl bg-white border border-slate-200 px-5 py-4 select-none",
-        "shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow",
-        tool.url ? "cursor-pointer" : "cursor-default"
+        "group relative rounded-2xl border p-3.5 cursor-pointer select-none",
+        theme.bg, theme.border,
+        "hover:border-slate-300 hover:shadow-[0_8px_22px_rgba(0,0,0,0.08)] transition-all"
       )}
     >
-      {/* Drag handle */}
-      {dragControls && (
-        <div
-          onPointerDown={(e) => { e.preventDefault(); dragControls.start(e); }}
-          title="Arrastra para reordenar"
-          className="shrink-0 w-7 h-10 -ml-1 flex items-center justify-center text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
-        >
-          <svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor" aria-hidden>
-            <circle cx="3"  cy="4"  r="1.5" /><circle cx="11" cy="4"  r="1.5" />
-            <circle cx="3"  cy="10" r="1.5" /><circle cx="11" cy="10" r="1.5" />
-            <circle cx="3"  cy="16" r="1.5" /><circle cx="11" cy="16" r="1.5" />
-          </svg>
+      <div className="flex items-center gap-2.5">
+        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-xl shrink-0">
+          {tool.icon}
         </div>
-      )}
-
-      {/* Icon */}
-      <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl shrink-0">
-        {tool.icon}
+        <h3 className="font-semibold text-slate-900 text-sm leading-tight truncate flex-1 min-w-0">
+          {tool.name}
+        </h3>
       </div>
 
-      {/* Name + category + description */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-slate-900 text-base leading-tight truncate">
-            {tool.name}
-          </h3>
-          <span className={cn("text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0", accent)}>
-            {tool.category}
-          </span>
-        </div>
-        {tool.description && (
-          <p className="text-xs text-slate-500 leading-snug mt-0.5 line-clamp-1">
-            {tool.description}
-          </p>
+      {/* Heart (always visible if favorite, fades-in on hover otherwise) */}
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleFav(); }}
+        title={fav ? "Quitar de favoritos" : "Marcar como favorita"}
+        className={cn(
+          "absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all",
+          fav
+            ? "text-rose-500 opacity-100 scale-100"
+            : "text-slate-300 opacity-0 group-hover:opacity-100 hover:text-rose-500"
         )}
-      </div>
+      >
+        <motion.span
+          animate={{ scale: fav ? [1, 1.4, 1] : 1 }}
+          transition={{ duration: 0.32, ease: "easeOut" }}
+          className="text-base"
+        >
+          {fav ? "♥" : "♡"}
+        </motion.span>
+      </button>
 
-      {/* Edit + Remove buttons */}
-      <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Edit + Remove (hidden until hover, bottom-right) */}
+      <div className="absolute bottom-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
-          onClick={handleEdit}
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
           title="Editar"
-          className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 flex items-center justify-center text-xs"
-          aria-label="Editar"
+          className="w-6 h-6 rounded-full bg-white/90 backdrop-blur border border-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center text-[10px]"
         >✎</button>
         <button
-          onClick={handleRemove}
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
           title="Quitar"
-          className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center text-sm"
-          aria-label="Quitar"
+          className="w-6 h-6 rounded-full bg-white/90 backdrop-blur border border-slate-200 text-slate-400 hover:text-rose-600 flex items-center justify-center text-[11px]"
         >✕</button>
       </div>
     </motion.div>
@@ -342,14 +417,9 @@ function ToolModal({
   const [name, setName] = useState(initial?.name || "");
   const [icon, setIcon] = useState(initial?.icon || "🔧");
   const [category, setCategory] = useState<string>(initial?.category || "IA");
-  const [description, setDescription] = useState(initial?.description || "");
   const [url, setUrl] = useState(initial?.url || "");
-  const [free, setFree] = useState(initial?.free ?? true);
-  const [cost, setCost] = useState<number>(initial?.cost ?? 0);
-  const [billing, setBilling] = useState<"monthly" | "yearly">(initial?.billing_period || "monthly");
   const [error, setError] = useState<string | null>(null);
 
-  // Lock body scroll while modal open
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -363,11 +433,8 @@ function ToolModal({
       name: name.trim(),
       icon,
       category,
-      description: description.trim() || undefined,
       url: url.trim() || undefined,
-      free,
-      cost: free ? 0 : Number(cost) || 0,
-      billing_period: free ? "monthly" : billing,
+      free: true,
     });
   }
 
@@ -391,9 +458,7 @@ function ToolModal({
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            ✕
-          </button>
+          >✕</button>
         </div>
 
         <form onSubmit={submit} className="p-6 space-y-4">
@@ -439,55 +504,17 @@ function ToolModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Categoría</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-              >
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                <option value="Otras">Otras</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Tipo</label>
-              <select
-                value={free ? "free" : "paid"}
-                onChange={(e) => setFree(e.target.value === "free")}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-              >
-                <option value="free">Gratis</option>
-                <option value="paid">De pago</option>
-              </select>
-            </div>
+          <div>
+            <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Categoría</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+            >
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              <option value="Otras">Otras</option>
+            </select>
           </div>
-
-          {!free && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Coste</label>
-                <input
-                  type="number" min="0" step="0.01"
-                  value={cost}
-                  onChange={(e) => setCost(Number(e.target.value) || 0)}
-                  className="input w-full"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Frecuencia</label>
-                <select
-                  value={billing}
-                  onChange={(e) => setBilling(e.target.value as "monthly" | "yearly")}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                >
-                  <option value="monthly">Al mes</option>
-                  <option value="yearly">Al año</option>
-                </select>
-              </div>
-            </div>
-          )}
 
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">URL</label>
@@ -496,17 +523,6 @@ function ToolModal({
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               className="input w-full"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Descripción</label>
-            <textarea
-              rows={2}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 resize-none"
-              placeholder="Para qué sirve…"
             />
           </div>
 

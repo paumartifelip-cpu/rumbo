@@ -78,6 +78,7 @@ interface RumboContext extends RumboState {
   addUserTool: (ut: Omit<UserTool, "id" | "user_id" | "created_at">) => void;
   removeUserTool: (id: string) => void;
   updateUserTool: (id: string, patch: Partial<UserTool>) => void;
+  toggleToolFavorite: (id: string) => void;
   reorderUserTools: (orderedIds: string[]) => void;
   saveOnboarding: (data: OnboardingData) => void;
   updateOnboarding: (patch: Partial<OnboardingData>) => void;
@@ -152,7 +153,7 @@ const BASE_DEFAULT_TOOLS = [
 
 // Bump this on every curated-list change to force a one-time reset of cached
 // user_tools across all profiles. Read by the hydration logic below.
-export const TOOLS_VERSION = "v3";
+export const TOOLS_VERSION = "v4";
 const TOOLS_SEED = "2026-05-07T00:00:00.000Z";
 
 // Names from the previous default list. If any of these are found in the
@@ -998,6 +999,15 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const toggleToolFavorite: RumboContext["toggleToolFavorite"] = useCallback((id) => {
+    setState((state) => ({
+      ...state,
+      userTools: state.userTools.map((ut) =>
+        ut.id === id ? { ...ut, is_favorite: !ut.is_favorite } : ut
+      ),
+    }));
+  }, []);
+
   const reorderUserTools: RumboContext["reorderUserTools"] = useCallback((orderedIds) => {
     setState((state) => {
       const byId = new Map(state.userTools.map((t) => [t.id, t]));
@@ -1092,6 +1102,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       addUserTool,
       removeUserTool,
       updateUserTool,
+      toggleToolFavorite,
       reorderUserTools,
       saveOnboarding,
       updateOnboarding,
@@ -1121,6 +1132,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       addUserTool,
       removeUserTool,
       updateUserTool,
+      toggleToolFavorite,
       reorderUserTools,
       saveOnboarding,
       updateOnboarding,

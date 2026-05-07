@@ -121,6 +121,7 @@ export interface UserTool {
   rating: number; // 1-5
   icon: string;
   highlight?: boolean;
-  order_index?: number; // user-defined order via drag-and-drop
+  is_favorite?: boolean; // user-marked favorites (heart icon)
+  order_index?: number;  // legacy, kept for round-trip but no longer surfaced in UI
   created_at: string;
 }
