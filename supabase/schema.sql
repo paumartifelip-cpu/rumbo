@@ -103,12 +103,14 @@ create index if not exists user_tools_user_id_idx on user_tools(user_id);
 create table if not exists paid_codes (
   code text primary key,
   name text,
+  email text,                      -- customer email from Stripe, used for lookup
   paid_at timestamptz default now(),
   stripe_session_id text,
   used boolean default false,
   created_at timestamptz default now()
 );
 create index if not exists paid_codes_session_idx on paid_codes(stripe_session_id);
+create index if not exists paid_codes_email_idx   on paid_codes(email);
 
 -- =============================================
 -- Pre-cargar las dos sesiones (Pau y Michelle)
