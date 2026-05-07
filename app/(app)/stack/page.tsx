@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence, Reorder } from "framer-motion";
+import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useRumbo } from "@/lib/store";
 import { UserTool } from "@/lib/types";
@@ -146,31 +146,26 @@ export default function StackPage() {
           axis="y"
           values={visible}
           onReorder={handleReorder}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+          className="flex flex-col gap-3 max-w-3xl mx-auto"
         >
           {visible.map((tool) => (
-            <Reorder.Item
-              key={tool.id}
-              value={tool}
-              className="cursor-grab active:cursor-grabbing"
-              whileDrag={{ scale: 1.04, zIndex: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.18)" }}
-            >
-              <ToolCard
-                tool={tool}
-                onEdit={() => setEditing(tool)}
-                onRemove={() => removeUserTool(tool.id)}
-              />
-            </Reorder.Item>
-          ))}
-        </Reorder.Group>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {visible.map((tool) => (
-            <ToolCard
+            <DraggableRow
               key={tool.id}
               tool={tool}
               onEdit={() => setEditing(tool)}
               onRemove={() => removeUserTool(tool.id)}
+            />
+          ))}
+        </Reorder.Group>
+      ) : (
+        <div className="flex flex-col gap-3 max-w-3xl mx-auto">
+          {visible.map((tool) => (
+            <ToolRow
+              key={tool.id}
+              tool={tool}
+              onEdit={() => setEditing(tool)}
+              onRemove={() => removeUserTool(tool.id)}
+              draggable={false}
             />
           ))}
         </div>
@@ -195,18 +190,53 @@ export default function StackPage() {
   );
 }
 
-// ─── Tool Card ────────────────────────────────────────────────────────────────
+// ─── Tool Row (single-column wide card) ───────────────────────────────────────
 
-function ToolCard({
+interface ToolRowProps {
+  tool: UserTool;
+  onEdit: () => void;
+  onRemove: () => void;
+  draggable?: boolean;
+}
+
+function ToolRow({ tool, onEdit, onRemove, draggable }: ToolRowProps) {
+  return (
+    <RowInner tool={tool} onEdit={onEdit} onRemove={onRemove} dragControls={null} />
+  );
+}
+
+/** Wraps a row in a Reorder.Item with a drag handle that starts the drag. */
+function DraggableRow({
   tool, onEdit, onRemove,
+}: { tool: UserTool; onEdit: () => void; onRemove: () => void }) {
+  const dragControls = useDragControls();
+  return (
+    <Reorder.Item
+      value={tool}
+      dragListener={false}
+      dragControls={dragControls}
+      className="list-none"
+      whileDrag={{ scale: 1.02, boxShadow: "0 12px 32px rgba(0,0,0,0.15)", zIndex: 10 }}
+    >
+      <RowInner tool={tool} onEdit={onEdit} onRemove={onRemove} dragControls={dragControls} />
+    </Reorder.Item>
+  );
+}
+
+function RowInner({
+  tool, onEdit, onRemove, dragControls,
 }: {
   tool: UserTool;
   onEdit: () => void;
   onRemove: () => void;
+  dragControls: ReturnType<typeof useDragControls> | null;
 }) {
   const accent = CAT_ACCENT[tool.category] || "text-slate-700 bg-slate-100";
 
-  function open() {
+  function open(e: React.MouseEvent) {
+    // Don't open if the click landed on a button inside the card.
+    const target = e.target as HTMLElement;
+    if (target.closest("button")) return;
     if (!tool.url) return;
     window.open(tool.url, "_blank", "noopener,noreferrer");
   }
@@ -224,59 +254,66 @@ function ToolCard({
   return (
     <motion.div
       onClick={open}
-      whileHover={{ scale: 1.03, y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 280, damping: 22 }}
+      whileHover={{ scale: 1.015, y: -1 }}
+      transition={{ type: "spring", stiffness: 320, damping: 24 }}
       className={cn(
-        "relative group rounded-2xl bg-white border border-slate-200 p-5 select-none",
-        "shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]",
-        "transition-shadow",
+        "group relative flex items-center gap-4 rounded-2xl bg-white border border-slate-200 px-5 py-4 select-none",
+        "shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow",
         tool.url ? "cursor-pointer" : "cursor-default"
       )}
     >
-      {/* Remove button (top-right) */}
-      <button
-        onClick={handleRemove}
-        title="Quitar"
-        className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-sm shadow-sm"
-        aria-label="Quitar herramienta"
-      >
-        ✕
-      </button>
-      {/* Edit button (top-right, just left of remove) */}
-      <button
-        onClick={handleEdit}
-        title="Editar"
-        className="absolute -top-2 right-7 w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs shadow-sm"
-        aria-label="Editar herramienta"
-      >
-        ✎
-      </button>
-
-      <div className="flex items-start gap-3">
-        <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl shrink-0">
-          {tool.icon}
+      {/* Drag handle */}
+      {dragControls && (
+        <div
+          onPointerDown={(e) => { e.preventDefault(); dragControls.start(e); }}
+          title="Arrastra para reordenar"
+          className="shrink-0 w-7 h-10 -ml-1 flex items-center justify-center text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
+        >
+          <svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor" aria-hidden>
+            <circle cx="3"  cy="4"  r="1.5" /><circle cx="11" cy="4"  r="1.5" />
+            <circle cx="3"  cy="10" r="1.5" /><circle cx="11" cy="10" r="1.5" />
+            <circle cx="3"  cy="16" r="1.5" /><circle cx="11" cy="16" r="1.5" />
+          </svg>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-slate-900 text-base leading-tight truncate">
+      )}
+
+      {/* Icon */}
+      <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-2xl shrink-0">
+        {tool.icon}
+      </div>
+
+      {/* Name + category + description */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-slate-900 text-base leading-tight truncate">
             {tool.name}
-          </div>
-          <span
-            className={cn(
-              "inline-block text-[10px] font-bold uppercase tracking-wider mt-1.5 px-2 py-0.5 rounded-full",
-              accent
-            )}
-          >
+          </h3>
+          <span className={cn("text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0", accent)}>
             {tool.category}
           </span>
         </div>
+        {tool.description && (
+          <p className="text-xs text-slate-500 leading-snug mt-0.5 line-clamp-1">
+            {tool.description}
+          </p>
+        )}
       </div>
 
-      {tool.description && (
-        <p className="text-xs text-slate-500 leading-relaxed mt-3 line-clamp-2">
-          {tool.description}
-        </p>
-      )}
+      {/* Edit + Remove buttons */}
+      <div className="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={handleEdit}
+          title="Editar"
+          className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 flex items-center justify-center text-xs"
+          aria-label="Editar"
+        >✎</button>
+        <button
+          onClick={handleRemove}
+          title="Quitar"
+          className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center text-sm"
+          aria-label="Quitar"
+        >✕</button>
+      </div>
     </motion.div>
   );
 }

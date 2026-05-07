@@ -152,15 +152,32 @@ const BASE_DEFAULT_TOOLS = [
 
 // Bump this on every curated-list change to force a one-time reset of cached
 // user_tools across all profiles. Read by the hydration logic below.
-export const TOOLS_VERSION = "v2";
+export const TOOLS_VERSION = "v3";
+const TOOLS_SEED = "2026-05-07T00:00:00.000Z";
+
+// Names from the previous default list. If any of these are found in the
+// user's cached tools we know it's stale and we replace the whole set.
+const STALE_DEFAULT_NAMES = new Set([
+  "Notion", "Obsidian", "Todoist", "Calendly", "Cal.com", "Linear", "Raycast",
+  "Revolut", "YNAB", "Wise", "Stripe", "Google Gemini", "v0", "Bolt",
+  "Replit Agent", "Mistral Le Chat", "Antigravity", "Google Whisk",
+  "Suno AI", "ElevenLabs", "HeyGen", "Higgsfield", "Krea", "Pomelli",
+  "Canva", "CapCut", "Descript", "Figma", "Cursor", "Vercel", "Supabase",
+  "Beehiiv", "Kit (ConvertKit)", "Buffer", "Loom", "Slack",
+]);
+
+/** Returns true if the cached userTools are from the old curated list. */
+export function userToolsAreStale(tools: UserTool[] | undefined): boolean {
+  if (!Array.isArray(tools) || tools.length === 0) return false;
+  return tools.some((t) => STALE_DEFAULT_NAMES.has(t.name));
+}
 
 export const buildDefaultUserTools = (userId: string): UserTool[] => {
-  const seed = "2026-05-07T00:00:00.000Z";
   return BASE_DEFAULT_TOOLS.map((t, idx) => ({
     ...t,
     id: `default-tool-${idx}`,
     user_id: userId,
-    created_at: seed,
+    created_at: TOOLS_SEED,
     order_index: idx,
   }));
 };
@@ -209,8 +226,10 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         if (raw) {
           const parsed = JSON.parse(raw);
           // One-time migration: replace tools when the curated list has been
-          // bumped, so every existing profile picks up the new defaults.
-          const needsToolsReset = parsed._toolsVersion !== TOOLS_VERSION;
+          // bumped, OR when we detect any name from the previous default list.
+          const needsToolsReset =
+            parsed._toolsVersion !== TOOLS_VERSION ||
+            userToolsAreStale(parsed.userTools);
           const userTools =
             !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
               ? parsed.userTools
@@ -591,7 +610,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       const raw = localStorage.getItem(storageKeyFor(p.id));
       if (raw) {
         const parsed = JSON.parse(raw);
-        const needsToolsReset = parsed._toolsVersion !== TOOLS_VERSION;
+        const needsToolsReset =
+          parsed._toolsVersion !== TOOLS_VERSION ||
+          userToolsAreStale(parsed.userTools);
         const userTools =
           !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
             ? parsed.userTools
