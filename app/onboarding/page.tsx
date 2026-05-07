@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { useRumbo } from "@/lib/store";
 import { OnboardingData } from "@/lib/types";
@@ -239,14 +239,39 @@ function Money({
   symbol: string;
   onEnter?: () => void;
 }) {
+  // Internal string state so the user can fully clear the field. Showing a
+  // bound `0` made it impossible to delete the leading zero — typing in front
+  // of it produced things like "0500" that the user couldn't fix. With a
+  // string buffer empty input is allowed and simply means "still 0".
+  const [text, setText] = useState<string>(
+    Number.isFinite(value) && value > 0 ? String(value) : ""
+  );
+
+  // If the parent's value changes from outside (e.g. moving between steps),
+  // reflect it. We don't sync when the user is mid-typing because that would
+  // re-introduce the same fight-the-input problem.
+  useEffect(() => {
+    const incoming = Number.isFinite(value) && value > 0 ? String(value) : "";
+    setText((prev) => (Number(prev) === value ? prev : incoming));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
   return (
     <div className="relative">
       <input
-        type="number"
+        type="text"
         inputMode="numeric"
+        pattern="[0-9]*"
         className="input text-3xl font-semibold w-full pr-12 py-4"
-        value={Number.isFinite(value) ? value : 0}
-        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        placeholder="0"
+        value={text}
+        onChange={(e) => {
+          // Strip everything that isn't a digit. Also strip any leading zeros
+          // so "05000" auto-corrects to "5000" (handles paste + bad input).
+          const cleaned = e.target.value.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "");
+          setText(cleaned);
+          onChange(cleaned === "" ? 0 : Number(cleaned));
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && onEnter) onEnter();
         }}
