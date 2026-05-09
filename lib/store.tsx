@@ -235,10 +235,16 @@ export function RumboProvider({ children }: { children: ReactNode }) {
             !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
               ? parsed.userTools
               : buildDefaultUserTools(p.user_id);
+          const onboardingDone = Boolean(
+            parsed.onboarding &&
+            parsed.onboarding.total_target > 0 &&
+            parsed.onboarding.monthly_target > 0
+          );
           setState({
             ...defaultState,
             ...parsed,
             userTools,
+            onboardingDone,
             prioritizing: false,
             aiSource: parsed.aiSource ?? "idle",
             syncStatus: supabaseEnabled ? "syncing" : "offline",
@@ -386,7 +392,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       snapshots: mergedSnapshots,
       userTools: mergedUserTools,
       onboarding: mergedOnboarding,
-      onboardingDone: Boolean(mergedOnboarding) || s.onboardingDone,
+      onboardingDone: Boolean(
+        mergedOnboarding &&
+        mergedOnboarding.total_target > 0 &&
+        mergedOnboarding.monthly_target > 0
+      ),
       user: {
         ...mockUser,
         id: p.user_id,
@@ -638,10 +648,16 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
             ? parsed.userTools
             : buildDefaultUserTools(p.user_id);
+        const onboardingDone = Boolean(
+          parsed.onboarding &&
+          parsed.onboarding.total_target > 0 &&
+          parsed.onboarding.monthly_target > 0
+        );
         setState({
           ...defaultState,
           ...parsed,
           userTools,
+          onboardingDone,
           prioritizing: false,
           aiSource: parsed.aiSource ?? "idle",
           syncStatus: supabaseEnabled ? "syncing" : "offline",
@@ -1074,9 +1090,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   const updateOnboarding: RumboContext["updateOnboarding"] = useCallback(
     (patch) => {
-      setState((s) => ({
-        ...s,
-        onboarding: {
+      setState((s) => {
+        const nextOnboarding = {
           name: s.onboarding?.name ?? "",
           current_money: s.onboarding?.current_money ?? 0,
           total_target: s.onboarding?.total_target ?? 0,
@@ -1085,9 +1100,17 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           target_date:
             s.onboarding?.target_date ?? new Date().toISOString(),
           ...patch,
-        },
-        onboardingDone: true,
-      }));
+        };
+        const hasTargets = Boolean(
+          nextOnboarding.total_target > 0 &&
+          nextOnboarding.monthly_target > 0
+        );
+        return {
+          ...s,
+          onboarding: nextOnboarding,
+          onboardingDone: hasTargets,
+        };
+      });
     },
     []
   );

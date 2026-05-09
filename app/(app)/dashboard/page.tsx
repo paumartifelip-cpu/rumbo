@@ -24,7 +24,13 @@ export default function DashboardPage() {
 
   // Show the big welcome CTA when there's no onboarding data — this happens on
   // a brand-new profile OR right after "Borrar todos mis datos".
-  const isFresh = !onboarding;
+  // It is also shown if the core financial objectives/targets are missing or 0.
+  const isFresh =
+    !onboarding ||
+    !onboarding.total_target ||
+    onboarding.total_target === 0 ||
+    !onboarding.monthly_target ||
+    onboarding.monthly_target === 0;
 
   return (
     <div className="max-w-6xl mx-auto">
