@@ -8,6 +8,7 @@ import { SpendingTrend } from "@/components/SpendingTrend";
 import { SpendingDonut } from "@/components/SpendingDonut";
 import { DailyExpensesChart } from "@/components/DailyExpensesChart";
 import { Reveal } from "@/components/Reveal";
+import { AddExpenseSheet } from "@/components/AddExpenseSheet";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
@@ -108,6 +109,7 @@ export default function GastosPage() {
   const format = useFormatMoney();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const { today, month, isCurrentMonth } = useDateLabels(selectedDate);
+  const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState<{
     title: string;
     amount: number | "";
@@ -179,26 +181,28 @@ export default function GastosPage() {
   return (
     <div>
       <PageHeader title="Gastos" subtitle={`Todo lo que añadas cuenta para ${month}.`} />
-      <div className="flex items-center gap-4 -mt-2 mb-6">
+      <div className="flex items-center gap-2 -mt-2 mb-6">
         <button
           onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1))}
-          className="p-2 -ml-2 rounded-lg hover:bg-slate-100 text-rumbo-muted hover:text-rumbo-ink transition-colors"
+          aria-label="Mes anterior"
+          className="w-11 h-11 -ml-2 flex items-center justify-center rounded-xl hover:bg-slate-100 text-rumbo-muted hover:text-rumbo-ink transition-colors active:scale-95"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         </button>
-        <div className="text-2xl md:text-3xl font-semibold capitalize tracking-tight flex-1">
+        <div className="text-xl md:text-3xl font-semibold capitalize tracking-tight flex-1 text-center md:text-left">
           {isCurrentMonth ? `📅 ${today}` : today}
         </div>
         <button
           onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1))}
-          className="p-2 -mr-2 rounded-lg hover:bg-slate-100 text-rumbo-muted hover:text-rumbo-ink transition-colors"
+          aria-label="Mes siguiente"
+          className="w-11 h-11 -mr-2 flex items-center justify-center rounded-xl hover:bg-slate-100 text-rumbo-muted hover:text-rumbo-ink transition-colors active:scale-95"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
         </button>
       </div>
 
-      {/* ── Add expense form ── */}
-      <Reveal>
+      {/* ── Add expense form (desktop only — móvil usa el FAB) ── */}
+      <Reveal className="hidden md:block">
         <Card className="mb-6 card-hover border-emerald-100 shadow-sm">
           <SectionTitle
             title="Añadir gasto"
@@ -215,7 +219,8 @@ export default function GastosPage() {
             <div className="relative">
               <input
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
+                step="0.01"
                 className="input pr-10"
                 placeholder="Cantidad"
                 value={form.amount}
@@ -352,7 +357,11 @@ export default function GastosPage() {
                               </div>
                               {isForeign && <div className="text-[10px] text-rumbo-muted">≈ {format(amountInPrimary(s))}</div>}
                             </div>
-                            <button onClick={() => removeFinance(s.id)} className="text-rumbo-muted hover:text-rose-600 text-xs p-1">✕</button>
+                            <button
+                              onClick={() => removeFinance(s.id)}
+                              aria-label={`Eliminar suscripción ${s.title}`}
+                              className="w-9 h-9 flex items-center justify-center rounded-lg text-rumbo-muted hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition"
+                            >✕</button>
                           </div>
                         </motion.div>
                       );
@@ -464,7 +473,11 @@ export default function GastosPage() {
                         <span className="text-rose-600 font-medium">-{formatCurrency(f.amount, entryCurrency)}</span>
                         {isForeign && <div className="text-[10px] text-rumbo-muted">≈ -{format(amountInPrimary(f))}</div>}
                       </div>
-                      <button onClick={() => removeFinance(f.id)} className="text-rumbo-muted hover:text-rose-600" aria-label="Eliminar">✕</button>
+                      <button
+                        onClick={() => removeFinance(f.id)}
+                        aria-label={`Eliminar gasto ${f.title}`}
+                        className="w-10 h-10 flex items-center justify-center rounded-lg text-rumbo-muted hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition"
+                      >✕</button>
                     </div>
                   </motion.div>
                 );
@@ -473,6 +486,23 @@ export default function GastosPage() {
           )}
         </Card>
       </Reveal>
+
+      {/* FAB móvil — primary action siempre al alcance del pulgar */}
+      <button
+        type="button"
+        onClick={() => setAddOpen(true)}
+        aria-label="Añadir gasto"
+        className="md:hidden fixed right-4 z-40 w-14 h-14 rounded-full bg-emerald-500 text-white text-3xl flex items-center justify-center shadow-[0_12px_28px_-6px_rgba(16,185,129,0.6)] active:scale-95 hover:bg-emerald-600 transition"
+        style={{ bottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}
+      >
+        <span aria-hidden="true" className="-mt-1 leading-none">+</span>
+      </button>
+
+      <AddExpenseSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        date={selectedDate}
+      />
     </div>
   );
 }

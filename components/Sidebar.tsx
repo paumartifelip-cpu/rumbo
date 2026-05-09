@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "./Logo";
+import { MoreSheet } from "./MoreSheet";
 import { cn } from "@/lib/utils";
 import { useRumbo } from "@/lib/store";
 
@@ -115,6 +117,8 @@ function SyncDot({ status }: { status: string }) {
   const cfg = map[status] ?? map.idle;
   return (
     <span
+      role="status"
+      aria-label={cfg.title}
       title={cfg.title}
       className={`inline-block w-2 h-2 rounded-full ${cfg.color}`}
     />
@@ -124,15 +128,19 @@ function SyncDot({ status }: { status: string }) {
 export function MobileHeader() {
   const { profile, syncStatus } = useRumbo();
   return (
-    <header className="md:hidden flex items-center justify-between px-6 py-4 bg-white border-b border-rumbo-line sticky top-0 z-50">
-      <Link href="/dashboard">
+    <header className="md:hidden flex items-center justify-between px-5 py-3 bg-white/85 backdrop-blur-md border-b border-rumbo-line sticky top-0 z-50">
+      <Link href="/dashboard" aria-label="Inicio">
         <Logo size="sm" />
       </Link>
-      
+
       {profile && (
         <div className="flex items-center gap-3">
           <SyncDot status={syncStatus} />
-          <Link href="/settings" className={`w-8 h-8 rounded-full bg-gradient-to-br ${profile.color} flex items-center justify-center text-[10px] font-black text-white shadow-sm ring-2 ring-white`}>
+          <Link
+            href="/settings"
+            aria-label={`Ajustes — ${profile.name}`}
+            className={`w-10 h-10 rounded-full bg-gradient-to-br ${profile.color} flex items-center justify-center text-xs font-bold text-white shadow-sm ring-2 ring-white active:scale-95 transition`}
+          >
             {profile.initials}
           </Link>
         </div>
@@ -141,40 +149,85 @@ export function MobileHeader() {
   );
 }
 
-// Mobile bottom nav shows all items to maintain consistency with desktop.
-const MOBILE_ITEMS = ["/dashboard", "/money", "/tasks", "/goals", "/stack", "/settings"];
+// Mobile tab bar — 5 items max, like Apple HIG. The "Más" tab opens a sheet
+// with the secondary destinations instead of cramming them all in.
+const MOBILE_TABS = [
+  { href: "/dashboard", label: "Inicio",  icon: "🏠", chip: "bg-amber-100"   },
+  { href: "/money",     label: "Dinero",  icon: "💸", chip: "bg-lime-100"    },
+  { href: "/gastos",    label: "Gastos",  icon: "🧾", chip: "bg-cyan-100"    },
+  { href: "/tasks",     label: "Tareas",  icon: "✅", chip: "bg-emerald-100" },
+];
+
+const MORE_PATHS = ["/goals", "/stack", "/settings"];
 
 export function MobileNav() {
   const pathname = usePathname();
-  const mobileItems = items.filter((it) => MOBILE_ITEMS.includes(it.href));
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive = MORE_PATHS.some((p) => pathname?.startsWith(p));
+
   return (
-    <nav
-      className="md:hidden fixed left-2 right-2 bg-white/90 backdrop-blur-md border border-rumbo-line rounded-2xl shadow-2xl p-1 flex justify-between z-50"
-      style={{ bottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
-    >
-      {mobileItems.map((it) => {
-        const active = pathname?.startsWith(it.href);
-        return (
-          <Link
-            key={it.href}
-            href={it.href}
+    <>
+      <nav
+        aria-label="Navegación principal"
+        className="md:hidden fixed left-0 right-0 bg-white/90 backdrop-blur-md border-t border-rumbo-line flex justify-around z-50"
+        style={{
+          bottom: 0,
+          paddingBottom: "max(0.25rem, env(safe-area-inset-bottom))",
+          paddingTop: "0.25rem",
+        }}
+      >
+        {MOBILE_TABS.map((it) => {
+          const active = pathname?.startsWith(it.href);
+          return (
+            <Link
+              key={it.href}
+              href={it.href}
+              aria-label={it.label}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                "flex flex-col items-center justify-center flex-1 min-h-[56px] py-1 rounded-xl text-[10px] font-medium transition-colors duration-200 active:scale-95",
+                active ? "text-rumbo-ink" : "text-rumbo-muted"
+              )}
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "w-9 h-9 rounded-xl flex items-center justify-center text-lg leading-none mb-0.5 transition-colors",
+                  active ? it.chip : "bg-transparent"
+                )}
+              >
+                {it.icon}
+              </span>
+              <span>{it.label}</span>
+            </Link>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setMoreOpen(true)}
+          aria-label="Más opciones"
+          aria-expanded={moreOpen}
+          aria-haspopup="dialog"
+          className={cn(
+            "flex flex-col items-center justify-center flex-1 min-h-[56px] py-1 rounded-xl text-[10px] font-medium transition-colors duration-200 active:scale-95",
+            moreActive || moreOpen ? "text-rumbo-ink" : "text-rumbo-muted"
+          )}
+        >
+          <span
+            aria-hidden="true"
             className={cn(
-              "flex flex-col items-center justify-center flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all duration-300 min-w-0 active:scale-90",
-              active
-                ? "bg-rumbo-ink text-white shadow-lg scale-110 -translate-y-1"
-                : "text-rumbo-muted hover:text-rumbo-ink"
+              "w-9 h-9 rounded-xl flex items-center justify-center text-lg leading-none mb-0.5 transition-colors",
+              moreActive || moreOpen ? "bg-slate-100" : "bg-transparent"
             )}
           >
-            <span className={cn(
-              "w-7 h-7 rounded-lg flex items-center justify-center text-base leading-none mb-0.5",
-              active ? "bg-white/15" : it.chip
-            )}>
-              {it.icon}
-            </span>
-            <span className="opacity-80">{it.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
+            •••
+          </span>
+          <span>Más</span>
+        </button>
+      </nav>
+
+      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
+    </>
   );
 }
