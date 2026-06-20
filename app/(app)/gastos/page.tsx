@@ -24,6 +24,14 @@ const QUICK_CATS = [
 
 type QuickCat = (typeof QUICK_CATS)[number]["key"] | null;
 
+// Icon for any category name (covers quick cats + heuristic categories + fallback)
+const CAT_ICONS: Record<string, string> = {
+  Comida: "🍽️", Transporte: "🚗", Trabajo: "💼", Alojamiento: "🏠", Otros: "📦",
+  Ocio: "🎮", Salud: "💊", Compras: "🛍️", Suscripciones: "🔁", Servicios: "🔧",
+  Educación: "📚", Viajes: "✈️", "Sin categoría": "🏷️",
+};
+const catIcon = (name: string) => CAT_ICONS[name] ?? "🏷️";
+
 // ─── Inline category picker for existing entries ──────────────────────────────
 function CategoryPicker({
   current,
@@ -118,6 +126,9 @@ export default function GastosPage() {
 
   const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
   const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([]);
+  const [openCats, setOpenCats] = useState<string[]>([]);
+  const toggleCat = (name: string) =>
+    setOpenCats((o) => (o.includes(name) ? o.filter((x) => x !== name) : [...o, name]));
 
   useEffect(() => {
     setForm((f) => ({ ...f, currency: primaryCurrency }));
@@ -182,6 +193,24 @@ export default function GastosPage() {
       map.set(k, (map.get(k) ?? 0) + amountInPrimary(f));
     });
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  }, [thisMonth, amountInPrimary]);
+
+  // Movements grouped into collapsible categories, each sorted by date (newest first)
+  const expenseGroups = useMemo(() => {
+    const map = new Map<string, typeof thisMonth>();
+    thisMonth.forEach((f) => {
+      const k = f.category || "Sin categoría";
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(f);
+    });
+    return Array.from(map.entries())
+      .map(([name, items]) => ({
+        name,
+        items: [...items].sort((a, b) => +new Date(b.date) - +new Date(a.date)),
+        total: items.reduce((acc, f) => acc + amountInPrimary(f), 0),
+        count: items.length,
+      }))
+      .sort((a, b) => b.total - a.total);
   }, [thisMonth, amountInPrimary]);
 
   const subscriptions = useMemo(() => {
@@ -512,63 +541,103 @@ export default function GastosPage() {
           {thisMonth.length === 0 ? (
             <EmptyState icon="🧾" title="Sin gastos este mes" description="Apunta el primero arriba." />
           ) : (
-            <AnimatePresence>
-              {thisMonth.map((f) => {
-                const entryCurrency = f.currency ?? primaryCurrency;
-                const isForeign = entryCurrency !== primaryCurrency;
+            <div className="mt-2 flex flex-col gap-2.5">
+              {expenseGroups.map((g) => {
+                const open = openCats.includes(g.name);
                 return (
-                  <motion.div
-                    key={f.id}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center justify-between py-3 border-b last:border-0 border-rumbo-line group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedMoveIds.includes(f.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedMoveIds([...selectedMoveIds, f.id]);
-                          } else {
-                            setSelectedMoveIds(selectedMoveIds.filter((id) => id !== f.id));
-                          }
-                        }}
-                        className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
-                      />
-                      <div className="min-w-0">
-                        <div className="font-medium truncate flex items-center gap-1.5">
-                          {f.title}
-                          {f.recurrence && <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-rumbo-muted">
-                          <span>{formatDate(f.date)}</span>
-                          <span>·</span>
-                          <CategoryPicker
-                            current={f.category}
-                            onChange={(cat) => updateFinance(f.id, { category: cat })}
-                          />
-                        </div>
+                  <div key={g.name} className="border border-rumbo-line rounded-2xl overflow-hidden bg-white">
+                    {/* Category header — tap to expand */}
+                    <button
+                      onClick={() => toggleCat(g.name)}
+                      aria-expanded={open}
+                      className="w-full flex items-center gap-3 px-3.5 py-3 text-left hover:bg-slate-50 transition-colors active:scale-[0.99]"
+                    >
+                      <span className="text-xl leading-none shrink-0">{catIcon(g.name)}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-rumbo-ink capitalize truncate">{g.name}</div>
+                        <div className="text-xs text-rumbo-muted">{g.count} {g.count === 1 ? "gasto" : "gastos"}</div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-2">
-                      <div className="text-right">
-                        <span className="text-rose-600 font-medium">-{formatCurrency(f.amount, entryCurrency)}</span>
-                        {isForeign && <div className="text-[10px] text-rumbo-muted">≈ -{format(amountInPrimary(f))}</div>}
-                      </div>
-                      <button
-                        onClick={() => deleteMovementCascade(f.id)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
-                        aria-label={`Eliminar gasto ${f.title}`}
+                      <span className="font-bold text-rose-600 tabular-nums shrink-0">-{format(g.total)}</span>
+                      <svg
+                        width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                        className={`shrink-0 text-rumbo-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
                       >
-                        ✕
-                      </button>
-                    </div>
-                  </motion.div>
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </button>
+
+                    {/* Expanded list — gastos ordenados por fecha */}
+                    <AnimatePresence initial={false}>
+                      {open && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.22, ease: "easeInOut" }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-3.5 pb-1 border-t border-rumbo-line">
+                            {g.items.map((f) => {
+                              const entryCurrency = f.currency ?? primaryCurrency;
+                              const isForeign = entryCurrency !== primaryCurrency;
+                              return (
+                                <div
+                                  key={f.id}
+                                  className="flex items-center justify-between py-2.5 border-b last:border-0 border-rumbo-line/70 group"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedMoveIds.includes(f.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedMoveIds([...selectedMoveIds, f.id]);
+                                        } else {
+                                          setSelectedMoveIds(selectedMoveIds.filter((id) => id !== f.id));
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors shrink-0"
+                                    />
+                                    <div className="min-w-0">
+                                      <div className="font-medium truncate flex items-center gap-1.5">
+                                        {f.title}
+                                        {f.recurrence && <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs text-rumbo-muted">
+                                        <span>{formatDate(f.date)}</span>
+                                        <span>·</span>
+                                        <CategoryPicker
+                                          current={f.category}
+                                          onChange={(cat) => updateFinance(f.id, { category: cat })}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 shrink-0 ml-2">
+                                    <div className="text-right">
+                                      <span className="text-rose-600 font-medium">-{formatCurrency(f.amount, entryCurrency)}</span>
+                                      {isForeign && <div className="text-[10px] text-rumbo-muted">≈ -{format(amountInPrimary(f))}</div>}
+                                    </div>
+                                    <button
+                                      onClick={() => deleteMovementCascade(f.id)}
+                                      className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
+                                      aria-label={`Eliminar gasto ${f.title}`}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 );
               })}
-            </AnimatePresence>
+            </div>
           )}
         </Card>
       </Reveal>
