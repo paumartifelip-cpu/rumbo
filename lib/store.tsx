@@ -71,6 +71,31 @@ const addTombstones = (existing: string[] | undefined, ...ids: string[]): string
   return merged.length > TOMBSTONE_CAP ? merged.slice(merged.length - TOMBSTONE_CAP) : merged;
 };
 
+// Order-independent content signature of a list. Used to detect when a remote
+// pull carries the exact same data we already have, so we can skip replacing
+// state entirely. This is what prevents the UI from flickering / reordering
+// every time the 30s poll or a realtime echo fires with unchanged data.
+function listSignature(arr: Array<Record<string, any>>): string {
+  return arr
+    .map((x) =>
+      [
+        x.id, x.title, x.amount, x.currency, x.category, x.date, x.type,
+        x.recurrence, x.last_generated_date, x.status, x.progress,
+        x.current_amount, x.target_amount, x.deadline, x.importance,
+        x.total, x.note, x.name, x.cost, x.rating, x.icon, x.is_favorite,
+        x.highlight, x.order_index, x.updated_at,
+      ].join("")
+    )
+    .sort()
+    .join("");
+}
+
+const onboardingSignature = (o?: OnboardingData): string =>
+  o
+    ? [o.name, o.current_money, o.total_target, o.current_monthly_income,
+       o.monthly_target, o.income_type, o.target_date].join("|")
+    : "";
+
 interface RumboContext extends RumboState {
   profile: Profile | null;
   signIn: (profileId: string) => void;
@@ -398,6 +423,43 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       mergedUserTools.length > (remote.userTools || []).length ||
       currencyMissingOnRemote;
 
+    // Idempotency guard: if a list's content is identical to what we already
+    // hold, keep the SAME array reference. This stops every consumer's useMemo
+    // from recomputing and prevents the list from visually reordering/flickering
+    // on each poll or realtime echo. Only genuinely-changed lists get new refs.
+    const goalsUnchanged = listSignature(cur.goals) === listSignature(mergedGoals);
+    const tasksUnchanged = listSignature(cur.tasks) === listSignature(mergedTasks);
+    const financesUnchanged = listSignature(cur.finances) === listSignature(mergedFinances);
+    const snapshotsUnchanged = listSignature(cur.snapshots) === listSignature(mergedSnapshots);
+    const toolsUnchanged = listSignature(cur.userTools || []) === listSignature(mergedUserTools);
+    const onboardingUnchanged = onboardingSignature(cur.onboarding) === onboardingSignature(mergedOnboarding);
+    const nextCurrency = remote.primaryCurrency ?? cur.primaryCurrency;
+    const currencyUnchanged = nextCurrency === cur.primaryCurrency;
+
+    const nextGoals = goalsUnchanged ? cur.goals : mergedGoals;
+    const nextTasks = tasksUnchanged ? cur.tasks : mergedTasks;
+    const nextFinances = financesUnchanged ? cur.finances : mergedFinances;
+    const nextSnapshots = snapshotsUnchanged ? cur.snapshots : mergedSnapshots;
+    const nextUserTools = toolsUnchanged ? (cur.userTools || []) : mergedUserTools;
+
+    const nothingChanged =
+      goalsUnchanged && tasksUnchanged && financesUnchanged &&
+      snapshotsUnchanged && toolsUnchanged && onboardingUnchanged &&
+      currencyUnchanged && !localAddedItems;
+
+    if (nothingChanged) {
+      // Pure no-op pull: don't touch any data array (no re-render churn). Just
+      // record that we're synced. Note we must NOT set justPulledRef here — no
+      // data changed, so the push effect won't run, and leaving it set would
+      // wrongly suppress the user's next real save.
+      setState((s) =>
+        s.syncStatus === "synced" && s.lastSyncAt
+          ? s
+          : { ...s, syncStatus: "synced", lastSyncAt: new Date().toISOString() }
+      );
+      return;
+    }
+
     justPulledRef.current = true;
     // If the remote profile has a primary_currency, adopt it (and keep the
     // local profile cache in sync so currency picks survive without Supabase).
@@ -417,11 +479,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }
     setState((s) => ({
       ...s,
-      goals: mergedGoals,
-      tasks: mergedTasks,
-      finances: mergedFinances,
-      snapshots: mergedSnapshots,
-      userTools: mergedUserTools,
+      goals: nextGoals,
+      tasks: nextTasks,
+      finances: nextFinances,
+      snapshots: nextSnapshots,
+      userTools: nextUserTools,
       onboarding: mergedOnboarding,
       onboardingDone: Boolean(
         mergedOnboarding &&
