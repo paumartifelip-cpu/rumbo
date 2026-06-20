@@ -56,7 +56,20 @@ interface RumboState {
   syncStatus: "idle" | "syncing" | "synced" | "offline" | "error";
   lastSyncAt?: string;
   primaryCurrency: Currency;
+  /**
+   * Tombstones: ids of rows the user has deleted locally. Prevents a racing
+   * remote pull from resurrecting them before the delete is pushed, and stops
+   * recurring generation from recreating a deleted instance. Capped to the
+   * most recent entries so it can't grow unbounded.
+   */
+  deletedIds: string[];
 }
+
+const TOMBSTONE_CAP = 2000;
+const addTombstones = (existing: string[] | undefined, ...ids: string[]): string[] => {
+  const merged = [...(existing ?? []), ...ids];
+  return merged.length > TOMBSTONE_CAP ? merged.slice(merged.length - TOMBSTONE_CAP) : merged;
+};
 
 interface RumboContext extends RumboState {
   profile: Profile | null;
@@ -196,6 +209,7 @@ const defaultState: RumboState = {
   aiSource: "idle",
   syncStatus: supabaseEnabled ? "idle" : "offline",
   primaryCurrency: "EUR",
+  deletedIds: [],
 };
 
 const Ctx = createContext<RumboContext | null>(null);
@@ -284,14 +298,20 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   function applyRemote(p: Profile, remote: SyncSnapshot) {
     const cur = stateRef.current;
+    // Rows the user deleted locally must never be re-added by a racing pull,
+    // even if the remote still has them (the delete push may not have landed).
+    const tombstoned = new Set(cur.deletedIds ?? []);
     // Merge by id: remote items are authoritative, but any local items not
     // yet on the server are preserved (so a device with offline-only history
     // doesn't get wiped the first time it syncs). Edits to the same id keep
     // the remote version; pure-local items survive.
     const mergeById = <T extends { id: string; created_at?: string }>(local: T[], rem: T[]): T[] => {
       const map = new Map<string, T>();
-      // Remote is authoritative for IDs it knows about
-      for (const r of rem) map.set(r.id, r);
+      // Remote is authoritative for IDs it knows about — except tombstoned ones.
+      for (const r of rem) {
+        if (tombstoned.has(r.id)) continue;
+        map.set(r.id, r);
+      }
       // Preserve local items not yet on the server:
       // - if we've never synced (no lastSyncAt), keep all local items
       // - if we have synced, keep local items created AFTER the last sync
@@ -321,7 +341,10 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const mergeToolsByUpdated = (local: UserTool[], rem: UserTool[]): UserTool[] => {
       const map = new Map<string, UserTool>();
       const ts = (t: UserTool) => t.updated_at || t.created_at || "";
-      for (const r of rem) map.set(r.id, r);
+      for (const r of rem) {
+        if (tombstoned.has(r.id)) continue;
+        map.set(r.id, r);
+      }
       for (const l of local) {
         const r = map.get(l.id);
         if (!r) {
@@ -437,6 +460,36 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       const todayStr = now.toISOString().slice(0, 10);
       const thisMonthStr = todayStr.slice(0, 7);
 
+      // Deterministic id for a generated recurring finance instance. Using a
+      // stable key (parent id + period) instead of a random uid makes
+      // regeneration idempotent: running the generator twice — or on two
+      // devices — produces the SAME id, so an upsert overwrites instead of
+      // creating a duplicate. This is what prevents the double/triple counting.
+      const tombstoned = new Set(s.deletedIds ?? []);
+      const existingFinanceIds = new Set(newFinances.map((f) => f.id));
+      // Logical signature guards against duplicating a row that already exists
+      // under a different (legacy random) id for the same month/amount/title.
+      const financeSig = (f: { type: string; title: string; amount: number; date: string }) =>
+        `${f.type}|${f.title}|${f.amount}|${f.date.slice(0, 10)}`;
+      const existingFinanceSigs = new Set(newFinances.map(financeSig));
+      const recurringChildId = (parentId: string, period: string) =>
+        `${parentId}__rec__${period}`;
+      const pushFinanceInstance = (instance: FinancialEntry) => {
+        // Never recreate something the user deleted, and never duplicate an
+        // instance that already exists — by id OR by logical signature.
+        if (
+          tombstoned.has(instance.id) ||
+          existingFinanceIds.has(instance.id) ||
+          existingFinanceSigs.has(financeSig(instance))
+        ) {
+          return;
+        }
+        existingFinanceIds.add(instance.id);
+        existingFinanceSigs.add(financeSig(instance));
+        newFinances.push(instance);
+        hasNew = true;
+      };
+
       s.tasks.forEach((t) => {
         if (!t.recurrence) return;
         const lastGen = t.last_generated_date ? t.last_generated_date.slice(0, 10) : t.created_at.slice(0, 10);
@@ -520,6 +573,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
             const idx = newFinances.findIndex(x => x.id === f.id);
             if (idx >= 0) {
               newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
+              hasNew = true;
             }
             missedMonths.forEach((monthStr) => {
               const origDate = new Date(f.date);
@@ -531,15 +585,14 @@ export function RumboProvider({ children }: { children: ReactNode }) {
               const lastDay = new Date(genYear, genMonth, 0).getDate();
               genDate.setDate(Math.min(origDay, lastDay));
 
-              newFinances.push({
+              pushFinanceInstance({
                 ...financeWithoutRecurrence,
-                id: uid(),
+                id: recurringChildId(f.id, monthStr),
                 date: genDate.toISOString(),
                 amount_in_primary: currentPrimaryAmt,
                 created_at: now.toISOString(),
               });
             });
-            hasNew = true;
           }
         } else if (f.recurrence === "anual") {
           const lastYear = f.last_generated_date ? f.last_generated_date.slice(0, 4) : f.date.slice(0, 4);
@@ -550,6 +603,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
               const idx = newFinances.findIndex(x => x.id === f.id);
               if (idx >= 0) {
                 newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
+                hasNew = true;
               }
               missedYears.forEach((yearStr) => {
                 const origDate = new Date(f.date);
@@ -562,15 +616,14 @@ export function RumboProvider({ children }: { children: ReactNode }) {
                 const lastDay = new Date(genYear, origMonth + 1, 0).getDate();
                 genDate.setDate(Math.min(origDay, lastDay));
 
-                newFinances.push({
+                pushFinanceInstance({
                   ...financeWithoutRecurrence,
-                  id: uid(),
+                  id: recurringChildId(f.id, yearStr),
                   date: genDate.toISOString(),
                   amount_in_primary: currentPrimaryAmt,
                   created_at: now.toISOString(),
                 });
               });
-              hasNew = true;
             }
           }
         }
@@ -905,6 +958,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       ...s,
       goals: s.goals.filter((g) => g.id !== id),
       tasks: s.tasks.filter((t) => t.goal_id !== id),
+      deletedIds: addTombstones(
+        s.deletedIds,
+        id,
+        ...s.tasks.filter((t) => t.goal_id === id).map((t) => t.id)
+      ),
     }));
   }, []);
 
@@ -935,6 +993,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     setState((s) => ({
       ...s,
       tasks: s.tasks.filter((t) => t.id !== id),
+      deletedIds: addTombstones(s.deletedIds, id),
     }));
   }, []);
 
@@ -1007,6 +1066,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     setState((s) => ({
       ...s,
       finances: s.finances.filter((f) => f.id !== id),
+      deletedIds: addTombstones(s.deletedIds, id),
     }));
   }, []);
 
@@ -1031,6 +1091,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     setState((s) => ({
       ...s,
       snapshots: s.snapshots.filter((x) => x.id !== id),
+      deletedIds: addTombstones(s.deletedIds, id),
     }));
   }, []);
 
@@ -1062,6 +1123,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     setState((state) => ({
       ...state,
       userTools: state.userTools.filter((ut) => ut.id !== id),
+      deletedIds: addTombstones(state.deletedIds, id),
     }));
   }, []);
 
