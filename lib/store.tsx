@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { aiCategorize, aiPrioritize, heuristicCategorize } from "./gemini";
+import { heuristicCategorize } from "./gemini";
 import {
   convertAmount,
   Currency,
@@ -87,6 +87,7 @@ interface RumboContext extends RumboState {
   setPrimaryCurrency: (c: Currency) => void;
   /** Returns the entry's amount converted into the user's primary currency. */
   amountInPrimary: (entry: FinancialEntry) => number;
+  adjustedBaseSalary: (monthKey: string) => number;
 }
 
 const STORAGE_PREFIX = "rumbo_state_v5_";
@@ -472,34 +473,106 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         }
       });
 
+      const getMissedMonths = (lastGenStr: string, currentMonthStr: string): string[] => {
+        const result: string[] = [];
+        let [year, month] = lastGenStr.split("-").map(Number);
+        const [curYear, curMonth] = currentMonthStr.split("-").map(Number);
+        while (true) {
+          month++;
+          if (month > 12) {
+            month = 1;
+            year++;
+          }
+          if (year > curYear || (year === curYear && month > curMonth)) {
+            break;
+          }
+          result.push(`${year}-${String(month).padStart(2, "0")}`);
+        }
+        return result;
+      };
+
+      const getMissedYears = (lastGenStr: string, currentYearStr: string): string[] => {
+        const result: string[] = [];
+        let year = Number(lastGenStr);
+        const curYear = Number(currentYearStr);
+        while (true) {
+          year++;
+          if (year > curYear) {
+            break;
+          }
+          result.push(String(year));
+        }
+        return result;
+      };
+
       s.finances.forEach((f) => {
         if (!f.recurrence) return;
-        const lastGen = f.last_generated_date ? f.last_generated_date.slice(0, 7) : f.created_at.slice(0, 7);
-        let shouldGenerate = false;
         
-        if (f.recurrence === "mensual" && lastGen < thisMonthStr) {
-          shouldGenerate = true;
-        } else if (f.recurrence === "anual") {
-          const lastYear = f.last_generated_date ? f.last_generated_date.slice(0, 4) : f.created_at.slice(0, 4);
-          if (lastYear < todayStr.slice(0, 4)) shouldGenerate = true;
-        }
+        // Fallback to f.date instead of f.created_at so backdated recurring finances generate correctly
+        const lastGen = f.last_generated_date ? f.last_generated_date.slice(0, 7) : f.date.slice(0, 7);
+        const entryCurrency = f.currency ?? s.primaryCurrency;
+        const currentPrimaryAmt = convertAmount(f.amount, entryCurrency, s.primaryCurrency);
+        const { recurrence, last_generated_date, ...financeWithoutRecurrence } = f;
 
-        if (shouldGenerate) {
-          const idx = newFinances.findIndex(x => x.id === f.id);
-          if (idx >= 0) {
-            newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
+        if (f.recurrence === "mensual" && lastGen < thisMonthStr) {
+          const missedMonths = getMissedMonths(lastGen, thisMonthStr);
+          if (missedMonths.length > 0) {
+            const idx = newFinances.findIndex(x => x.id === f.id);
+            if (idx >= 0) {
+              newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
+            }
+            missedMonths.forEach((monthStr) => {
+              const origDate = new Date(f.date);
+              const origDay = origDate.getDate();
+              const [genYear, genMonth] = monthStr.split("-").map(Number);
+              const genDate = new Date(origDate);
+              genDate.setFullYear(genYear);
+              genDate.setMonth(genMonth - 1, 1);
+              const lastDay = new Date(genYear, genMonth, 0).getDate();
+              genDate.setDate(Math.min(origDay, lastDay));
+
+              newFinances.push({
+                ...financeWithoutRecurrence,
+                id: uid(),
+                date: genDate.toISOString(),
+                amount_in_primary: currentPrimaryAmt,
+                created_at: now.toISOString(),
+              });
+            });
+            hasNew = true;
           }
-          const entryCurrency = f.currency ?? s.primaryCurrency;
-          const currentPrimaryAmt = convertAmount(f.amount, entryCurrency, s.primaryCurrency);
-          const { recurrence, last_generated_date, ...financeWithoutRecurrence } = f;
-          newFinances.push({
-            ...financeWithoutRecurrence,
-            id: uid(),
-            date: now.toISOString(),
-            amount_in_primary: currentPrimaryAmt,
-            created_at: now.toISOString(),
-          });
-          hasNew = true;
+        } else if (f.recurrence === "anual") {
+          const lastYear = f.last_generated_date ? f.last_generated_date.slice(0, 4) : f.date.slice(0, 4);
+          const curYear = todayStr.slice(0, 4);
+          if (lastYear < curYear) {
+            const missedYears = getMissedYears(lastYear, curYear);
+            if (missedYears.length > 0) {
+              const idx = newFinances.findIndex(x => x.id === f.id);
+              if (idx >= 0) {
+                newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
+              }
+              missedYears.forEach((yearStr) => {
+                const origDate = new Date(f.date);
+                const origDay = origDate.getDate();
+                const origMonth = origDate.getMonth();
+                const genYear = Number(yearStr);
+                const genDate = new Date(origDate);
+                genDate.setFullYear(genYear);
+                genDate.setMonth(origMonth, 1);
+                const lastDay = new Date(genYear, origMonth + 1, 0).getDate();
+                genDate.setDate(Math.min(origDay, lastDay));
+
+                newFinances.push({
+                  ...financeWithoutRecurrence,
+                  id: uid(),
+                  date: genDate.toISOString(),
+                  amount_in_primary: currentPrimaryAmt,
+                  created_at: now.toISOString(),
+                });
+              });
+              hasNew = true;
+            }
+          }
         }
       });
 
@@ -709,6 +782,36 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const adjustedBaseSalary = useCallback((mKey: string) => {
+    const isEntrepreneur = stateRef.current.onboarding?.income_type === "empresario";
+    if (isEntrepreneur) return 0;
+    
+    const baseSalary = stateRef.current.onboarding?.current_monthly_income ?? 0;
+    if (baseSalary <= 0) return 0;
+
+    const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
+
+    // Check if there is any logged income in this month that represents the salary
+    const hasLoggedSalary = stateRef.current.finances.some((f) => {
+      if (f.type !== "ingreso") return false;
+      
+      const fDate = new Date(f.date);
+      const fKey = monthKey(fDate);
+      if (fKey !== mKey) return false;
+      
+      const title = f.title.toLowerCase();
+      const isSalaryTitle = title.includes("sueldo") || title.includes("nómina") || title.includes("nomina") || title.includes("salary") || title.includes("payroll");
+      
+      const from = f.currency ?? stateRef.current.primaryCurrency;
+      const amtInPrimary = convertAmount(f.amount, from, stateRef.current.primaryCurrency);
+      const isMatchingAmount = Math.abs(amtInPrimary - baseSalary) < 0.01;
+      
+      return isSalaryTitle || isMatchingAmount;
+    });
+
+    return hasLoggedSalary ? 0 : baseSalary;
+  }, []);
+
   const signOut = useCallback(() => {
     setCurrentProfileId(null);
     setProfile(null);
@@ -725,62 +828,23 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    setState((cur) => ({ ...cur, prioritizing: true }));
+    setState((cur) => ({ ...cur, prioritizing: false }));
 
-    const currentMoney =
-      (s.snapshots[s.snapshots.length - 1]?.total ??
-        s.onboarding?.current_money) ??
-      0;
-
-    let source: "openai" | "gemini" | "fallback" = "fallback";
-    let scores: Array<{ task_id: string; score: number; reason: string }> = [];
-    let advice = { today_focus: "", financial_advice: "" };
-
-    try {
-      const remote = await aiPrioritize(pending, s.goals, {
-        current_money: currentMoney,
-        monthly_target: s.onboarding?.monthly_target,
-      });
-      if (remote) {
-        source = remote.source;
-        scores = (remote.data.ordered_tasks ?? []).map((o) => ({
-          task_id: o.task_id,
-          score: o.priority_score,
-          reason: o.reason,
-        }));
-        advice = {
-          today_focus: remote.data.today_focus ?? "",
-          financial_advice: remote.data.financial_advice ?? "",
-        };
-      } else {
-        const local = localPrioritize(pending, s.goals);
-        scores = local.ordered.map((o) => ({
-          task_id: o.task.id,
-          score: o.score,
-          reason: o.reason,
-        }));
-        advice = {
-          today_focus: local.today_focus,
-          financial_advice: local.financial_advice,
-        };
-      }
-    } catch {
-      const local = localPrioritize(pending, s.goals);
-      scores = local.ordered.map((o) => ({
-        task_id: o.task.id,
-        score: o.score,
-        reason: o.reason,
-      }));
-      advice = {
-        today_focus: local.today_focus,
-        financial_advice: local.financial_advice,
-      };
-    }
+    const local = localPrioritize(pending, s.goals);
+    const scores = local.ordered.map((o) => ({
+      task_id: o.task.id,
+      score: o.score,
+      reason: o.reason,
+    }));
+    const advice = {
+      today_focus: local.today_focus,
+      financial_advice: local.financial_advice,
+    };
 
     setState((cur) => ({
       ...cur,
       prioritizing: false,
-      aiSource: source,
+      aiSource: "fallback",
       aiAdvice: advice,
       tasks: cur.tasks.map((t) => {
         const found = scores.find((x) => x.task_id === t.id);
@@ -911,6 +975,10 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     setState((s) => {
       const from = f.currency ?? s.primaryCurrency;
       const amount_in_primary = convertAmount(f.amount, from, s.primaryCurrency);
+      const finalCategory = f.type === "gasto" && !f.category
+        ? (heuristicCategorize(f.title) ?? "Otros")
+        : f.category;
+
       return {
         ...s,
         finances: [
@@ -919,46 +987,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
             ...f,
             id,
             amount_in_primary,
+            category: finalCategory,
             user_id: s.user.id,
             created_at: new Date().toISOString(),
           },
         ],
       };
     });
-
-    // AI categorization for expenses without a category.
-    if (f.type === "gasto" && !f.category) {
-      const existingCategories = Array.from(
-        new Set(
-          stateRef.current.finances
-            .filter((x) => x.type === "gasto" && x.category)
-            .map((x) => x.category as string)
-        )
-      );
-      aiCategorize({
-        title: f.title,
-        amount: f.amount,
-        existing_categories: existingCategories,
-      })
-        .then((cat) => {
-          const final = cat ?? heuristicCategorize(f.title) ?? "Otros";
-          setState((s) => ({
-            ...s,
-            finances: s.finances.map((x) =>
-              x.id === id ? { ...x, category: final } : x
-            ),
-          }));
-        })
-        .catch(() => {
-          const final = heuristicCategorize(f.title) ?? "Otros";
-          setState((s) => ({
-            ...s,
-            finances: s.finances.map((x) =>
-              x.id === id ? { ...x, category: final } : x
-            ),
-          }));
-        });
-    }
   }, []);
 
   const updateFinance: RumboContext["updateFinance"] = useCallback((id, patch) => {
@@ -1178,6 +1213,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       prioritize,
       setPrimaryCurrency,
       amountInPrimary,
+      adjustedBaseSalary,
     }),
     [
       state,
@@ -1208,6 +1244,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       prioritize,
       setPrimaryCurrency,
       amountInPrimary,
+      adjustedBaseSalary,
     ]
   );
 

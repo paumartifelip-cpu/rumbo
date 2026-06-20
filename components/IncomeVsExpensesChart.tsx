@@ -14,7 +14,7 @@ import {
 import { useFormatMoney, useRumbo } from "@/lib/store";
 
 export function IncomeVsExpensesChart() {
-  const { finances, amountInPrimary, onboarding } = useRumbo();
+  const { finances, amountInPrimary, onboarding, adjustedBaseSalary } = useRumbo();
   const formatMoney = useFormatMoney();
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
@@ -22,8 +22,6 @@ export function IncomeVsExpensesChart() {
   const data = useMemo(() => {
     const now = new Date();
     const buckets = [];
-    const isEntrepreneur = onboarding?.income_type === "empresario";
-    const baseSalary = isEntrepreneur ? 0 : (onboarding?.current_monthly_income ?? 0);
 
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -31,6 +29,8 @@ export function IncomeVsExpensesChart() {
       const label = d
         .toLocaleDateString("es-ES", { month: "short" })
         .replace(".", "");
+
+      const baseSalary = adjustedBaseSalary(key);
 
       const income = finances
         .filter((f) => f.type === "ingreso" && monthKey(new Date(f.date)) === key)
@@ -43,7 +43,7 @@ export function IncomeVsExpensesChart() {
       buckets.push({ label, ingresos: income, gastos: expenses });
     }
     return buckets;
-  }, [finances, amountInPrimary, onboarding]);
+  }, [finances, amountInPrimary, onboarding, adjustedBaseSalary]);
 
   return (
     <div className="h-96 mt-6">

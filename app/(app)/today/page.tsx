@@ -110,10 +110,7 @@ export default function TodayPage() {
             </h2>
             <div className="flex items-center gap-2 mt-2">
               <span className="chip bg-emerald-100 text-emerald-700">
-                Impacto {main.ai_priority_score ?? "—"}/100
-              </span>
-              <span className="chip bg-slate-100 text-rumbo-muted">
-                {aiSource === "gemini" ? "Gemini Flash" : "Local"}
+                Prioridad {main.ai_priority_score ?? "—"}/100
               </span>
             </div>
             {main.ai_reason && (
@@ -134,7 +131,7 @@ export default function TodayPage() {
         ) : (
           <div className="mt-3">
             <p className="text-rumbo-muted">
-              No tienes tareas. Crea la primera y la IA la puntuará al instante.
+              No tienes tareas. Crea la primera para empezar.
             </p>
             <Link href="/tasks" className="btn-primary mt-4 inline-flex">
               + Nueva tarea
@@ -152,7 +149,7 @@ export default function TodayPage() {
             <EmptyState
               icon="🎯"
               title="Aún no hay tareas"
-              description="Empieza creando una. Gemini la puntuará al momento."
+              description="Empieza creando una para hoy."
               action={
                 <Link href="/tasks" className="btn-primary">
                   + Nueva tarea
@@ -187,15 +184,8 @@ export default function TodayPage() {
               className="text-rumbo-ink"
             >
               {aiAdvice?.today_focus ??
-                "Cuando crees tareas, la IA te dirá qué hacer primero según lo que más te acerca a tus dos metas."}
+                "Cuando crees tareas, el sistema te recomendará qué hacer primero según lo que más te acerca a tus dos metas."}
             </motion.p>
-            <div className="text-[11px] text-rumbo-muted mt-3">
-              {aiSource === "gemini"
-                ? "Gemini 2.5 Flash"
-                : aiSource === "fallback"
-                ? "Heurística local (añade tu API key en Ajustes para activar Gemini)"
-                : "Sin datos aún"}
-            </div>
           </Card>
 
           {distractions.length > 0 && (

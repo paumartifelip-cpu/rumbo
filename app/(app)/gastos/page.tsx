@@ -58,9 +58,7 @@ function CategoryPicker({
         ) : current ? (
           <span>{current}</span>
         ) : (
-          <motion.span animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.2, repeat: Infinity }}>
-            clasificando…
-          </motion.span>
+          <span>sin categoría</span>
         )}
         <span className="opacity-0 group-hover:opacity-60 transition-opacity">✎</span>
       </button>
@@ -143,15 +141,9 @@ export default function GastosPage() {
   }, [thisMonth, amountInPrimary]);
 
   const subscriptions = useMemo(() => {
-    const seen = new Map<string, typeof finances[0]>();
-    finances
+    return finances
       .filter((f) => f.type === "gasto" && f.recurrence)
-      .sort((a, b) => +new Date(b.date) - +new Date(a.date))
-      .forEach((f) => {
-        const key = f.title.toLowerCase().trim();
-        if (!seen.has(key)) seen.set(key, f);
-      });
-    return Array.from(seen.values()).sort((a, b) => amountInPrimary(b) - amountInPrimary(a));
+      .sort((a, b) => amountInPrimary(b) - amountInPrimary(a));
   }, [finances, amountInPrimary]);
 
   const totalMonthlySubscriptions = useMemo(
@@ -206,7 +198,7 @@ export default function GastosPage() {
         <Card className="mb-6 card-hover border-emerald-100 shadow-sm">
           <SectionTitle
             title="Añadir gasto"
-            hint={form.category ? `Categoría: ${form.category}` : "Sin categoría → la IA la elige"}
+            hint={form.category ? `Categoría: ${form.category}` : "Sin categoría → se asigna por reglas"}
           />
           <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_120px_auto] gap-2">
             <input
@@ -267,7 +259,7 @@ export default function GastosPage() {
                 onClick={() => setForm({ ...form, category: null })}
                 className="px-3 py-1.5 rounded-full text-sm text-rumbo-muted hover:text-rose-600 transition-colors"
               >
-                Dejar que la IA decida ✦
+                Clasificación automática
               </button>
             )}
           </div>
@@ -358,10 +350,27 @@ export default function GastosPage() {
                               {isForeign && <div className="text-[10px] text-rumbo-muted">≈ {format(amountInPrimary(s))}</div>}
                             </div>
                             <button
-                              onClick={() => removeFinance(s.id)}
+                              onClick={() => {
+                                if (confirm(`¿Quieres eliminar la suscripción "${s.title}"?\nEsto también eliminará el cargo de este mes si ya fue generado.`)) {
+                                  removeFinance(s.id);
+                                  // Also search for any generated copies in finances that match this title for this month and delete them!
+                                  const generatedCopy = finances.find(
+                                    (f) =>
+                                      f.type === "gasto" &&
+                                      !f.recurrence &&
+                                      f.title.toLowerCase().trim() === s.title.toLowerCase().trim() &&
+                                      monthKey(new Date(f.date)) === currentKey
+                                  );
+                                  if (generatedCopy) {
+                                    removeFinance(generatedCopy.id);
+                                  }
+                                }
+                              }}
                               aria-label={`Eliminar suscripción ${s.title}`}
-                              className="w-9 h-9 flex items-center justify-center rounded-lg text-rumbo-muted hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition"
-                            >✕</button>
+                              className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
+                            >
+                              🗑️
+                            </button>
                           </div>
                         </motion.div>
                       );
@@ -474,10 +483,16 @@ export default function GastosPage() {
                         {isForeign && <div className="text-[10px] text-rumbo-muted">≈ -{format(amountInPrimary(f))}</div>}
                       </div>
                       <button
-                        onClick={() => removeFinance(f.id)}
+                        onClick={() => {
+                          if (confirm(`¿Quieres eliminar el gasto "${f.title}"?`)) {
+                            removeFinance(f.id);
+                          }
+                        }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
                         aria-label={`Eliminar gasto ${f.title}`}
-                        className="w-10 h-10 flex items-center justify-center rounded-lg text-rumbo-muted hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition"
-                      >✕</button>
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </motion.div>
                 );

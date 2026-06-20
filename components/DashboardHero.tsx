@@ -9,7 +9,7 @@ import { Reveal } from "./Reveal";
 import { useEffect, useState } from "react";
 
 export function DashboardHero() {
-  const { snapshots, onboarding, finances, amountInPrimary } = useRumbo();
+  const { snapshots, onboarding, finances, amountInPrimary, adjustedBaseSalary } = useRumbo();
   const formatMoney = useFormatMoney();
 
   const now = new Date();
@@ -23,9 +23,9 @@ export function DashboardHero() {
   const total = sortedSnaps[sortedSnaps.length - 1]?.total ?? onboarding?.current_money ?? 0;
 
   // 2. Cuanto he ganado al mes
-  const isEntrepreneur = onboarding?.income_type === "empresario";
+  const currentMonthKey = `${currentYear}-${currentMonth}`;
   const monthIncome =
-    (isEntrepreneur ? 0 : (onboarding?.current_monthly_income ?? 0)) +
+    adjustedBaseSalary(currentMonthKey) +
     finances
       .filter(
         (f) =>

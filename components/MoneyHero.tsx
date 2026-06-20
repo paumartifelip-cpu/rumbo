@@ -11,7 +11,7 @@ import {
 import { useFormatMoney, useRumbo } from "@/lib/store";
 
 export function MoneyHero() {
-  const { snapshots, onboarding, finances, amountInPrimary } = useRumbo();
+  const { snapshots, onboarding, finances, amountInPrimary, adjustedBaseSalary } = useRumbo();
   const formatMoney = useFormatMoney();
 
   const sortedSnaps = [...snapshots].sort(
@@ -24,9 +24,9 @@ export function MoneyHero() {
   const totalTarget = onboarding?.total_target ?? 0;
 
   const now = new Date();
-  const isEntrepreneur = onboarding?.income_type === "empresario";
+  const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
   const monthIncome =
-    (isEntrepreneur ? 0 : (onboarding?.current_monthly_income ?? 0)) +
+    adjustedBaseSalary(currentMonthKey) +
     finances
       .filter(
         (f) =>

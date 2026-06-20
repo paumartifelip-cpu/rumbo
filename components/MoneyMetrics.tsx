@@ -4,7 +4,7 @@ import { useFormatMoney, useRumbo } from "@/lib/store";
 import { ProgressBar } from "./Card";
 
 export function MoneyMetrics({ compact = false }: { compact?: boolean }) {
-  const { snapshots, onboarding, finances, amountInPrimary } = useRumbo();
+  const { snapshots, onboarding, finances, amountInPrimary, adjustedBaseSalary } = useRumbo();
   const formatMoney = useFormatMoney();
 
   const sortedSnaps = [...snapshots].sort(
@@ -17,9 +17,9 @@ export function MoneyMetrics({ compact = false }: { compact?: boolean }) {
 
   // Ingresos del mes actual a partir de movimientos en finances + sueldo base.
   const now = new Date();
-  const isEntrepreneur = onboarding?.income_type === "empresario";
+  const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
   const monthIncome =
-    (isEntrepreneur ? 0 : (onboarding?.current_monthly_income ?? 0)) +
+    adjustedBaseSalary(currentMonthKey) +
     finances
       .filter(
         (f) =>

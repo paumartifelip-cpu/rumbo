@@ -65,7 +65,7 @@ const SPECS: Spec[] = [
 ];
 
 export function CashflowHero({ selectedDate }: { selectedDate: Date }) {
-  const { finances, onboarding, amountInPrimary } = useRumbo();
+  const { finances, onboarding, amountInPrimary, adjustedBaseSalary } = useRumbo();
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
   const currentKey = monthKey(selectedDate);
@@ -73,10 +73,9 @@ export function CashflowHero({ selectedDate }: { selectedDate: Date }) {
   const cards = useMemo(
     () =>
       SPECS.map((spec) => {
-        const isEntrepreneur = onboarding?.income_type === "empresario";
         const baseSalary =
-          (spec.includeBaseSalary || spec.kind === "ahorro") && !isEntrepreneur
-            ? onboarding?.current_monthly_income ?? 0
+          (spec.includeBaseSalary || spec.kind === "ahorro")
+            ? adjustedBaseSalary(currentKey)
             : 0;
 
         const sumFor = (type: FinancialType, key: string) =>
@@ -102,8 +101,8 @@ export function CashflowHero({ selectedDate }: { selectedDate: Date }) {
               .toLocaleDateString("es-ES", { month: "short" })
               .replace(".", "");
             const base =
-              (spec.includeBaseSalary || spec.kind === "ahorro") && !onboarding?.income_type || onboarding?.income_type === "salariado"
-                ? onboarding?.current_monthly_income ?? 0
+              (spec.includeBaseSalary || spec.kind === "ahorro")
+                ? adjustedBaseSalary(key)
                 : 0;
             const total =
               spec.kind === "ahorro"
@@ -120,7 +119,7 @@ export function CashflowHero({ selectedDate }: { selectedDate: Date }) {
         return { spec, monthTotal, last6, delta };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [finances, onboarding, currentKey, amountInPrimary]
+    [finances, onboarding, currentKey, amountInPrimary, adjustedBaseSalary]
   );
 
   return (

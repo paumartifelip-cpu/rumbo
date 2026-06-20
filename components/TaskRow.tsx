@@ -117,15 +117,6 @@ export function TaskRow({
               🔁 {task.recurrence}
             </span>
           )}
-          {score === undefined && (
-            <motion.span
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-600 shrink-0"
-              animate={{ opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1.4, repeat: Infinity }}
-            >
-              Eval…
-            </motion.span>
-          )}
         </div>
       </div>
 
@@ -151,7 +142,7 @@ export function TaskRow({
             "text-[8px] sm:text-[9px] font-bold uppercase tracking-widest mt-0.5",
             done ? "text-slate-400" : isHighImpact ? "text-emerald-200" : isDistraction ? "text-rose-200" : "text-slate-500"
           )}>
-            Imp.
+            Prio.
           </div>
         </div>
       )}

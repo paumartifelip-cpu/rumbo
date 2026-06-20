@@ -24,6 +24,7 @@ export function MonthlyIncome() {
     onboarding,
     primaryCurrency,
     amountInPrimary,
+    adjustedBaseSalary,
   } = useRumbo();
   const format = useFormatMoney();
 
@@ -32,7 +33,6 @@ export function MonthlyIncome() {
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
   const currentKey = monthKey(now);
 
-  const baseSalary = onboarding?.current_monthly_income ?? 0;
   const monthlyTarget = onboarding?.monthly_target ?? 0;
 
   const thisMonthEntries = useMemo(
@@ -47,23 +47,16 @@ export function MonthlyIncome() {
     [finances, currentKey]
   );
 
-  // Recurring incomes logic (similar to subscriptions)
+  // Recurring incomes logic (simply list all with f.recurrence === "mensual", no title deduplication)
   const recurringIncomes = useMemo(() => {
-    const seen = new Map<string, typeof finances[0]>();
-    finances
+    return finances
       .filter((f) => f.type === "ingreso" && f.recurrence === "mensual")
-      .sort((a, b) => +new Date(b.date) - +new Date(a.date))
-      .forEach((f) => {
-        const key = f.title.toLowerCase().trim();
-        if (!seen.has(key)) seen.set(key, f);
-      });
-    return Array.from(seen.values()).sort(
-      (a, b) => amountInPrimary(b) - amountInPrimary(a)
-    );
+      .sort((a, b) => amountInPrimary(b) - amountInPrimary(a));
   }, [finances, amountInPrimary]);
 
+  const currentBaseSalary = adjustedBaseSalary(currentKey);
   const earnedThisMonth =
-    baseSalary +
+    currentBaseSalary +
     thisMonthEntries.reduce((a, b) => a + amountInPrimary(b), 0);
 
   const animated = useCounter(earnedThisMonth);
@@ -90,12 +83,12 @@ export function MonthlyIncome() {
           buckets.get(k)!.total += amountInPrimary(f);
         }
       });
-    if (baseSalary > 0) {
-      buckets.forEach((b) => (b.total += baseSalary));
-    }
+    buckets.forEach((val, k) => {
+      val.total += adjustedBaseSalary(k);
+    });
     return Array.from(buckets.values());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finances, baseSalary, amountInPrimary]);
+  }, [finances, amountInPrimary, adjustedBaseSalary]);
 
   const [form, setForm] = useState<{
     title: string;
@@ -164,9 +157,9 @@ export function MonthlyIncome() {
             </div>
           )}
 
-          {baseSalary > 0 && (
+          {currentBaseSalary > 0 && (
             <div className="text-[10px] text-rumbo-muted mt-6 inline-block px-3 py-1 bg-white/50 rounded-full border border-rumbo-line">
-              Incluye sueldo base de {format(baseSalary)}/mes
+              Incluye sueldo base de {format(currentBaseSalary)}/mes
             </div>
           )}
         </div>
@@ -286,11 +279,26 @@ export function MonthlyIncome() {
                         )}
                       </div>
                       <button
-                        onClick={() => removeFinance(s.id)}
-                        className="text-rumbo-muted hover:text-rose-600 text-xs p-1"
+                        onClick={() => {
+                          if (confirm(`¿Quieres eliminar el ingreso recurrente "${s.title}"?\nEsto también eliminará el movimiento de este mes si ya fue generado.`)) {
+                            removeFinance(s.id);
+                            // Also search for any generated copies in finances that match this title for this month and delete them!
+                            const generatedCopy = finances.find(
+                              (f) =>
+                                f.type === "ingreso" &&
+                                !f.recurrence &&
+                                f.title.toLowerCase().trim() === s.title.toLowerCase().trim() &&
+                                monthKey(new Date(f.date)) === currentKey
+                            );
+                            if (generatedCopy) {
+                              removeFinance(generatedCopy.id);
+                            }
+                          }
+                        }}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
                         aria-label="Eliminar ingreso recurrente"
                       >
-                        ✕
+                        🗑️
                       </button>
                     </div>
                   </motion.div>
@@ -339,11 +347,15 @@ export function MonthlyIncome() {
                       )}
                     </div>
                     <button
-                      onClick={() => removeFinance(f.id)}
-                      className="text-rumbo-muted hover:text-rose-600"
-                      aria-label="Eliminar"
+                      onClick={() => {
+                        if (confirm(`¿Quieres eliminar el ingreso "${f.title}"?`)) {
+                          removeFinance(f.id);
+                        }
+                      }}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
+                      aria-label="Eliminar ingreso"
                     >
-                      ✕
+                      🗑️
                     </button>
                   </div>
                 </motion.div>
