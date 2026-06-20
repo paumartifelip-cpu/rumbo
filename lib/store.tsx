@@ -467,10 +467,12 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       // creating a duplicate. This is what prevents the double/triple counting.
       const tombstoned = new Set(s.deletedIds ?? []);
       const existingFinanceIds = new Set(newFinances.map((f) => f.id));
-      // Logical signature guards against duplicating a row that already exists
-      // under a different (legacy random) id for the same month/amount/title.
+      // Month-level logical signature: a recurring instance must appear AT MOST
+      // ONCE per month. This guards against duplicating a row that already
+      // exists for the same month under a different (legacy random) id or on a
+      // slightly different day — the real cause of the recurring duplication.
       const financeSig = (f: { type: string; title: string; amount: number; date: string }) =>
-        `${f.type}|${f.title}|${f.amount}|${f.date.slice(0, 10)}`;
+        `${f.type}|${f.title.trim().toLowerCase()}|${f.amount}|${f.date.slice(0, 7)}`;
       const existingFinanceSigs = new Set(newFinances.map(financeSig));
       const recurringChildId = (parentId: string, period: string) =>
         `${parentId}__rec__${period}`;
