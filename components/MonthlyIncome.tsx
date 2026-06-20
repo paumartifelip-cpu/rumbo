@@ -47,12 +47,23 @@ export function MonthlyIncome() {
     [finances, currentKey]
   );
 
-  // Recurring incomes logic (simply list all with f.recurrence === "mensual", no title deduplication)
+  // Recurring incomes — deduped so the same one never shows twice.
   const recurringIncomes = useMemo(() => {
-    return finances
+    const seen = new Map<string, (typeof finances)[number]>();
+    finances
       .filter((f) => f.type === "ingreso" && f.recurrence === "mensual")
-      .sort((a, b) => amountInPrimary(b) - amountInPrimary(a));
-  }, [finances, amountInPrimary]);
+      .forEach((f) => {
+        const key = `${f.title.trim().toLowerCase()}|${f.amount}|${f.currency ?? primaryCurrency}`;
+        const prev = seen.get(key);
+        if (!prev || (f.created_at ?? "") < (prev.created_at ?? "")) seen.set(key, f);
+      });
+    return Array.from(seen.values()).sort((a, b) => amountInPrimary(b) - amountInPrimary(a));
+  }, [finances, amountInPrimary, primaryCurrency]);
+
+  const totalMonthlyRecurring = useMemo(
+    () => recurringIncomes.reduce((acc, f) => acc + amountInPrimary(f), 0),
+    [recurringIncomes, amountInPrimary]
+  );
 
   const currentBaseSalary = adjustedBaseSalary(currentKey);
   const earnedThisMonth =
@@ -221,7 +232,7 @@ export function MonthlyIncome() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_120px_auto] gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
           <div className="relative group">
             <input
               className="input bg-white group-hover:border-emerald-400 transition-colors pl-10"
@@ -251,26 +262,35 @@ export function MonthlyIncome() {
               {CURRENCIES[form.currency].symbol}
             </span>
           </div>
-          <select
-            className="input bg-white cursor-pointer hover:border-emerald-400 transition-colors font-medium"
-            value={form.currency}
-            onChange={(e) =>
-              setForm({ ...form, currency: e.target.value as Currency })
-            }
-            aria-label="Moneda"
-          >
-            {(Object.keys(CURRENCIES) as Currency[]).map((c) => (
-              <option key={c} value={c}>
-                {CURRENCIES[c].flag} {c}
-              </option>
-            ))}
-          </select>
           <button className="btn-primary bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200 px-8" onClick={submit}>
             + Guardar ingreso
           </button>
         </div>
 
-        <div className="mt-4 flex items-center gap-3 text-sm text-rumbo-muted">
+        {/* Moneda — botones (como categorías), no desplegable */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] uppercase tracking-wider text-rumbo-muted font-bold mr-1">Moneda</span>
+          {(Object.keys(CURRENCIES) as Currency[]).map((c) => {
+            const active = form.currency === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setForm({ ...form, currency: c })}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all active:scale-95 ${
+                  active
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                    : "bg-white text-rumbo-muted border-rumbo-line hover:border-emerald-400 hover:text-emerald-700"
+                }`}
+              >
+                <span>{CURRENCIES[c].flag}</span>
+                <span>{c}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 flex items-center gap-3 text-sm text-rumbo-muted">
           <label className="flex items-center gap-2 cursor-pointer group bg-white px-3 py-1.5 rounded-full border border-rumbo-line hover:border-emerald-400 transition-colors">
             <input
               type="checkbox"
@@ -284,83 +304,92 @@ export function MonthlyIncome() {
         </div>
       </div>
 
-      {/* Recurring Incomes Section */}
-      {recurringIncomes.length > 0 && (
-        <div className="mt-8 border-t border-rumbo-line pt-5">
-          <div className="flex justify-between items-center mb-2">
-            <SectionTitle 
-              title="Ingresos recurrentes activos" 
-              hint="Estos ingresos se repiten cada mes automáticamente."
-            />
-            {selectedSubIds.length > 0 && (
-              <button
-                onClick={deleteSelectedSubscriptions}
-                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1"
-              >
-                ✕ Eliminar ({selectedSubIds.length})
-              </button>
-            )}
+      {/* Ingresos recurrentes mensuales — apartado claro con bloques */}
+      <div className="mt-8 rounded-3xl border border-emerald-200 bg-emerald-50/40 p-5">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center text-xl shadow-lg shrink-0">🔁</span>
+            <div>
+              <h3 className="text-lg font-black tracking-tight">Ingresos recurrentes mensuales</h3>
+              <p className="text-xs text-rumbo-muted font-medium">
+                {recurringIncomes.length > 0
+                  ? `${format(totalMonthlyRecurring)}/mes garantizados · ${recurringIncomes.length} ${recurringIncomes.length === 1 ? "ingreso fijo" : "ingresos fijos"}`
+                  : "Marca un ingreso como 🔁 al añadirlo para verlo aquí."}
+              </p>
+            </div>
           </div>
-          <div className="grid gap-2">
+          {selectedSubIds.length > 0 && (
+            <button
+              onClick={deleteSelectedSubscriptions}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1 shrink-0"
+            >
+              ✕ Eliminar ({selectedSubIds.length})
+            </button>
+          )}
+        </div>
+
+        {recurringIncomes.length === 0 ? (
+          <div className="text-sm text-rumbo-muted py-4 text-center">
+            Aún no tienes ingresos recurrentes. Al añadir un ingreso, marca <span className="font-semibold">🔁 recurrente</span>.
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <AnimatePresence>
               {recurringIncomes.map((s) => {
                 const entryCurrency = s.currency ?? primaryCurrency;
                 const isForeign = entryCurrency !== primaryCurrency;
+                const selected = selectedSubIds.includes(s.id);
                 return (
                   <motion.div
                     key={s.id}
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line group"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.97 }}
+                    className={`relative flex flex-col gap-2 rounded-2xl border p-3.5 transition-colors ${
+                      selected ? "border-rose-300 bg-rose-50/60" : "border-emerald-200 bg-white hover:border-emerald-400"
+                    }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedSubIds.includes(s.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedSubIds([...selectedSubIds, s.id]);
-                          } else {
-                            setSelectedSubIds(selectedSubIds.filter((id) => id !== s.id));
-                          }
-                        }}
-                        className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
-                      />
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm truncate flex items-center gap-1.5">
-                          <span className="text-[10px] bg-emerald-100 text-emerald-900 px-1 rounded font-bold">🔁</span>
-                          {s.title}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-2">
-                      <div className="text-right">
-                        <div className="font-medium text-sm text-emerald-600">
-                          +{formatCurrency(s.amount, entryCurrency)}
-                          <span className="text-[10px] text-rumbo-muted ml-1">/mes</span>
-                        </div>
-                        {isForeign && (
-                          <div className="text-[10px] text-rumbo-muted">
-                            ≈ +{format(amountInPrimary(s))}
-                          </div>
-                        )}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedSubIds([...selectedSubIds, s.id]);
+                            } else {
+                              setSelectedSubIds(selectedSubIds.filter((id) => id !== s.id));
+                            }
+                          }}
+                          className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors shrink-0"
+                        />
+                        <span className="text-[10px] bg-emerald-100 text-emerald-900 px-1 rounded font-bold shrink-0">🔁</span>
+                        <span className="font-semibold text-sm truncate">{s.title}</span>
                       </div>
                       <button
                         onClick={() => deleteSubscriptionCascade(s.id)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
                         aria-label="Eliminar ingreso recurrente"
+                        className="w-7 h-7 -mt-0.5 -mr-0.5 shrink-0 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition active:scale-90"
                       >
                         ✕
                       </button>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-emerald-600 tabular-nums leading-tight">
+                        +{formatCurrency(s.amount, entryCurrency)}
+                        <span className="text-[10px] text-rumbo-muted ml-0.5 font-normal">/mes</span>
+                      </div>
+                      {isForeign && (
+                        <div className="text-[10px] text-rumbo-muted">≈ +{format(amountInPrimary(s))}</div>
+                      )}
                     </div>
                   </motion.div>
                 );
               })}
             </AnimatePresence>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Entries this month */}
       <div className="mt-8 border-t border-rumbo-line pt-5">

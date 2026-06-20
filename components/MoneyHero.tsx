@@ -1,17 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  RadialBar,
-  RadialBarChart,
-  ResponsiveContainer,
-  PolarAngleAxis,
-} from "recharts";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 
 export function MoneyHero() {
-  const { snapshots, onboarding, finances, amountInPrimary, adjustedBaseSalary } = useRumbo();
+  const { snapshots, onboarding } = useRumbo();
   const formatMoney = useFormatMoney();
 
   const sortedSnaps = [...snapshots].sort(
@@ -22,220 +15,58 @@ export function MoneyHero() {
 
   const total = latest?.total ?? onboarding?.current_money ?? 0;
   const totalTarget = onboarding?.total_target ?? 0;
-
-  const now = new Date();
-  const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
-  const monthIncome =
-    adjustedBaseSalary(currentMonthKey) +
-    finances
-      .filter(
-        (f) =>
-          f.type === "ingreso" &&
-          new Date(f.date).getMonth() === now.getMonth() &&
-          new Date(f.date).getFullYear() === now.getFullYear()
-      )
-      .reduce((a, b) => a + amountInPrimary(b), 0);
-  const monthTarget = onboarding?.monthly_target ?? 0;
-
   const totalProgress = totalTarget
     ? Math.min(100, (total / totalTarget) * 100)
     : 0;
-  const monthProgress = monthTarget
-    ? Math.min(100, (monthIncome / monthTarget) * 100)
-    : 0;
-
-  const monthDelta =
-    latest && previous ? latest.total - previous.total : null;
+  const missing = Math.max(0, totalTarget - total);
+  const monthDelta = latest && previous ? latest.total - previous.total : null;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <RadialCard
-        title="Patrimonio total"
-        subtitle="Lo que tienes vs lo que quieres tener"
-        current={total}
-        target={totalTarget}
-        progress={totalProgress}
-        from="#064E3B"
-        to="#059669"
-        accent="green"
-        footer={
-          monthDelta !== null
-            ? `${monthDelta >= 0 ? "+" : ""}${formatMoney(monthDelta)} desde la última medición`
-            : "Añade una medición en Dinero para ver tu evolución"
-        }
-      />
-      <RadialCard
-        title="Ingreso mensual"
-        subtitle="Lo que ganas vs lo que quieres ganar"
-        current={monthIncome}
-        target={monthTarget}
-        progress={monthProgress}
-        from="#A78BFA"
-        to="#F472B6"
-        accent="violet"
-        footer={
-          monthTarget
-            ? `Faltan ${formatMoney(Math.max(0, monthTarget - monthIncome))} este mes`
-            : "Define tu objetivo mensual en Dinero"
-        }
-      />
-    </div>
-  );
-}
-
-function useCounter(target: number, duration = 900) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const start = performance.now();
-    const initial = value;
-    const delta = target - initial;
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(initial + delta * eased);
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target]);
-  return value;
-}
-
-function RadialCard({
-  title,
-  subtitle,
-  current,
-  target,
-  progress,
-  from,
-  to,
-  accent,
-  footer,
-}: {
-  title: string;
-  subtitle: string;
-  current: number;
-  target: number;
-  progress: number;
-  from: string;
-  to: string;
-  accent: "green" | "violet";
-  footer?: string;
-}) {
-  const formatMoney = useFormatMoney();
-  const animatedCurrent = useCounter(current);
-  const animatedProgress = useCounter(progress);
-  const gradientId = useMemo(
-    () => `g-${title.replace(/\s/g, "-")}`,
-    [title]
-  );
-
-  const data = [{ name: title, value: animatedProgress, fill: `url(#${gradientId})` }];
-  const missing = Math.max(0, target - current);
-
-  return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ type: "spring", stiffness: 200, damping: 18 }}
-      className="card p-6 overflow-hidden relative group"
-    >
-      <div
-        className={`absolute -top-16 -right-16 w-56 h-56 rounded-full blur-3xl opacity-20 transition-opacity group-hover:opacity-30 ${
-          accent === "green" ? "bg-green-300" : "bg-violet-300"
-        }`}
-      />
-
-      <div className="relative">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">
-              {title}
-            </div>
-            <div className="text-xs text-rumbo-muted mt-0.5">{subtitle}</div>
+    <div className="card p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wider text-rumbo-muted">
+            Patrimonio total
           </div>
-          <span
-            className={`chip ${
-              accent === "green"
-                ? "bg-green-100 text-green-900 font-bold"
-                : "bg-violet-100 text-violet-700"
-            }`}
-          >
-            {Math.round(progress)}%
+          <div className="text-xl sm:text-2xl font-semibold tracking-tight tabular-nums mt-0.5">
+            {formatMoney(total)}
+            {totalTarget > 0 && (
+              <span className="text-sm font-normal text-rumbo-muted ml-1.5">
+                de {formatMoney(totalTarget)}
+              </span>
+            )}
+          </div>
+        </div>
+        {totalTarget > 0 && (
+          <span className="chip bg-green-100 text-green-900 font-bold shrink-0">
+            {Math.round(totalProgress)}%
           </span>
-        </div>
+        )}
+      </div>
 
-        <div className="mt-2 grid grid-cols-[1fr_auto] gap-3 md:gap-4 items-center">
-          <div className="min-w-0">
-            <motion.div
-              key={current}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight tabular-nums break-words"
-            >
-              {formatMoney(animatedCurrent)}
-            </motion.div>
-            <div className="text-xs sm:text-sm text-rumbo-muted mt-1">
-              de {formatMoney(target)}
-            </div>
-            <div className="text-sm mt-3">
-              <span className="text-rumbo-muted">Faltan</span>{" "}
-              <span className="font-semibold">{formatMoney(missing)}</span>
-            </div>
-          </div>
-
-          <div className="w-[120px] h-[120px] sm:w-[140px] sm:h-[140px] md:w-[160px] md:h-[160px] -mr-1 md:-mr-2 shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadialBarChart
-                cx="50%"
-                cy="50%"
-                innerRadius="72%"
-                outerRadius="100%"
-                barSize={14}
-                data={data}
-                startAngle={90}
-                endAngle={-270}
-              >
-                <defs>
-                  <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor={from} />
-                    <stop offset="100%" stopColor={to} />
-                  </linearGradient>
-                </defs>
-                <PolarAngleAxis
-                  type="number"
-                  domain={[0, 100]}
-                  angleAxisId={0}
-                  tick={false}
-                />
-                <RadialBar
-                  background={{ fill: "#F1F5F9" } as any}
-                  dataKey="value"
-                  cornerRadius={20}
-                  isAnimationActive={false}
-                />
-              </RadialBarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="mt-4 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+      {totalTarget > 0 && (
+        <div className="mt-3 h-1.5 rounded-full bg-slate-100 overflow-hidden">
           <motion.div
-            className="h-full"
-            style={{
-              background: `linear-gradient(90deg, ${from}, ${to})`,
-            }}
+            className="h-full bg-gradient-to-r from-emerald-700 to-emerald-500"
             initial={false}
-            animate={{ width: `${progress}%` }}
+            animate={{ width: `${totalProgress}%` }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           />
         </div>
+      )}
 
-        {footer && (
-          <div className="text-xs text-rumbo-muted mt-3">{footer}</div>
+      <div className="mt-2.5 flex items-center justify-between gap-3 text-xs text-rumbo-muted">
+        <span className="truncate">
+          {monthDelta !== null
+            ? `${monthDelta >= 0 ? "+" : ""}${formatMoney(monthDelta)} desde la última medición`
+            : "Añade una medición para ver tu evolución"}
+        </span>
+        {totalTarget > 0 && missing > 0 && (
+          <span className="shrink-0">
+            Faltan <span className="font-semibold text-rumbo-ink">{formatMoney(missing)}</span>
+          </span>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }
