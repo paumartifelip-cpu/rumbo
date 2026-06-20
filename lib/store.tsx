@@ -86,6 +86,13 @@ interface RumboContext extends RumboState {
   addFinance: (f: Omit<FinancialEntry, "id" | "user_id" | "created_at">) => void;
   updateFinance: (id: string, patch: Partial<FinancialEntry>) => void;
   removeFinance: (id: string) => void;
+  /**
+   * Robust delete for recurring entries. If `id` is a recurring template it
+   * removes the template AND every generated instance (deterministic children
+   * by id prefix + legacy children by title/amount). For a normal entry it just
+   * removes that one. Everything removed is tombstoned so it can't come back.
+   */
+  removeFinanceCascade: (id: string) => void;
   addSnapshot: (s: Omit<MoneySnapshot, "id" | "user_id" | "created_at">) => void;
   removeSnapshot: (id: string) => void;
   addUserTool: (ut: Omit<UserTool, "id" | "user_id" | "created_at">) => void;
@@ -830,9 +837,15 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   const amountInPrimary = useCallback(
     (entry: FinancialEntry) => {
-      if (entry.amount_in_primary !== undefined) return entry.amount_in_primary;
-      const from = entry.currency ?? stateRef.current.primaryCurrency;
-      return convertAmount(entry.amount, from, stateRef.current.primaryCurrency);
+      const primary = stateRef.current.primaryCurrency;
+      const from = entry.currency ?? primary;
+      // Always convert LIVE from the entry's own currency to the CURRENT primary
+      // currency. We deliberately ignore any stored `amount_in_primary` snapshot:
+      // it was frozen against whatever the primary currency was at creation time,
+      // so trusting it silently corrupts every sum the moment the user changes
+      // their primary currency. Same-currency entries return their exact amount.
+      if (from === primary) return entry.amount;
+      return convertAmount(entry.amount, from, primary);
     },
     []
   );
@@ -846,22 +859,21 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
     const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
 
-    // Check if there is any logged income in this month that represents the salary
+    // Suppress the implicit base salary only when the user has EXPLICITLY logged
+    // a salary that month, detected by title. We intentionally do NOT match by
+    // amount: an unrelated income that merely happens to equal the base salary
+    // would otherwise wipe it out and undercount the month.
     const hasLoggedSalary = stateRef.current.finances.some((f) => {
       if (f.type !== "ingreso") return false;
-      
-      const fDate = new Date(f.date);
-      const fKey = monthKey(fDate);
-      if (fKey !== mKey) return false;
-      
+      if (monthKey(new Date(f.date)) !== mKey) return false;
       const title = f.title.toLowerCase();
-      const isSalaryTitle = title.includes("sueldo") || title.includes("nómina") || title.includes("nomina") || title.includes("salary") || title.includes("payroll");
-      
-      const from = f.currency ?? stateRef.current.primaryCurrency;
-      const amtInPrimary = convertAmount(f.amount, from, stateRef.current.primaryCurrency);
-      const isMatchingAmount = Math.abs(amtInPrimary - baseSalary) < 0.01;
-      
-      return isSalaryTitle || isMatchingAmount;
+      return (
+        title.includes("sueldo") ||
+        title.includes("nómina") ||
+        title.includes("nomina") ||
+        title.includes("salary") ||
+        title.includes("payroll")
+      );
     });
 
     return hasLoggedSalary ? 0 : baseSalary;
@@ -1032,6 +1044,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addFinance: RumboContext["addFinance"] = useCallback((f) => {
+    // Defensive: never store a broken amount (NaN/Infinity/negative). Keeps
+    // every downstream sum well-defined no matter what the form passes in.
+    const amount = Number(f.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    f = { ...f, amount };
     const id = uid();
     setState((s) => {
       const from = f.currency ?? s.primaryCurrency;
@@ -1070,6 +1087,34 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       finances: s.finances.filter((f) => f.id !== id),
       deletedIds: addTombstones(s.deletedIds, id),
     }));
+  }, []);
+
+  const removeFinanceCascade: RumboContext["removeFinanceCascade"] = useCallback((id) => {
+    setState((s) => {
+      const target = s.finances.find((f) => f.id === id);
+      if (!target) return s;
+      const ids = new Set<string>([id]);
+      // Only a recurring template fans out to its instances.
+      if (target.recurrence) {
+        const t = target.title.trim().toLowerCase();
+        const prefix = `${id}__rec__`;
+        s.finances.forEach((f) => {
+          if (f.id === id) return;
+          const isDeterministicChild = f.id.startsWith(prefix);
+          const isLegacyChild =
+            !f.recurrence &&
+            f.type === target.type &&
+            f.amount === target.amount &&
+            f.title.trim().toLowerCase() === t;
+          if (isDeterministicChild || isLegacyChild) ids.add(f.id);
+        });
+      }
+      return {
+        ...s,
+        finances: s.finances.filter((f) => !ids.has(f.id)),
+        deletedIds: addTombstones(s.deletedIds, ...ids),
+      };
+    });
   }, []);
 
   const addSnapshot: RumboContext["addSnapshot"] = useCallback((s) => {
@@ -1264,6 +1309,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       addFinance,
       updateFinance,
       removeFinance,
+      removeFinanceCascade,
       addSnapshot,
       removeSnapshot,
       addUserTool,
@@ -1295,6 +1341,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       addFinance,
       updateFinance,
       removeFinance,
+      removeFinanceCascade,
       addSnapshot,
       removeSnapshot,
       addUserTool,

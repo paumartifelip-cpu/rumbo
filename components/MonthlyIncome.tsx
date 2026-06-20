@@ -21,6 +21,7 @@ export function MonthlyIncome() {
     finances,
     addFinance,
     removeFinance,
+    removeFinanceCascade,
     onboarding,
     primaryCurrency,
     amountInPrimary,
@@ -120,41 +121,17 @@ export function MonthlyIncome() {
   const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
   const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([]);
 
-  const deleteSubscriptionCascade = (subId: string) => {
-    const sub = finances.find((f) => f.id === subId);
-    if (!sub) return;
-    removeFinance(subId);
-    const generatedCopy = finances.find(
-      (f) =>
-        f.type === "ingreso" &&
-        !f.recurrence &&
-        f.title.toLowerCase().trim() === sub.title.toLowerCase().trim() &&
-        monthKey(new Date(f.date)) === currentKey
-    );
-    if (generatedCopy) {
-      removeFinance(generatedCopy.id);
-    }
-  };
+  // Deleting a recurring income removes the template AND all its generated months.
+  const deleteSubscriptionCascade = (subId: string) => removeFinanceCascade(subId);
 
   const deleteSelectedSubscriptions = () => {
     selectedSubIds.forEach(deleteSubscriptionCascade);
     setSelectedSubIds([]);
   };
 
-  const deleteMovementCascade = (moveId: string) => {
-    const move = finances.find((f) => f.id === moveId);
-    if (!move) return;
-    removeFinance(moveId);
-    const matchingTemplate = finances.find(
-      (f) =>
-        f.type === "ingreso" &&
-        f.recurrence &&
-        f.title.toLowerCase().trim() === move.title.toLowerCase().trim()
-    );
-    if (matchingTemplate) {
-      removeFinance(matchingTemplate.id);
-    }
-  };
+  // Deleting a single movement removes ONLY that row (tombstoned), never the
+  // recurring template behind it.
+  const deleteMovementCascade = (moveId: string) => removeFinance(moveId);
 
   const deleteSelectedMovements = () => {
     selectedMoveIds.forEach(deleteMovementCascade);

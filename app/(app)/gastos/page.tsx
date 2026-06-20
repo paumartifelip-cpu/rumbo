@@ -108,7 +108,7 @@ function useDateLabels(date: Date) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function GastosPage() {
-  const { finances, addFinance, updateFinance, removeFinance, primaryCurrency, amountInPrimary } = useRumbo();
+  const { finances, addFinance, updateFinance, removeFinance, removeFinanceCascade, primaryCurrency, amountInPrimary } = useRumbo();
   const format = useFormatMoney();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const { today, month, isCurrentMonth } = useDateLabels(selectedDate);
@@ -134,41 +134,17 @@ export default function GastosPage() {
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
   const currentKey = monthKey(selectedDate);
 
-  const deleteSubscriptionCascade = (subId: string) => {
-    const sub = finances.find((f) => f.id === subId);
-    if (!sub) return;
-    removeFinance(subId);
-    const generatedCopy = finances.find(
-      (f) =>
-        f.type === "gasto" &&
-        !f.recurrence &&
-        f.title.toLowerCase().trim() === sub.title.toLowerCase().trim() &&
-        monthKey(new Date(f.date)) === currentKey
-    );
-    if (generatedCopy) {
-      removeFinance(generatedCopy.id);
-    }
-  };
+  // Deleting a subscription removes the template AND all its generated months.
+  const deleteSubscriptionCascade = (subId: string) => removeFinanceCascade(subId);
 
   const deleteSelectedSubscriptions = () => {
     selectedSubIds.forEach(deleteSubscriptionCascade);
     setSelectedSubIds([]);
   };
 
-  const deleteMovementCascade = (moveId: string) => {
-    const move = finances.find((f) => f.id === moveId);
-    if (!move) return;
-    removeFinance(moveId);
-    const matchingTemplate = finances.find(
-      (f) =>
-        f.type === "gasto" &&
-        f.recurrence &&
-        f.title.toLowerCase().trim() === move.title.toLowerCase().trim()
-    );
-    if (matchingTemplate) {
-      removeFinance(matchingTemplate.id);
-    }
-  };
+  // Deleting a single movement removes ONLY that row (tombstoned so it can't
+  // regenerate). It must never nuke the recurring template behind it.
+  const deleteMovementCascade = (moveId: string) => removeFinance(moveId);
 
   const deleteSelectedMovements = () => {
     selectedMoveIds.forEach(deleteMovementCascade);
