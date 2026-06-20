@@ -164,29 +164,36 @@ No incluyas texto adicional fuera del JSON.`;
  * Fast rule-based categorizer. Returns null when no rule matches so the
  * caller knows it needs to fall back to AI.
  */
+// IMPORTANT: only the 6 fixed categories may ever be produced:
+// Comida · Transporte · Alojamiento · Trabajo · Compras · Otros.
+// "Trabajo" is assigned manually by the user; the heuristic detects the rest
+// and returns null (→ caller defaults to "Otros") when nothing matches.
+export const EXPENSE_CATEGORIES = [
+  "Comida",
+  "Transporte",
+  "Alojamiento",
+  "Trabajo",
+  "Compras",
+  "Otros",
+] as const;
+
 export function heuristicCategorize(title: string): string | null {
   const t = title
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
 
-  // Vivienda
+  // Alojamiento (vivienda, suministros, hoteles y viajes)
   if (
-    /(alquiler|hipoteca|comunidad|ibi|derrama|portero|ascensor|piso|casa|apartamento|habitacion|studio|flat|rent|mortgage|electricity|electric|luz|agua|calefaccion|caldera|gas natural|wifi|internet|fibra|router|modem|vodafone|movistar|orange|digi|yoigo|euskaltel)/.test(t)
+    /(alquiler|hipoteca|comunidad|ibi|derrama|portero|ascensor|piso|casa|apartamento|habitacion|studio|flat|rent|mortgage|electricity|electric|luz|agua|calefaccion|caldera|gas natural|wifi|internet|fibra|router|modem|vodafone|movistar|orange|digi|yoigo|euskaltel|hotel|hostal|pension|airbnb|booking|trivago|edreams|lastminute|resort|camping|glamping|balneario)/.test(t)
   )
-    return "Vivienda";
+    return "Alojamiento";
 
-  // Comida (supermercados y alimentación)
+  // Comida (supermercados, alimentación, restaurantes y bares)
   if (
-    /(mercadona|carrefour|lidl|aldi|dia |eroski|consum|alcampo|hipercor|bonpreu|condis|covirán|spar|froiz|supercor|supermercado|fruteria|verduleria|carniceria|pescaderia|panaderia|pasteleria|charcuteria|colmado|ultramarinos|alimentacion|grocery|supermarket|glovo|just eat|deliveroo|uber eats|rappi|getir|gorillas)/.test(t)
+    /(mercadona|carrefour|lidl|aldi|dia |eroski|consum|alcampo|hipercor|bonpreu|condis|coviran|spar|froiz|supercor|supermercado|fruteria|verduleria|carniceria|pescaderia|panaderia|pasteleria|charcuteria|colmado|ultramarinos|alimentacion|grocery|supermarket|glovo|just eat|deliveroo|uber eats|rappi|getir|gorillas|restaurante|restaurant|bar |cafeteria|cafe |coffee|starbucks|mcdonalds|mcdonald|burger king|kfc|dominos|telepizza|pizza hut|subway|five guys|popeyes|foster|taco bell|tapas|bocadillo|bocata|menu del dia|cena|almuerzo|desayuno|brunch|sushi|ramen|kebab|hamburgues|poke)/.test(t)
   )
     return "Comida";
-
-  // Restaurantes y bares
-  if (
-    /(restaurante|restaurant|bar |cafeteria|cafe |coffee|starbucks|mcdonalds|mcdonald|burger king|kfc|dominos|telepizza|pizza hut|subway|five guys|popeyes|foster|taco bell|tapas|bocadillo|bocata|menu del dia|cena|almuerzo|desayuno|brunch|sushi|ramen|kebab|chino|italiano|mexicano|hamburgues|poke|sандwich)/.test(t)
-  )
-    return "Restaurantes";
 
   // Transporte
   if (
@@ -194,49 +201,13 @@ export function heuristicCategorize(title: string): string | null {
   )
     return "Transporte";
 
-  // Suscripciones y software
-  if (
-    /(netflix|hbo|max |disney|prime video|apple tv|mubi|filmin|rakuten|crunchyroll|spotify|apple music|tidal|deezer|youtube premium|twitch|patreon|chatgpt|openai|claude|anthropic|notion|obsidian|figma|adobe|photoshop|illustrator|premiere|lightroom|canva|sketch|framer|webflow|github|gitlab|vercel|netlify|heroku|aws |azure |google cloud|gcp |dropbox|icloud|onedrive|google one|1password|lastpass|bitwarden|nordvpn|expressvpn|linear|jira|asana|trello|slack|zoom|loom|calendly|typeform|airtable|hubspot|mailchimp|convertkit|substack|beehiiv|plus|pro |premium|plan |subscription|suscripcion|mensualidad|anualidad|licencia)/.test(t)
-  )
-    return "Suscripciones";
-
-  // Salud y bienestar
-  if (
-    /(farmacia|medicamento|medicina|pastilla|receta|medico|doctor|consulta|clinica|hospital|dentista|ortodoncista|optica|gafas|lentillas|fisioterapia|psicólogo|psicologo|terapeuta|quiropractico|gym|gimnasio|crossfit|pilates|yoga|padel|tenis|natacion|running|maratón|maraton|suplemento|proteina|vitamina|health|wellness|sanitas|adeslas|asisa|dkv|mapfre salud|mutua)/.test(t)
-  )
-    return "Salud";
-
-  // Compras y moda
+  // Compras (moda, electrónica, hogar y comercio)
   if (
     /(amazon|ebay|aliexpress|shein|zara|h&m|mango|bershka|stradivarius|pull.*bear|massimo dutti|el corte ingles|primark|lefties|calzedonia|intimissimi|decathlon|nike|adidas|puma|new balance|vans|converse|timberland|zalando|asos|farfetch|vinted|wallapop|fnac|media markt|pc componentes|phone house|apple store|ikea|leroy merlin|aki |bricomart|bauhaus|worten|ropa|zapatillas|zapatos|vestido|pantalon|camisa|chaqueta|abrigo|complementos|bolso|cartera|reloj|joya|mueble|sofa|cama|colchon|electrodomestico|nevera|lavadora|secadora|microondas|television|movil|ordenador|portatil|tablet|auriculares|altavoz|camara)/.test(t)
   )
     return "Compras";
 
-  // Ocio y entretenimiento
-  if (
-    /(cine|teatro|museo|concierto|festival|espectaculo|entrada|ticketmaster|viagogo|eventbrite|bowling|escape room|karting|lasertag|parque.*atrac|parque.*acuat|zoo|aquarium|arcade|videojuego|steam|playstation|xbox|nintendo|ps5|ps4|switch|juego|hobby|manualidades|pintura|fotografia)/.test(t)
-  )
-    return "Ocio";
-
-  // Viajes y alojamiento
-  if (
-    /(hotel|hostal|pension|airbnb|booking|trivago|edreams|rumbo|lastminute|viaje|vacacion|vacation|holiday|travel|turismo|excursion|tour|crucero|resort|spa |balneario|camping|glamping)/.test(t)
-  )
-    return "Viajes";
-
-  // Educación
-  if (
-    /(udemy|coursera|linkedin learning|masterclass|domestika|platzi|skillshare|duolingo|babbel|academia|curso|formacion|máster|master|universidad|colegio|escuela|libro|libros|amazon kindle|audible|fnac.*libro|libreria|material escolar|clase particular)/.test(t)
-  )
-    return "Educación";
-
-  // Finanzas y seguros
-  if (
-    /(seguro|aseguradora|mapfre|allianz|axa|generali|zurich|mutua|fondo|pension|inversion|broker|trading|comision bancaria|transferencia|tarjeta|cuota.*banco|mantenimiento.*cuenta|prestamo|credito|hipoteca|interes|asesor)/.test(t)
-  )
-    return "Finanzas";
-
-  return null; // no match → let AI decide
+  return null; // sin coincidencia → el llamador asigna "Otros"
 }
 
 /**

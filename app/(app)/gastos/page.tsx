@@ -15,20 +15,19 @@ import { formatDate } from "@/lib/utils";
 const QUICK_CATS = [
   { key: "Comida",      icon: "🍽️", label: "Comida" },
   { key: "Transporte",  icon: "🚗", label: "Transporte" },
-  { key: "Trabajo",     icon: "💼", label: "Trabajo" },
   { key: "Alojamiento", icon: "🏠", label: "Alojamiento" },
+  { key: "Trabajo",     icon: "💼", label: "Trabajo" },
+  { key: "Compras",     icon: "🛍️", label: "Compras" },
   { key: "Otros",       icon: "📦", label: "Otros" },
 ] as const;
 
 type QuickCat = (typeof QUICK_CATS)[number]["key"] | null;
 
-// Icon for any category name (covers quick cats + heuristic categories + fallback)
+// Icon for each of the 6 fixed categories (anything else falls back to Otros)
 const CAT_ICONS: Record<string, string> = {
-  Comida: "🍽️", Transporte: "🚗", Trabajo: "💼", Alojamiento: "🏠", Otros: "📦",
-  Ocio: "🎮", Salud: "💊", Compras: "🛍️", Suscripciones: "🔁", Servicios: "🔧",
-  Educación: "📚", Viajes: "✈️", "Sin categoría": "🏷️",
+  Comida: "🍽️", Transporte: "🚗", Alojamiento: "🏠", Trabajo: "💼", Compras: "🛍️", Otros: "📦",
 };
-const catIcon = (name: string) => CAT_ICONS[name] ?? "🏷️";
+const catIcon = (name: string) => CAT_ICONS[name] ?? "📦";
 
 // ─── Inline category picker for existing entries ──────────────────────────────
 function CategoryPicker({
@@ -193,11 +192,12 @@ export default function GastosPage() {
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [thisMonth, amountInPrimary]);
 
-  // Movements grouped into collapsible categories, each sorted by date (newest first)
+  // Movements grouped into collapsible categories, each sorted by date (newest first).
+  // Any category outside the 6 fixed ones is bucketed into "Otros".
   const expenseGroups = useMemo(() => {
     const map = new Map<string, typeof thisMonth>();
     thisMonth.forEach((f) => {
-      const k = f.category || "Sin categoría";
+      const k = f.category && CAT_ICONS[f.category] ? f.category : "Otros";
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(f);
     });

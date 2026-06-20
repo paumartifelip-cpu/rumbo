@@ -8,8 +8,9 @@ import { CURRENCIES, Currency } from "@/lib/currency";
 const QUICK_CATS = [
   { key: "Comida",      icon: "🍽️", label: "Comida" },
   { key: "Transporte",  icon: "🚗", label: "Transporte" },
+  { key: "Alojamiento", icon: "🏠", label: "Alojamiento" },
   { key: "Trabajo",     icon: "💼", label: "Trabajo" },
-  { key: "Alojamiento", icon: "🏠", label: "Casa" },
+  { key: "Compras",     icon: "🛍️", label: "Compras" },
   { key: "Otros",       icon: "📦", label: "Otros" },
 ] as const;
 
