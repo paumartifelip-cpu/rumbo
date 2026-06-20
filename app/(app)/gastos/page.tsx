@@ -5,8 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { CashflowHero } from "@/components/CashflowHero";
 import { SpendingTrend } from "@/components/SpendingTrend";
-import { SpendingDonut } from "@/components/SpendingDonut";
-import { DailyExpensesChart } from "@/components/DailyExpensesChart";
 import { Reveal } from "@/components/Reveal";
 import { AddExpenseSheet } from "@/components/AddExpenseSheet";
 import { useFormatMoney, useRumbo } from "@/lib/store";
@@ -214,9 +212,17 @@ export default function GastosPage() {
   }, [thisMonth, amountInPrimary]);
 
   const subscriptions = useMemo(() => {
-    return finances
+    // Dedupe defensively: never show the same subscription twice. Key by
+    // normalized title + amount + recurrence; keep the earliest-created one.
+    const seen = new Map<string, (typeof finances)[number]>();
+    finances
       .filter((f) => f.type === "gasto" && f.recurrence)
-      .sort((a, b) => amountInPrimary(b) - amountInPrimary(a));
+      .forEach((f) => {
+        const key = `${f.title.trim().toLowerCase()}|${f.amount}|${f.recurrence}`;
+        const prev = seen.get(key);
+        if (!prev || (f.created_at ?? "") < (prev.created_at ?? "")) seen.set(key, f);
+      });
+    return Array.from(seen.values()).sort((a, b) => amountInPrimary(b) - amountInPrimary(a));
   }, [finances, amountInPrimary]);
 
   const totalMonthlySubscriptions = useMemo(
@@ -361,63 +367,60 @@ export default function GastosPage() {
         </div>
       </Reveal>
 
-      {/* Tendencia + Suscripciones */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <Reveal delay={0.08} className="lg:col-span-2">
-          <Card className="card-hover h-full">
-            <SectionTitle title="Tendencia mensual" hint="Últimos 6 meses. Barra oscura = mes actual." />
-            <SpendingTrend />
-          </Card>
-        </Reveal>
+      {/* Tendencia mensual */}
+      <Reveal delay={0.08}>
+        <Card className="card-hover mb-6">
+          <SectionTitle title="Tendencia mensual" hint="Últimos 6 meses. Barra oscura = mes actual." />
+          <SpendingTrend />
+        </Card>
+      </Reveal>
 
-        <Reveal delay={0.1}>
-          <Card className="card-hover h-full">
-            <SectionTitle title="Reparto por categorías" />
-            <SpendingDonut />
-          </Card>
-        </Reveal>
-
-        <Reveal delay={0.12}>
-          <Card className="card-hover h-full">
-            <div className="flex justify-between items-center mb-2">
-              <SectionTitle
-                title="Suscripciones activas"
-                hint={subscriptions.length > 0 ? `${format(totalMonthlySubscriptions)}/mes en fijos` : "Marca un gasto como 🔁 para verlo aquí"}
-              />
-              {selectedSubIds.length > 0 && (
-                <button
-                  onClick={deleteSelectedSubscriptions}
-                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1"
-                >
-                  ✕ Eliminar ({selectedSubIds.length})
-                </button>
-              )}
-            </div>
-            {subscriptions.length === 0 ? (
-              <EmptyState icon="🔁" title="Sin suscripciones" description="Al añadir un gasto, marca 'Es una suscripción' para que aparezca aquí." />
-            ) : (
-              <div>
-                <div className="text-2xl font-semibold tabular-nums mb-4">
-                  {format(totalMonthlySubscriptions)}
-                  <span className="text-sm font-normal text-rumbo-muted ml-1">/mes</span>
-                </div>
-                <div className="grid gap-2">
-                  <AnimatePresence>
-                    {subscriptions.map((s) => {
-                      const entryCurrency = s.currency ?? primaryCurrency;
-                      const isForeign = entryCurrency !== primaryCurrency;
-                      return (
-                        <motion.div
-                          key={s.id}
-                          initial={{ opacity: 0, x: -6 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0 }}
-                          className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line group"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+      {/* Suscripciones — bloques claros, sin duplicados */}
+      <Reveal delay={0.12}>
+        <Card className="card-hover mb-6">
+          <div className="flex justify-between items-center mb-3">
+            <SectionTitle
+              title="Suscripciones activas"
+              hint={subscriptions.length > 0 ? `${format(totalMonthlySubscriptions)}/mes en fijos` : "Marca un gasto como 🔁 para verlo aquí"}
+            />
+            {selectedSubIds.length > 0 && (
+              <button
+                onClick={deleteSelectedSubscriptions}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1"
+              >
+                ✕ Eliminar ({selectedSubIds.length})
+              </button>
+            )}
+          </div>
+          {subscriptions.length === 0 ? (
+            <EmptyState icon="🔁" title="Sin suscripciones" description="Al añadir un gasto, marca 'Es una suscripción' para que aparezca aquí." />
+          ) : (
+            <>
+              <div className="text-2xl font-semibold tabular-nums mb-4">
+                {format(totalMonthlySubscriptions)}
+                <span className="text-sm font-normal text-rumbo-muted ml-1">/mes</span>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <AnimatePresence>
+                  {subscriptions.map((s) => {
+                    const entryCurrency = s.currency ?? primaryCurrency;
+                    const isForeign = entryCurrency !== primaryCurrency;
+                    const selected = selectedSubIds.includes(s.id);
+                    return (
+                      <motion.div
+                        key={s.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.97 }}
+                        className={`relative flex flex-col gap-2 rounded-2xl border p-3.5 transition-colors ${
+                          selected ? "border-rose-300 bg-rose-50/60" : "border-rumbo-line bg-white hover:border-rumbo-ink/30"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <input
                               type="checkbox"
-                              checked={selectedSubIds.includes(s.id)}
+                              checked={selected}
                               onChange={(e) => {
                                 if (e.target.checked) {
                                   setSelectedSubIds([...selectedSubIds, s.id]);
@@ -425,45 +428,43 @@ export default function GastosPage() {
                                   setSelectedSubIds(selectedSubIds.filter((id) => id !== s.id));
                                 }
                               }}
-                              className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
+                              className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors shrink-0"
                             />
-                            <div className="min-w-0">
-                              <div className="font-medium text-sm truncate flex items-center gap-1.5">
-                                <span className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
-                                {s.title}
-                              </div>
-                              <CategoryPicker
-                                current={s.category}
-                                onChange={(cat) => updateFinance(s.id, { category: cat })}
-                              />
-                            </div>
+                            <span className="text-[10px] bg-slate-100 px-1 rounded shrink-0">🔁</span>
+                            <span className="font-semibold text-sm truncate">{s.title}</span>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0 ml-2">
-                            <div className="text-right">
-                              <div className="font-medium text-sm text-rose-600">
-                                {formatCurrency(s.amount, entryCurrency)}
-                                {s.recurrence === "anual" && <span className="text-[10px] text-rumbo-muted ml-1">/año</span>}
-                              </div>
-                              {isForeign && <div className="text-[10px] text-rumbo-muted">≈ {format(amountInPrimary(s))}</div>}
+                          <button
+                            onClick={() => deleteSubscriptionCascade(s.id)}
+                            aria-label={`Eliminar suscripción ${s.title}`}
+                            className="w-7 h-7 -mt-0.5 -mr-0.5 shrink-0 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition active:scale-90"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className="flex items-end justify-between gap-2">
+                          <CategoryPicker
+                            current={s.category}
+                            onChange={(cat) => updateFinance(s.id, { category: cat })}
+                          />
+                          <div className="text-right">
+                            <div className="font-bold text-rose-600 tabular-nums leading-tight">
+                              {formatCurrency(s.amount, entryCurrency)}
+                              <span className="text-[10px] text-rumbo-muted ml-0.5 font-normal">
+                                /{s.recurrence === "anual" ? "año" : "mes"}
+                              </span>
                             </div>
-                            <button
-                              onClick={() => deleteSubscriptionCascade(s.id)}
-                              aria-label={`Eliminar suscripción ${s.title}`}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
-                            >
-                              ✕
-                            </button>
+                            {isForeign && <div className="text-[10px] text-rumbo-muted">≈ {format(amountInPrimary(s))}</div>}
                           </div>
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
               </div>
-            )}
-          </Card>
-        </Reveal>
-      </div>
+            </>
+          )}
+        </Card>
+      </Reveal>
 
       <div className="mb-6">
         <Reveal delay={0.1}>
@@ -501,22 +502,6 @@ export default function GastosPage() {
                 })}
               </div>
             )}
-          </Card>
-        </Reveal>
-      </div>
-
-      {/* Ritmo diario */}
-      <div className="mb-6">
-        <Reveal delay={0.14}>
-          <Card className="card-hover">
-            <SectionTitle 
-              title="Gastos por día" 
-              hint={`Distribución de tus gastos durante ${month}`} 
-            />
-            <DailyExpensesChart 
-              expenses={thisMonth} 
-              selectedDate={selectedDate} 
-            />
           </Card>
         </Reveal>
       </div>
