@@ -116,12 +116,56 @@ export default function GastosPage() {
     category: QuickCat;
   }>({ title: "", amount: "", recurrence: "", currency: primaryCurrency, category: null });
 
+  const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
+  const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([]);
+
   useEffect(() => {
     setForm((f) => ({ ...f, currency: primaryCurrency }));
   }, [primaryCurrency]);
 
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
   const currentKey = monthKey(selectedDate);
+
+  const deleteSubscriptionCascade = (subId: string) => {
+    const sub = finances.find((f) => f.id === subId);
+    if (!sub) return;
+    removeFinance(subId);
+    const generatedCopy = finances.find(
+      (f) =>
+        f.type === "gasto" &&
+        !f.recurrence &&
+        f.title.toLowerCase().trim() === sub.title.toLowerCase().trim() &&
+        monthKey(new Date(f.date)) === currentKey
+    );
+    if (generatedCopy) {
+      removeFinance(generatedCopy.id);
+    }
+  };
+
+  const deleteSelectedSubscriptions = () => {
+    selectedSubIds.forEach(deleteSubscriptionCascade);
+    setSelectedSubIds([]);
+  };
+
+  const deleteMovementCascade = (moveId: string) => {
+    const move = finances.find((f) => f.id === moveId);
+    if (!move) return;
+    removeFinance(moveId);
+    const matchingTemplate = finances.find(
+      (f) =>
+        f.type === "gasto" &&
+        f.recurrence &&
+        f.title.toLowerCase().trim() === move.title.toLowerCase().trim()
+    );
+    if (matchingTemplate) {
+      removeFinance(matchingTemplate.id);
+    }
+  };
+
+  const deleteSelectedMovements = () => {
+    selectedMoveIds.forEach(deleteMovementCascade);
+    setSelectedMoveIds([]);
+  };
 
   const thisMonth = useMemo(
     () =>
@@ -306,10 +350,20 @@ export default function GastosPage() {
 
         <Reveal delay={0.12}>
           <Card className="card-hover h-full">
-            <SectionTitle
-              title="Suscripciones activas"
-              hint={subscriptions.length > 0 ? `${format(totalMonthlySubscriptions)}/mes en fijos` : "Marca un gasto como 🔁 para verlo aquí"}
-            />
+            <div className="flex justify-between items-center mb-2">
+              <SectionTitle
+                title="Suscripciones activas"
+                hint={subscriptions.length > 0 ? `${format(totalMonthlySubscriptions)}/mes en fijos` : "Marca un gasto como 🔁 para verlo aquí"}
+              />
+              {selectedSubIds.length > 0 && (
+                <button
+                  onClick={deleteSelectedSubscriptions}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1"
+                >
+                  ✕ Eliminar ({selectedSubIds.length})
+                </button>
+              )}
+            </div>
             {subscriptions.length === 0 ? (
               <EmptyState icon="🔁" title="Sin suscripciones" description="Al añadir un gasto, marca 'Es una suscripción' para que aparezca aquí." />
             ) : (
@@ -329,17 +383,31 @@ export default function GastosPage() {
                           initial={{ opacity: 0, x: -6 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0 }}
-                          className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line"
+                          className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line group"
                         >
-                          <div className="min-w-0">
-                            <div className="font-medium text-sm truncate flex items-center gap-1.5">
-                              <span className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
-                              {s.title}
-                            </div>
-                            <CategoryPicker
-                              current={s.category}
-                              onChange={(cat) => updateFinance(s.id, { category: cat })}
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={selectedSubIds.includes(s.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedSubIds([...selectedSubIds, s.id]);
+                                } else {
+                                  setSelectedSubIds(selectedSubIds.filter((id) => id !== s.id));
+                                }
+                              }}
+                              className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
                             />
+                            <div className="min-w-0">
+                              <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                                <span className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>
+                                {s.title}
+                              </div>
+                              <CategoryPicker
+                                current={s.category}
+                                onChange={(cat) => updateFinance(s.id, { category: cat })}
+                              />
+                            </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-2">
                             <div className="text-right">
@@ -350,26 +418,11 @@ export default function GastosPage() {
                               {isForeign && <div className="text-[10px] text-rumbo-muted">≈ {format(amountInPrimary(s))}</div>}
                             </div>
                             <button
-                              onClick={() => {
-                                if (confirm(`¿Quieres eliminar la suscripción "${s.title}"?\nEsto también eliminará el cargo de este mes si ya fue generado.`)) {
-                                  removeFinance(s.id);
-                                  // Also search for any generated copies in finances that match this title for this month and delete them!
-                                  const generatedCopy = finances.find(
-                                    (f) =>
-                                      f.type === "gasto" &&
-                                      !f.recurrence &&
-                                      f.title.toLowerCase().trim() === s.title.toLowerCase().trim() &&
-                                      monthKey(new Date(f.date)) === currentKey
-                                  );
-                                  if (generatedCopy) {
-                                    removeFinance(generatedCopy.id);
-                                  }
-                                }
-                              }}
+                              onClick={() => deleteSubscriptionCascade(s.id)}
                               aria-label={`Eliminar suscripción ${s.title}`}
                               className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
                             >
-                              🗑️
+                              ✕
                             </button>
                           </div>
                         </motion.div>
@@ -442,10 +495,20 @@ export default function GastosPage() {
       {/* Expense list */}
       <Reveal delay={0.18}>
         <Card className="card-hover">
-          <SectionTitle
-            title="Movimientos del mes"
-            hint={`${thisMonth.length} gastos en ${selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`}
-          />
+          <div className="flex justify-between items-center mb-2">
+            <SectionTitle
+              title="Movimientos del mes"
+              hint={`${thisMonth.length} gastos en ${selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`}
+            />
+            {selectedMoveIds.length > 0 && (
+              <button
+                onClick={deleteSelectedMovements}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1"
+              >
+                ✕ Eliminar ({selectedMoveIds.length})
+              </button>
+            )}
+          </div>
           {thisMonth.length === 0 ? (
             <EmptyState icon="🧾" title="Sin gastos este mes" description="Apunta el primero arriba." />
           ) : (
@@ -459,9 +522,21 @@ export default function GastosPage() {
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
-                    className="flex items-center justify-between py-3 border-b last:border-0 border-rumbo-line"
+                    className="flex items-center justify-between py-3 border-b last:border-0 border-rumbo-line group"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedMoveIds.includes(f.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedMoveIds([...selectedMoveIds, f.id]);
+                          } else {
+                            setSelectedMoveIds(selectedMoveIds.filter((id) => id !== f.id));
+                          }
+                        }}
+                        className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
+                      />
                       <div className="min-w-0">
                         <div className="font-medium truncate flex items-center gap-1.5">
                           {f.title}
@@ -477,21 +552,17 @@ export default function GastosPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0 ml-2">
                       <div className="text-right">
                         <span className="text-rose-600 font-medium">-{formatCurrency(f.amount, entryCurrency)}</span>
                         {isForeign && <div className="text-[10px] text-rumbo-muted">≈ -{format(amountInPrimary(f))}</div>}
                       </div>
                       <button
-                        onClick={() => {
-                          if (confirm(`¿Quieres eliminar el gasto "${f.title}"?`)) {
-                            removeFinance(f.id);
-                          }
-                        }}
+                        onClick={() => deleteMovementCascade(f.id)}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
                         aria-label={`Eliminar gasto ${f.title}`}
                       >
-                        🗑️
+                        ✕
                       </button>
                     </div>
                   </motion.div>

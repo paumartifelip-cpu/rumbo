@@ -106,6 +106,50 @@ export function MonthlyIncome() {
     setForm((f) => ({ ...f, currency: primaryCurrency }));
   }, [primaryCurrency]);
 
+  const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
+  const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([]);
+
+  const deleteSubscriptionCascade = (subId: string) => {
+    const sub = finances.find((f) => f.id === subId);
+    if (!sub) return;
+    removeFinance(subId);
+    const generatedCopy = finances.find(
+      (f) =>
+        f.type === "ingreso" &&
+        !f.recurrence &&
+        f.title.toLowerCase().trim() === sub.title.toLowerCase().trim() &&
+        monthKey(new Date(f.date)) === currentKey
+    );
+    if (generatedCopy) {
+      removeFinance(generatedCopy.id);
+    }
+  };
+
+  const deleteSelectedSubscriptions = () => {
+    selectedSubIds.forEach(deleteSubscriptionCascade);
+    setSelectedSubIds([]);
+  };
+
+  const deleteMovementCascade = (moveId: string) => {
+    const move = finances.find((f) => f.id === moveId);
+    if (!move) return;
+    removeFinance(moveId);
+    const matchingTemplate = finances.find(
+      (f) =>
+        f.type === "ingreso" &&
+        f.recurrence &&
+        f.title.toLowerCase().trim() === move.title.toLowerCase().trim()
+    );
+    if (matchingTemplate) {
+      removeFinance(matchingTemplate.id);
+    }
+  };
+
+  const deleteSelectedMovements = () => {
+    selectedMoveIds.forEach(deleteMovementCascade);
+    setSelectedMoveIds([]);
+  };
+
   function submit() {
     if (!form.title || typeof form.amount !== "number" || form.amount <= 0)
       return;
@@ -243,10 +287,20 @@ export function MonthlyIncome() {
       {/* Recurring Incomes Section */}
       {recurringIncomes.length > 0 && (
         <div className="mt-8 border-t border-rumbo-line pt-5">
-          <SectionTitle 
-            title="Ingresos recurrentes activos" 
-            hint="Estos ingresos se repiten cada mes automáticamente."
-          />
+          <div className="flex justify-between items-center mb-2">
+            <SectionTitle 
+              title="Ingresos recurrentes activos" 
+              hint="Estos ingresos se repiten cada mes automáticamente."
+            />
+            {selectedSubIds.length > 0 && (
+              <button
+                onClick={deleteSelectedSubscriptions}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1"
+              >
+                ✕ Eliminar ({selectedSubIds.length})
+              </button>
+            )}
+          </div>
           <div className="grid gap-2">
             <AnimatePresence>
               {recurringIncomes.map((s) => {
@@ -258,12 +312,26 @@ export function MonthlyIncome() {
                     initial={{ opacity: 0, x: -6 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0 }}
-                    className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line"
+                    className="flex items-center justify-between py-2 border-b last:border-0 border-rumbo-line group"
                   >
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm truncate flex items-center gap-1.5">
-                        <span className="text-[10px] bg-emerald-100 text-emerald-900 px-1 rounded font-bold">🔁</span>
-                        {s.title}
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedSubIds.includes(s.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedSubIds([...selectedSubIds, s.id]);
+                          } else {
+                            setSelectedSubIds(selectedSubIds.filter((id) => id !== s.id));
+                          }
+                        }}
+                        className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
+                      />
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                          <span className="text-[10px] bg-emerald-100 text-emerald-900 px-1 rounded font-bold">🔁</span>
+                          {s.title}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 shrink-0 ml-2">
@@ -279,26 +347,11 @@ export function MonthlyIncome() {
                         )}
                       </div>
                       <button
-                        onClick={() => {
-                          if (confirm(`¿Quieres eliminar el ingreso recurrente "${s.title}"?\nEsto también eliminará el movimiento de este mes si ya fue generado.`)) {
-                            removeFinance(s.id);
-                            // Also search for any generated copies in finances that match this title for this month and delete them!
-                            const generatedCopy = finances.find(
-                              (f) =>
-                                f.type === "ingreso" &&
-                                !f.recurrence &&
-                                f.title.toLowerCase().trim() === s.title.toLowerCase().trim() &&
-                                monthKey(new Date(f.date)) === currentKey
-                            );
-                            if (generatedCopy) {
-                              removeFinance(generatedCopy.id);
-                            }
-                          }
-                        }}
+                        onClick={() => deleteSubscriptionCascade(s.id)}
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
                         aria-label="Eliminar ingreso recurrente"
                       >
-                        🗑️
+                        ✕
                       </button>
                     </div>
                   </motion.div>
@@ -311,7 +364,17 @@ export function MonthlyIncome() {
 
       {/* Entries this month */}
       <div className="mt-8 border-t border-rumbo-line pt-5">
-        <SectionTitle title="Movimientos de este mes" />
+        <div className="flex justify-between items-center mb-2">
+          <SectionTitle title="Movimientos de este mes" />
+          {selectedMoveIds.length > 0 && (
+            <button
+              onClick={deleteSelectedMovements}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1"
+            >
+              ✕ Eliminar ({selectedMoveIds.length})
+            </button>
+          )}
+        </div>
         <AnimatePresence>
           {thisMonthEntries.length === 0 ? (
             <div className="text-sm text-rumbo-muted py-3">
@@ -327,15 +390,29 @@ export function MonthlyIncome() {
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="flex items-center justify-between py-2.5 border-b last:border-0 border-rumbo-line"
+                  className="flex items-center justify-between py-2.5 border-b last:border-0 border-rumbo-line group"
                 >
-                  <div>
-                    <div className="font-medium">{f.title}</div>
-                    <div className="text-xs text-rumbo-muted">
-                      {formatDate(f.date)}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={selectedMoveIds.includes(f.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedMoveIds([...selectedMoveIds, f.id]);
+                        } else {
+                          setSelectedMoveIds(selectedMoveIds.filter((id) => id !== f.id));
+                        }
+                      }}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
+                    />
+                    <div>
+                      <div className="font-medium">{f.title}</div>
+                      <div className="text-xs text-rumbo-muted">
+                        {formatDate(f.date)}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 shrink-0 ml-2">
                     <div className="text-right">
                       <span className="text-emerald-600 font-medium">
                         +{formatCurrency(f.amount, entryCurrency)}
@@ -347,15 +424,11 @@ export function MonthlyIncome() {
                       )}
                     </div>
                     <button
-                      onClick={() => {
-                        if (confirm(`¿Quieres eliminar el ingreso "${f.title}"?`)) {
-                          removeFinance(f.id);
-                        }
-                      }}
+                      onClick={() => deleteMovementCascade(f.id)}
                       className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
                       aria-label="Eliminar ingreso"
                     >
-                      🗑️
+                      ✕
                     </button>
                   </div>
                 </motion.div>
