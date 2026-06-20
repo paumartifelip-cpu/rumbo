@@ -21,9 +21,7 @@ type FloatItem = {
 
 const FLOATERS: FloatItem[] = [
   { emoji: "🎯", label: "Objetivos",       bg: "bg-amber-300",   pos: { top: "10%", left: "8%"  }, size: "lg", delay: 0.0, amp: 10, rotate: -6 },
-  { emoji: "🤖", label: "IA priorizadora", bg: "bg-violet-300",  pos: { top: "6%",  left: "32%" }, size: "md", delay: 0.4, amp: 8,  rotate: 8, hideOnMobile: true },
   { emoji: "🏆", label: "Logros",          bg: "bg-rose-300",    pos: { top: "12%", left: "58%" }, size: "sm", delay: 0.8, amp: 7,  rotate: -10, hideOnMobile: true },
-  { emoji: "✅", label: "Tareas",          bg: "bg-emerald-300", pos: { top: "8%",  left: "82%" }, size: "lg", delay: 0.2, amp: 9,  rotate: 6 },
   { emoji: "🛠️", label: "Stack",           bg: "bg-sky-300",     pos: { top: "30%", left: "3%"  }, size: "md", delay: 0.6, amp: 8,  rotate: 4, hideOnMobile: true },
   { emoji: "💡", label: "Ideas",           bg: "bg-pink-300",    pos: { top: "32%", left: "90%" }, size: "md", delay: 1.0, amp: 9,  rotate: -8, hideOnMobile: true },
   { emoji: "💰", label: "Dinero",          bg: "bg-lime-300",    pos: { top: "55%", left: "5%"  }, size: "lg", delay: 0.3, amp: 10, rotate: 5 },

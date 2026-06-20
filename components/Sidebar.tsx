@@ -15,7 +15,6 @@ const items = [
   { href: "/dashboard", label: "Inicio",    icon: "🏠", chip: "bg-amber-100"   },
   { href: "/money",     label: "Dinero",    icon: "💸", chip: "bg-lime-100"    },
   { href: "/gastos",    label: "Gastos",    icon: "🧾", chip: "bg-cyan-100"    },
-  { href: "/tasks",     label: "Tareas",    icon: "✅", chip: "bg-emerald-100" },
   { href: "/goals",     label: "Objetivos", icon: "🚩", chip: "bg-rose-100"    },
   { href: "/stack",     label: "Stack",     icon: "🧰", chip: "bg-violet-100"  },
   { href: "/settings",  label: "Ajustes",   icon: "⚙️", chip: "bg-slate-100"   },
@@ -155,7 +154,6 @@ const MOBILE_TABS = [
   { href: "/dashboard", label: "Inicio",  icon: "🏠", chip: "bg-amber-100"   },
   { href: "/money",     label: "Dinero",  icon: "💸", chip: "bg-lime-100"    },
   { href: "/gastos",    label: "Gastos",  icon: "🧾", chip: "bg-cyan-100"    },
-  { href: "/tasks",     label: "Tareas",  icon: "✅", chip: "bg-emerald-100" },
 ];
 
 const MORE_PATHS = ["/goals", "/stack", "/settings"];

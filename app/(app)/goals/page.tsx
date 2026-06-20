@@ -45,7 +45,7 @@ const TIMEFRAME_META: Record<string, { label: string; icon: string; gradient: st
 };
 
 export default function GoalsPage() {
-  const { goals, addGoal, updateGoal, removeGoal, tasks, primaryCurrency } = useRumbo();
+  const { goals, addGoal, updateGoal, removeGoal, primaryCurrency } = useRumbo();
   const formatMoney = useFormatMoney();
   const symbol = CURRENCIES[primaryCurrency].symbol;
   const [open, setOpen] = useState(false);
@@ -116,13 +116,9 @@ export default function GoalsPage() {
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {grouped[tf].map((g) => {
-                  const linked = tasks.filter((t) => t.goal_id === g.id);
-                  const done = linked.filter((t) => t.status === "completada").length;
                   const isIncremental = !!g.unit && !!g.target_amount;
                   const computed = isIncremental
                     ? Math.min(100, Math.round(((g.current_amount ?? 0) / g.target_amount!) * 100))
-                    : linked.length > 0
-                    ? Math.round((done / linked.length) * 100)
                     : g.target_amount
                     ? Math.min(100, Math.round(((g.current_amount ?? 0) / g.target_amount) * 100))
                     : g.progress;
@@ -244,8 +240,6 @@ export default function GoalsPage() {
                                 {formatMoney(g.current_amount ?? 0)}
                                 <span className="text-slate-400 font-medium"> / {formatMoney(g.target_amount)}</span>
                               </div>
-                            ) : linked.length > 0 ? (
-                              <div className="text-xs text-slate-400 font-bold">{done} de {linked.length} tareas</div>
                             ) : null}
                           </div>
                         )}
