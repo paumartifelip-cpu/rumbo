@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MobileHeader, MobileNav, Sidebar } from "@/components/Sidebar";
 import { useRumbo } from "@/lib/store";
-import { getCurrentProfileId, setCurrentProfileId } from "@/lib/profiles";
-import { needsPinPrompt } from "@/lib/pin";
+import { getSupabase } from "@/lib/supabase";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -13,22 +12,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    // Wait until store has hydrated. profile === null after mount and no
-    // saved id means redirect to login. Also boot back to login if the PIN
-    // hasn't been verified for a while.
-    const id = getCurrentProfileId();
-    if (!id) {
+    const supa = getSupabase();
+    if (!supa) {
       router.replace("/login");
       return;
     }
-    if (needsPinPrompt(id)) {
-      // Drop the session so the login page doesn't bounce us back. Local
-      // data buckets stay intact — the user re-enters via PIN.
-      setCurrentProfileId(null);
-      window.location.replace("/login");
-      return;
-    }
-    setChecked(true);
+    let active = true;
+    // Only an authenticated Supabase session may enter the app.
+    supa.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (!data.session) {
+        router.replace("/login");
+        return;
+      }
+      setChecked(true);
+    });
+    // Bounce straight back to login the moment the session ends anywhere.
+    const { data: sub } = supa.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.replace("/login");
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, [router]);
 
   if (!checked || !profile) {

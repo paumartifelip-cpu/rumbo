@@ -20,15 +20,13 @@ import {
 import { mockFinances, mockGoals, mockSnapshots, mockTasks, mockUser } from "./mock";
 import { localPrioritize } from "./priority";
 import {
-  findProfile,
-  getCurrentProfileId,
   getProfileCurrency,
   Profile,
-  setCurrentProfileId,
   updateProfileCurrency,
   updateProfileLocally,
 } from "./profiles";
 import { pullFromSupabase, pushToSupabase, SyncSnapshot, wipeProfileData } from "./sync";
+import { ensureProfileRow, profileFromAuthUser, signOutAuth } from "./auth";
 import { getSupabase, supabaseEnabled } from "./supabase";
 import {
   FinancialEntry,
@@ -258,74 +256,99 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   // True from the moment a local edit happens until the push completes,
   // so auto-refresh doesn't overwrite a pending local change.
   const pushPendingRef = useRef(false);
+  // Which auth user we've already booted, so repeated auth events
+  // (token refresh, INITIAL_SESSION) don't re-load and re-pull needlessly.
+  const bootedUidRef = useRef<string | null>(null);
 
-  // Load current profile + its data on mount.
-  useEffect(() => {
-    // Kick off live FX-rate fetch in the background.
-    fetchRates().catch(() => {});
-    const id = getCurrentProfileId();
-    const p = findProfile(id);
+  // Load a profile's data: local cache first (instant), then authoritative pull.
+  function bootProfile(p: Profile) {
+    if (bootedUidRef.current === p.user_id) return;
+    bootedUidRef.current = p.user_id;
     setProfile(p);
-    if (p) {
-      const profileCurrency = getProfileCurrency(p.id);
-      // Local cache first (instant load).
-      try {
-        const raw = localStorage.getItem(storageKeyFor(p.id));
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          // One-time migration: replace tools when the curated list has been
-          // bumped, OR when we detect any name from the previous default list.
-          const needsToolsReset =
-            parsed._toolsVersion !== TOOLS_VERSION ||
-            userToolsAreStale(parsed.userTools);
-          const userTools =
-            !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
-              ? parsed.userTools
-              : buildDefaultUserTools(p.user_id);
-          const onboardingDone = Boolean(
-            parsed.onboarding &&
-            parsed.onboarding.total_target > 0 &&
-            parsed.onboarding.monthly_target > 0
-          );
-          setState({
-            ...defaultState,
-            ...parsed,
-            userTools,
-            onboardingDone,
-            prioritizing: false,
-            aiSource: parsed.aiSource ?? "idle",
-            syncStatus: supabaseEnabled ? "syncing" : "offline",
-            primaryCurrency: profileCurrency,
-          });
-        } else {
-          setState({
-            ...defaultState,
-            user: { ...mockUser, name: p.name, email: p.email ?? "" },
-            userTools: buildDefaultUserTools(p.user_id),
-            primaryCurrency: profileCurrency,
-          });
-        }
-      } catch {
+    const profileCurrency = getProfileCurrency(p.id);
+    // user.id MUST equal the auth uid — every new row is stamped with it and
+    // RLS checks auth.uid() = user_id. Always override whatever the cache had.
+    const authedUser = { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" };
+    try {
+      const raw = localStorage.getItem(storageKeyFor(p.id));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const needsToolsReset =
+          parsed._toolsVersion !== TOOLS_VERSION || userToolsAreStale(parsed.userTools);
+        const userTools =
+          !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
+            ? parsed.userTools
+            : buildDefaultUserTools(p.user_id);
+        const onboardingDone = Boolean(
+          parsed.onboarding && parsed.onboarding.total_target > 0 && parsed.onboarding.monthly_target > 0
+        );
         setState({
           ...defaultState,
+          ...parsed,
+          user: authedUser,
+          userTools,
+          onboardingDone,
+          prioritizing: false,
+          aiSource: parsed.aiSource ?? "idle",
+          syncStatus: supabaseEnabled ? "syncing" : "offline",
+          primaryCurrency: profileCurrency,
+        });
+      } else {
+        setState({
+          ...defaultState,
+          user: authedUser,
           userTools: buildDefaultUserTools(p.user_id),
           primaryCurrency: profileCurrency,
         });
       }
-      // Then pull from Supabase to get the latest authoritative state.
-      if (supabaseEnabled) {
-        pullFromSupabase(p.user_id).then((remote) => {
-          if (remote) {
-            applyRemote(p, remote);
-          } else {
-            setState((s) => ({ ...s, syncStatus: "error" }));
-          }
-        });
-      }
-    } else {
-      setState(defaultState);
+    } catch {
+      setState({
+        ...defaultState,
+        user: authedUser,
+        userTools: buildDefaultUserTools(p.user_id),
+        primaryCurrency: profileCurrency,
+      });
     }
-    setHydrated(true);
+    if (supabaseEnabled) {
+      pullFromSupabase(p.user_id).then((remote) => {
+        if (remote) applyRemote(p, remote);
+        else setState((s) => ({ ...s, syncStatus: "error" }));
+      });
+    }
+  }
+
+  // Auth-driven bootstrap: the active user is whoever holds the Supabase session.
+  useEffect(() => {
+    fetchRates().catch(() => {});
+    const supa = getSupabase();
+    if (!supa) { setHydrated(true); return; }
+
+    supa.auth.getSession().then(({ data }) => {
+      const u = data.session?.user;
+      if (u) {
+        const p = profileFromAuthUser(u);
+        ensureProfileRow(u.id, p.name, u.email ?? "").catch(() => {});
+        bootProfile(p);
+      } else {
+        bootedUidRef.current = null;
+        setProfile(null);
+        setState(defaultState);
+      }
+      setHydrated(true);
+    });
+
+    const { data: sub } = supa.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user;
+      if (u) {
+        bootProfile(profileFromAuthUser(u));
+      } else {
+        bootedUidRef.current = null;
+        setProfile(null);
+        setState(defaultState);
+      }
+    });
+    return () => { sub.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function applyRemote(p: Profile, remote: SyncSnapshot) {
@@ -827,67 +850,10 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.user_id]);
 
-  const signIn = useCallback((profileId: string) => {
-    const p = findProfile(profileId);
-    if (!p) return;
-    setCurrentProfileId(p.id);
-    setProfile(p);
-    const profileCurrency = getProfileCurrency(p.id);
-    // Local cache first.
-    try {
-      const raw = localStorage.getItem(storageKeyFor(p.id));
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const needsToolsReset =
-          parsed._toolsVersion !== TOOLS_VERSION ||
-          userToolsAreStale(parsed.userTools);
-        const userTools =
-          !needsToolsReset && Array.isArray(parsed.userTools) && parsed.userTools.length > 0
-            ? parsed.userTools
-            : buildDefaultUserTools(p.user_id);
-        const onboardingDone = Boolean(
-          parsed.onboarding &&
-          parsed.onboarding.total_target > 0 &&
-          parsed.onboarding.monthly_target > 0
-        );
-        setState({
-          ...defaultState,
-          ...parsed,
-          userTools,
-          onboardingDone,
-          prioritizing: false,
-          aiSource: parsed.aiSource ?? "idle",
-          syncStatus: supabaseEnabled ? "syncing" : "offline",
-          primaryCurrency: profileCurrency,
-        });
-      } else {
-        setState({
-          ...defaultState,
-          user: { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" },
-          userTools: buildDefaultUserTools(p.user_id),
-          syncStatus: supabaseEnabled ? "syncing" : "offline",
-          primaryCurrency: profileCurrency,
-        });
-      }
-    } catch {
-      setState({
-        ...defaultState,
-        user: { ...mockUser, id: p.user_id, name: p.name, email: p.email ?? "" },
-        userTools: buildDefaultUserTools(p.user_id),
-        primaryCurrency: profileCurrency,
-      });
-    }
-    // Pull authoritative state from Supabase.
-    if (supabaseEnabled) {
-      pullFromSupabase(p.user_id).then((remote) => {
-        if (remote) {
-          applyRemote(p, remote);
-        } else {
-          setState((s) => ({ ...s, syncStatus: "error" }));
-        }
-      });
-    }
-  }, []);
+  // Sign-in now happens through Supabase Auth (lib/auth.ts); the store reacts
+  // via onAuthStateChange and boots the profile automatically. Kept for API
+  // compatibility with any caller that still references it.
+  const signIn = useCallback((_profileId: string) => {}, []);
 
   const setPrimaryCurrency = useCallback(
     (c: Currency) => {
@@ -942,7 +908,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
-    setCurrentProfileId(null);
+    bootedUidRef.current = null;
+    signOutAuth().catch(() => {});
     setProfile(null);
     setState(defaultState);
   }, []);

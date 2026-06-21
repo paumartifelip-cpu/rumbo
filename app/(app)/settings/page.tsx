@@ -1,20 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/Card";
 import { SettingsAccordion } from "@/components/SettingsAccordion";
-import { PinModal } from "@/components/PinModal";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { supabaseEnabled } from "@/lib/supabase";
 import { CURRENCIES, Currency } from "@/lib/currency";
-import {
-  PIN_THRESHOLD_DAYS,
-  checkPin,
-  clearPin,
-  isPinSet,
-  setPin,
-} from "@/lib/pin";
+import { sendPasswordReset } from "@/lib/auth";
 import { RumboWrapped } from "@/components/RumboWrapped";
 
 export default function SettingsPage() {
@@ -43,31 +36,18 @@ export default function SettingsPage() {
     : onboarding?.current_money ?? null;
   const formatMoney = useFormatMoney();
 
-  const [pinModal, setPinModal] = useState<null | "create" | "change">(null);
-  const [pinHasValue, setPinHasValue] = useState(false);
-  const [pinHint, setPinHint] = useState<string | null>(null);
   const [showWrapped, setShowWrapped] = useState(false);
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwHint, setPwHint] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (profile) setPinHasValue(isPinSet(profile.id));
-  }, [profile]);
-
-  async function handleSetPin(pin: string) {
-    if (!profile) return;
-    await setPin(profile.id, profile.user_id, pin);
-    setPinHasValue(true);
-    setPinModal(null);
-    setPinHint("PIN guardado");
-    setTimeout(() => setPinHint(null), 2500);
-  }
-
-  async function handleRemovePin() {
-    if (!profile) return;
-    if (!confirm("¿Quitar el PIN de esta cuenta? Cualquiera podrá entrar.")) return;
-    await clearPin(profile.id, profile.user_id);
-    setPinHasValue(false);
-    setPinHint("PIN eliminado");
-    setTimeout(() => setPinHint(null), 2500);
+  async function handleChangePassword() {
+    const email = user.email;
+    if (!email) { setPwHint("No hay email en tu cuenta."); return; }
+    setPwBusy(true);
+    const res = await sendPasswordReset(email);
+    setPwBusy(false);
+    setPwHint(res.ok ? "Te hemos enviado un email para cambiar tu contraseña." : (res.error ?? "No se pudo enviar."));
+    setTimeout(() => setPwHint(null), 4000);
   }
 
 
@@ -241,51 +221,31 @@ export default function SettingsPage() {
 
         <SettingsAccordion
           id="security"
-          title="Seguridad"
+          title="Cuenta y seguridad"
           icon="🔒"
-          hint={`Añade un PIN de 4 dígitos para bloquear tu app tras ${PIN_THRESHOLD_DAYS} días.`}
+          hint="Tu cuenta está protegida con email y contraseña. Solo tú ves tus datos."
           activeId={activeSection}
           onToggle={toggleSection}
         >
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="text-sm">
               <div className="font-medium flex items-center gap-2">
-                {pinHasValue ? "PIN activado 🔒" : "Sin PIN"}
+                {user.email || "Sin email"}
               </div>
               <div className="text-rumbo-muted text-xs mt-1 max-w-sm">
-                {pinHasValue
-                  ? `Tendrás que escribirlo después de ${PIN_THRESHOLD_DAYS} días sin entrar.`
-                  : "Crea uno para que nadie más pueda abrir tu cuenta."}
+                Tus datos están aislados por usuario: nadie más puede verlos ni modificarlos.
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {pinHasValue ? (
-                <>
-                  <button
-                    className="btn-soft"
-                    onClick={() => setPinModal("change")}
-                  >
-                    Cambiar PIN
-                  </button>
-                  <button
-                    className="btn-ghost text-rose-600"
-                    onClick={handleRemovePin}
-                  >
-                    Quitar PIN
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="btn-primary"
-                  onClick={() => setPinModal("create")}
-                >
-                  Crear PIN
-                </button>
-              )}
-            </div>
+            <button
+              className="btn-soft"
+              onClick={handleChangePassword}
+              disabled={pwBusy}
+            >
+              {pwBusy ? "Enviando…" : "Cambiar contraseña"}
+            </button>
           </div>
-          {pinHint && (
-            <div className="text-emerald-600 text-sm mt-3 bg-emerald-50 px-3 py-2 rounded-lg inline-block">{pinHint}</div>
+          {pwHint && (
+            <div className="text-emerald-600 text-sm mt-3 bg-emerald-50 px-3 py-2 rounded-lg inline-block">{pwHint}</div>
           )}
         </SettingsAccordion>
 
@@ -312,15 +272,6 @@ export default function SettingsPage() {
         </SettingsAccordion>
       </div>
 
-      {pinModal && profile && (
-        <PinModal
-          profile={profile}
-          mode="create"
-          onSuccess={handleSetPin}
-          onCancel={() => setPinModal(null)}
-          verify={(pin) => checkPin(profile.id, profile.user_id, pin)}
-        />
-      )}
       {showWrapped && <RumboWrapped onClose={() => setShowWrapped(false)} />}
     </div>
   );
