@@ -125,10 +125,10 @@ values
 on conflict (user_id) do nothing;
 
 -- =============================================
--- RLS abierto (sin auth)
--- Permite lectura/escritura con la clave anon. Apto para una app personal
--- de dos perfiles preconfigurados. Si añades auth real más adelante,
--- reemplaza estas políticas por las basadas en auth.uid().
+-- RLS por usuario (Supabase Auth)
+-- Cada usuario inicia sesión con email + contraseña; user_id = auth.uid().
+-- La base de datos GARANTIZA que cada uno solo lee/escribe sus propias filas,
+-- aunque tenga la clave anon. NO uses políticas "using(true)": reabren todo.
 -- =============================================
 
 alter table profiles enable row level security;
@@ -139,7 +139,7 @@ alter table money_snapshots enable row level security;
 alter table user_tools enable row level security;
 alter table paid_codes enable row level security;
 
--- Borra políticas previas para que el script sea repetible.
+-- Borra políticas previas (abiertas o no) para que el script sea repetible.
 drop policy if exists "open_all_profiles" on profiles;
 drop policy if exists "open_all_goals" on goals;
 drop policy if exists "open_all_tasks" on tasks;
@@ -148,16 +148,20 @@ drop policy if exists "open_all_money_snapshots" on money_snapshots;
 drop policy if exists "open_all_user_tools" on user_tools;
 drop policy if exists "anon_read_paid_codes"   on paid_codes;
 drop policy if exists "anon_update_paid_codes" on paid_codes;
+drop policy if exists "own_profiles" on profiles;
+drop policy if exists "own_goals" on goals;
+drop policy if exists "own_tasks" on tasks;
+drop policy if exists "own_financial_entries" on financial_entries;
+drop policy if exists "own_money_snapshots" on money_snapshots;
+drop policy if exists "own_user_tools" on user_tools;
 
-create policy "open_all_profiles" on profiles for all using (true) with check (true);
-create policy "open_all_goals" on goals for all using (true) with check (true);
-create policy "open_all_tasks" on tasks for all using (true) with check (true);
-create policy "open_all_financial_entries" on financial_entries for all using (true) with check (true);
-create policy "open_all_money_snapshots" on money_snapshots for all using (true) with check (true);
-create policy "open_all_user_tools" on user_tools for all using (true) with check (true);
+-- Cada usuario solo puede ver/editar sus propias filas.
+create policy "own_profiles" on profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_goals" on goals for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_tasks" on tasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_financial_entries" on financial_entries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_money_snapshots" on money_snapshots for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_user_tools" on user_tools for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- paid_codes: anon can READ (to verify a code) and UPDATE (mark used=true
--- after creating a profile). Inserts come exclusively from the stripe-webhook
--- Edge Function which uses the service role key.
-create policy "anon_read_paid_codes"   on paid_codes for select using (true);
-create policy "anon_update_paid_codes" on paid_codes for update using (true) with check (true);
+-- paid_codes: tabla del paywall antiguo (ya no se usa). Sin políticas =
+-- inaccesible vía API. Los Edge Functions (service role) la saltan si hiciera falta.

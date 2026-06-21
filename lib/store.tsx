@@ -259,11 +259,18 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   // Which auth user we've already booted, so repeated auth events
   // (token refresh, INITIAL_SESSION) don't re-load and re-pull needlessly.
   const bootedUidRef = useRef<string | null>(null);
+  // CRITICAL data-safety gate: stays false until we've successfully pulled the
+  // user's remote data at least once. The debounced push is blocked until then,
+  // so a slow/failed initial pull can never push an empty local state that
+  // would wipe the user's cloud data. Reset on every profile (re)boot.
+  const initialPullDoneRef = useRef(false);
 
   // Load a profile's data: local cache first (instant), then authoritative pull.
   function bootProfile(p: Profile) {
     if (bootedUidRef.current === p.user_id) return;
     bootedUidRef.current = p.user_id;
+    // Block any push until this profile's remote data has been pulled once.
+    initialPullDoneRef.current = false;
     setProfile(p);
     const profileCurrency = getProfileCurrency(p.id);
     // user.id MUST equal the auth uid — every new row is stamped with it and
@@ -352,6 +359,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   }, []);
 
   function applyRemote(p: Profile, remote: SyncSnapshot) {
+    // We have authoritative remote data now — safe to allow pushes.
+    initialPullDoneRef.current = true;
     const cur = stateRef.current;
     // Rows the user deleted locally must never be re-added by a racing pull,
     // even if the remote still has them (the delete push may not have landed).
@@ -748,6 +757,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!hydrated || !profile || !supabaseEnabled) return;
+    // Data-safety gate: never push until the first successful remote pull, so an
+    // empty/initial local state can't overwrite (and wipe) the user's cloud data.
+    if (!initialPullDoneRef.current) return;
     // Skip pushing while we're still pulling the initial remote state.
     if (state.syncStatus === "syncing") return;
     // The state change came from a remote pull — don't echo it back.
@@ -909,6 +921,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     bootedUidRef.current = null;
+    initialPullDoneRef.current = false;
     signOutAuth().catch(() => {});
     setProfile(null);
     setState(defaultState);
