@@ -82,7 +82,7 @@ function LoginInner() {
     mode === "signin"
       ? "Entra con tu email y contraseña."
       : mode === "signup"
-      ? "Tu dinero, solo tuyo. Empieza gratis."
+      ? "Tu dinero, solo tuyo. Empieza en un minuto."
       : "Te enviaremos un enlace para crear una nueva.";
 
   return (
@@ -171,7 +171,7 @@ function LoginInner() {
                 <div>
                   ¿No tienes cuenta?{" "}
                   <button onClick={() => { setMode("signup"); setError(null); setInfo(null); }} className="font-semibold text-emerald-700 hover:underline">
-                    Crea una gratis
+                    Créala aquí
                   </button>
                 </div>
                 <div>
