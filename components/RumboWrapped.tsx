@@ -11,23 +11,18 @@ function pct(a: number, b: number) {
   return Math.round((a / b) * 100);
 }
 
-function topBy<T>(arr: T[], key: (x: T) => string, n = 1): string[] {
-  const counts: Record<string, number> = {};
-  for (const x of arr) {
-    const k = key(x);
-    counts[k] = (counts[k] ?? 0) + 1;
-  }
-  return Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, n)
-    .map(([k]) => k);
+const MONTHS_ES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+function monthLabel(key: string) {
+  const [y, m] = key.split("-").map(Number);
+  return `${MONTHS_ES[m - 1]} ${y}`;
 }
 
-// ─── slide configs ────────────────────────────────────────────────────────────
-
 interface SlideData {
-  bg: string;       // gradient class
-  accent: string;   // accent colour class
+  bg: string;
+  accent: string;
   icon: string;
   title: string;
   hero: string;
@@ -38,132 +33,287 @@ interface SlideData {
 // ─── component ────────────────────────────────────────────────────────────────
 
 export function RumboWrapped({ onClose }: { onClose: () => void }) {
-  const { tasks, goals, finances, snapshots, onboarding, user } = useRumbo();
+  const { finances, snapshots, onboarding, user, amountInPrimary } = useRumbo();
   const formatMoney = useFormatMoney();
 
-  // ── compute stats ───────────────────────────────────────────────────────────
+  // ── compute money-only stats ────────────────────────────────────────────────
   const stats = useMemo(() => {
-    const completed   = tasks.filter((t) => t.status === "completada");
-    const pending     = tasks.filter((t) => t.status === "pendiente");
-    const highImpact  = completed.filter((t) => (t.ai_priority_score ?? 0) >= 70);
-    const totalMins   = completed.reduce((s, t) => s + (t.estimated_minutes ?? 0), 0);
-    const topCat      = topBy(completed, (t) => t.goal_id ?? "sin objetivo")[0] ?? "—";
-    const linkedGoal  = goals.find((g) => g.id === topCat);
-    const topCatLabel = linkedGoal ? linkedGoal.title : "Tareas sin objetivo";
+    const amt = (f: (typeof finances)[number]) => amountInPrimary(f);
+    const incomes = finances.filter((f) => f.type === "ingreso");
+    const expenses = finances.filter((f) => f.type === "gasto");
 
-    const goalsCompleted = goals.filter((g) => g.status === "completado");
-    const topGoalCat     = topBy(goals, (g) => g.category)[0] ?? "—";
+    const totalIn = incomes.reduce((s, f) => s + amt(f), 0);
+    const totalOut = expenses.reduce((s, f) => s + amt(f), 0);
+    const net = totalIn - totalOut;
+    const savingsRate = totalIn > 0 ? Math.round((net / totalIn) * 100) : 0;
 
-    const incomes    = finances.filter((f) => f.type === "ingreso");
-    const expenses   = finances.filter((f) => f.type === "gasto");
-    const totalIn    = incomes.reduce((s, f) => s + (f.amount_in_primary ?? f.amount), 0);
-    const totalOut   = expenses.reduce((s, f) => s + (f.amount_in_primary ?? f.amount), 0);
-    const topExpCat  = topBy(expenses, (f) => f.category ?? "otros")[0] ?? "—";
-    const topIncCat  = topBy(incomes,  (f) => f.category ?? "otros")[0] ?? "—";
+    const mKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
-    const latestSnap = snapshots.length
-      ? [...snapshots].sort((a, b) => +new Date(b.date) - +new Date(a.date))[0].total
-      : onboarding?.current_money ?? 0;
+    // Monthly aggregation
+    const inByMonth = new Map<string, number>();
+    const outByMonth = new Map<string, number>();
+    const activeMonths = new Set<string>();
+    incomes.forEach((f) => {
+      const k = mKey(new Date(f.date));
+      inByMonth.set(k, (inByMonth.get(k) ?? 0) + amt(f));
+      activeMonths.add(k);
+    });
+    expenses.forEach((f) => {
+      const k = mKey(new Date(f.date));
+      outByMonth.set(k, (outByMonth.get(k) ?? 0) + amt(f));
+      activeMonths.add(k);
+    });
+    const monthsActive = Math.max(1, activeMonths.size);
+
+    let bestIncomeMonth: { key: string; v: number } | null = null;
+    inByMonth.forEach((v, key) => {
+      if (!bestIncomeMonth || v > bestIncomeMonth.v) bestIncomeMonth = { key, v };
+    });
+    let worstExpenseMonth: { key: string; v: number } | null = null;
+    outByMonth.forEach((v, key) => {
+      if (!worstExpenseMonth || v > worstExpenseMonth.v) worstExpenseMonth = { key, v };
+    });
+
+    // Categories
+    const byCat = new Map<string, number>();
+    expenses.forEach((f) => {
+      const k = f.category || "Otros";
+      byCat.set(k, (byCat.get(k) ?? 0) + amt(f));
+    });
+    const topCat = [...byCat.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+
+    // Biggest single movements
+    const biggestExpense = expenses.reduce<{ title: string; v: number } | null>(
+      (best, f) => (!best || amt(f) > best.v ? { title: f.title, v: amt(f) } : best),
+      null
+    );
+    const biggestIncome = incomes.reduce<{ title: string; v: number } | null>(
+      (best, f) => (!best || amt(f) > best.v ? { title: f.title, v: amt(f) } : best),
+      null
+    );
+
+    // Recurring (deduped by title+amount)
+    const dedupe = (arr: typeof finances) => {
+      const seen = new Map<string, (typeof finances)[number]>();
+      arr.forEach((f) => {
+        const key = `${f.title.trim().toLowerCase()}|${f.amount}|${f.recurrence}`;
+        if (!seen.has(key)) seen.set(key, f);
+      });
+      return [...seen.values()];
+    };
+    const recurringExp = dedupe(expenses.filter((f) => f.recurrence));
+    const monthlyFixed = recurringExp.reduce(
+      (s, f) => s + (f.recurrence === "anual" ? amt(f) / 12 : amt(f)),
+      0
+    );
+    const recurringInc = dedupe(incomes.filter((f) => f.recurrence === "mensual"));
+    const monthlyRecurringIncome = recurringInc.reduce((s, f) => s + amt(f), 0);
+
+    // Patrimony
+    const sortedSnaps = [...snapshots].sort((a, b) => +new Date(a.date) - +new Date(b.date));
+    const firstSnap = sortedSnaps[0]?.total ?? onboarding?.current_money ?? 0;
+    const latestSnap = sortedSnaps[sortedSnaps.length - 1]?.total ?? onboarding?.current_money ?? 0;
+    const growth = latestSnap - firstSnap;
+    const target = onboarding?.total_target ?? 0;
+    const targetPct = pct(latestSnap, target);
+
+    // Averages & projection
+    const avgMonthlyIn = totalIn / monthsActive;
+    const avgMonthlyOut = totalOut / monthsActive;
+    const avgMonthlyNet = net / monthsActive;
+    const monthsToTarget =
+      avgMonthlyNet > 0 && target > latestSnap
+        ? Math.ceil((target - latestSnap) / avgMonthlyNet)
+        : null;
 
     return {
-      totalTasks:      tasks.length,
-      completedTasks:  completed.length,
-      pendingTasks:    pending.length,
-      highImpact:      highImpact.length,
-      completionRate:  pct(completed.length, tasks.length),
-      focusHours:      Math.round(totalMins / 60),
-      topCatLabel,
-      goalsTotal:      goals.length,
-      goalsCompleted:  goalsCompleted.length,
-      topGoalCat,
-      totalIn,
-      totalOut,
-      netBalance:      totalIn - totalOut,
-      topExpCat,
-      topIncCat,
-      latestSnap,
+      totalIn, totalOut, net, savingsRate,
+      incomeCount: incomes.length, expenseCount: expenses.length,
+      bestIncomeMonth: bestIncomeMonth as { key: string; v: number } | null,
+      worstExpenseMonth: worstExpenseMonth as { key: string; v: number } | null,
+      topCat, topCatPct: topCat ? pct(topCat[1], totalOut) : 0,
+      biggestExpense, biggestIncome,
+      monthlyFixed, recurringExpCount: recurringExp.length,
+      monthlyRecurringIncome, recurringIncCount: recurringInc.length,
+      firstSnap, latestSnap, growth, target, targetPct,
+      avgMonthlyIn, avgMonthlyOut, avgMonthlyNet, monthsToTarget,
+      monthsActive: activeMonths.size,
     };
-  }, [tasks, goals, finances, snapshots, onboarding]);
+  }, [finances, snapshots, onboarding, amountInPrimary]);
 
-  // ── slides ──────────────────────────────────────────────────────────────────
-  const slides: SlideData[] = useMemo(() => [
-    {
-      bg: "from-violet-900 via-purple-900 to-indigo-900",
-      accent: "text-violet-300",
-      icon: "🚀",
-      title: "Tu año en Rumbo",
-      hero: user.name ? `Hola, ${user.name}` : "Tu resumen",
-      sub: "Esto es todo lo que has construido. Es más de lo que crees.",
-      detail: undefined,
-    },
-    {
+  // ── build slides (money only, skip the ones without data) ────────────────────
+  const slides: SlideData[] = useMemo(() => {
+    const out: SlideData[] = [];
+
+    out.push({
+      bg: "from-emerald-900 via-green-900 to-teal-900",
+      accent: "text-emerald-300",
+      icon: "💸",
+      title: "Tu dinero en Rumbo",
+      hero: user.name ? `Hola, ${user.name}` : "Tu resumen de dinero",
+      sub: "Un repaso a todo lo que ha entrado, salido y crecido.",
+      detail: stats.monthsActive > 0 ? `${stats.monthsActive} ${stats.monthsActive === 1 ? "mes" : "meses"} de actividad` : undefined,
+    });
+
+    out.push({
       bg: "from-emerald-900 via-teal-900 to-cyan-900",
       accent: "text-emerald-300",
-      icon: "✅",
-      title: "Tareas completadas",
-      hero: `${stats.completedTasks}`,
-      sub: `de ${stats.totalTasks} tareas en total`,
-      detail: `Tasa de finalización: ${stats.completionRate}%`,
-    },
-    {
-      bg: "from-orange-900 via-red-900 to-rose-900",
-      accent: "text-orange-300",
-      icon: "⚡",
-      title: "Alto impacto",
-      hero: `${stats.highImpact}`,
-      sub: "tareas de alto impacto completadas",
-      detail: `${stats.focusHours > 0 ? `~${stats.focusHours}h de trabajo estimado` : "El impacto real no se mide en horas"}`,
-    },
-    {
+      icon: "📥",
+      title: "Total ingresado",
+      hero: formatMoney(stats.totalIn),
+      sub: "que ha entrado en total",
+      detail: `${stats.incomeCount} ${stats.incomeCount === 1 ? "ingreso registrado" : "ingresos registrados"}`,
+    });
+
+    out.push({
+      bg: "from-rose-900 via-red-900 to-orange-900",
+      accent: "text-rose-300",
+      icon: "📤",
+      title: "Total gastado",
+      hero: formatMoney(stats.totalOut),
+      sub: "que ha salido en total",
+      detail: `${stats.expenseCount} ${stats.expenseCount === 1 ? "gasto" : "gastos"} · media ${formatMoney(stats.avgMonthlyOut)}/mes`,
+    });
+
+    out.push({
+      bg: stats.net >= 0 ? "from-green-900 via-emerald-900 to-teal-900" : "from-rose-900 via-red-900 to-rose-950",
+      accent: stats.net >= 0 ? "text-emerald-300" : "text-rose-300",
+      icon: stats.net >= 0 ? "🟢" : "🔴",
+      title: "Balance neto",
+      hero: `${stats.net >= 0 ? "+" : "−"}${formatMoney(Math.abs(stats.net))}`,
+      sub: stats.net >= 0 ? "ahorrado: ingresos menos gastos" : "gastaste más de lo que ingresaste",
+      detail: stats.totalIn > 0 ? `Tasa de ahorro: ${stats.savingsRate}%` : undefined,
+    });
+
+    if (stats.bestIncomeMonth) {
+      out.push({
+        bg: "from-violet-900 via-purple-900 to-indigo-900",
+        accent: "text-violet-300",
+        icon: "🚀",
+        title: "Tu mejor mes",
+        hero: formatMoney(stats.bestIncomeMonth.v),
+        sub: `lo ganaste en ${monthLabel(stats.bestIncomeMonth.key)}`,
+        detail: "Tu récord de ingresos en un mes",
+      });
+    }
+
+    if (stats.topCat) {
+      out.push({
+        bg: "from-amber-900 via-orange-900 to-red-900",
+        accent: "text-amber-300",
+        icon: "🔥",
+        title: "Donde más gastas",
+        hero: stats.topCat[0],
+        sub: `${formatMoney(stats.topCat[1])} en total`,
+        detail: `El ${stats.topCatPct}% de todos tus gastos`,
+      });
+    }
+
+    if (stats.monthlyFixed > 0) {
+      out.push({
+        bg: "from-fuchsia-900 via-pink-900 to-rose-900",
+        accent: "text-fuchsia-300",
+        icon: "🔁",
+        title: "Tus gastos fijos",
+        hero: `${formatMoney(stats.monthlyFixed)}/mes`,
+        sub: `en ${stats.recurringExpCount} ${stats.recurringExpCount === 1 ? "suscripción" : "suscripciones"}`,
+        detail: `Son ${formatMoney(stats.monthlyFixed * 12)} al año`,
+      });
+    }
+
+    if (stats.monthlyRecurringIncome > 0) {
+      out.push({
+        bg: "from-teal-900 via-emerald-900 to-green-900",
+        accent: "text-teal-300",
+        icon: "💵",
+        title: "Ingresos recurrentes",
+        hero: `${formatMoney(stats.monthlyRecurringIncome)}/mes`,
+        sub: `de ${stats.recurringIncCount} ${stats.recurringIncCount === 1 ? "fuente fija" : "fuentes fijas"}`,
+        detail: `≈ ${formatMoney(stats.monthlyRecurringIncome * 12)} garantizados al año`,
+      });
+    }
+
+    if (stats.biggestExpense && stats.biggestExpense.v > 0) {
+      out.push({
+        bg: "from-red-900 via-rose-900 to-pink-900",
+        accent: "text-red-300",
+        icon: "💥",
+        title: "Tu mayor gasto",
+        hero: formatMoney(stats.biggestExpense.v),
+        sub: stats.biggestExpense.title,
+        detail: "El golpe más grande a tu cuenta",
+      });
+    }
+
+    if (stats.biggestIncome && stats.biggestIncome.v > 0) {
+      out.push({
+        bg: "from-emerald-900 via-green-800 to-lime-900",
+        accent: "text-lime-300",
+        icon: "🏆",
+        title: "Tu mayor ingreso",
+        hero: formatMoney(stats.biggestIncome.v),
+        sub: stats.biggestIncome.title,
+        detail: "El mejor cobro de todos",
+      });
+    }
+
+    out.push({
       bg: "from-blue-900 via-indigo-900 to-violet-900",
       accent: "text-blue-300",
-      icon: "🎯",
-      title: "Tu zona de trabajo",
-      hero: stats.topCatLabel.length > 22 ? stats.topCatLabel.slice(0, 22) + "…" : stats.topCatLabel,
-      sub: "fue donde más te enfocaste",
-      detail: undefined,
-    },
-    {
-      bg: "from-amber-900 via-yellow-900 to-orange-900",
-      accent: "text-amber-300",
-      icon: "🏆",
-      title: "Objetivos",
-      hero: `${stats.goalsCompleted} / ${stats.goalsTotal}`,
-      sub: "objetivos completados",
-      detail: `Categoría favorita: ${stats.topGoalCat}`,
-    },
-    {
+      icon: "⚖️",
+      title: "Tu ritmo mensual",
+      hero: `${formatMoney(stats.avgMonthlyIn)}`,
+      sub: "ingresas al mes de media",
+      detail: `Gastas ${formatMoney(stats.avgMonthlyOut)}/mes · ${stats.avgMonthlyNet >= 0 ? "ahorras" : "pierdes"} ${formatMoney(Math.abs(stats.avgMonthlyNet))}/mes`,
+    });
+
+    out.push({
       bg: "from-slate-900 via-zinc-900 to-neutral-900",
       accent: "text-slate-300",
-      icon: "💰",
-      title: "Tus finanzas",
-      hero: formatMoney(stats.totalIn),
-      sub: "ingresos registrados",
-      detail: `Gastos: ${formatMoney(stats.totalOut)} · Mayor gasto: ${stats.topExpCat}`,
-    },
-    {
-      bg: "from-pink-900 via-rose-900 to-red-900",
-      accent: "text-pink-300",
-      icon: "📈",
-      title: "Balance neto",
-      hero: formatMoney(Math.abs(stats.netBalance)),
-      sub: stats.netBalance >= 0 ? "de balance positivo 🎉" : "de balance negativo — toca ajustar",
-      detail: `Patrimonio actual: ${formatMoney(stats.latestSnap)}`,
-    },
-    {
-      bg: "from-violet-900 via-fuchsia-900 to-pink-900",
-      accent: "text-fuchsia-300",
+      icon: "🏦",
+      title: "Tu patrimonio",
+      hero: formatMoney(stats.latestSnap),
+      sub: stats.target > 0 ? `el ${stats.targetPct}% de tu meta de ${formatMoney(stats.target)}` : "lo que tienes ahora mismo",
+      detail:
+        stats.growth !== 0
+          ? `${stats.growth > 0 ? "+" : "−"}${formatMoney(Math.abs(stats.growth))} desde tu primera medición`
+          : undefined,
+    });
+
+    if (stats.monthsToTarget != null) {
+      const years = Math.floor(stats.monthsToTarget / 12);
+      const rem = stats.monthsToTarget % 12;
+      const eta =
+        years > 0
+          ? `${years} ${years === 1 ? "año" : "años"}${rem ? ` y ${rem} ${rem === 1 ? "mes" : "meses"}` : ""}`
+          : `${stats.monthsToTarget} ${stats.monthsToTarget === 1 ? "mes" : "meses"}`;
+      out.push({
+        bg: "from-indigo-900 via-violet-900 to-fuchsia-900",
+        accent: "text-fuchsia-300",
+        icon: "🎯",
+        title: "A este ritmo…",
+        hero: eta,
+        sub: `para alcanzar tu meta de ${formatMoney(stats.target)}`,
+        detail: `Ahorrando ${formatMoney(stats.avgMonthlyNet)}/mes`,
+      });
+    }
+
+    out.push({
+      bg: "from-emerald-900 via-teal-900 to-cyan-900",
+      accent: "text-emerald-300",
       icon: "🌟",
-      title: "Resumen final",
-      hero: "Sigue así",
-      sub: `${stats.completedTasks} tareas. ${stats.goalsCompleted} objetivos. ${formatMoney(stats.netBalance >= 0 ? stats.netBalance : 0)} ahorrado.`,
-      detail: "Cada día cuenta. Rumbo 🚀",
-    },
-  ], [stats, user.name, formatMoney]);
+      title: "En resumen",
+      hero: stats.net >= 0 ? `+${formatMoney(stats.net)}` : `−${formatMoney(Math.abs(stats.net))}`,
+      sub: `${formatMoney(stats.totalIn)} ingresados · ${formatMoney(stats.totalOut)} gastados`,
+      detail: "Cada euro cuenta. Sigue tu rumbo 🚀",
+    });
+
+    return out;
+  }, [stats, user.name, formatMoney]);
 
   const [slide, setSlide] = useState(0);
-  const [dir, setDir]     = useState(1);
-  const [auto, setAuto]   = useState(true);
+  const [dir, setDir] = useState(1);
+  const [auto, setAuto] = useState(true);
 
   useEffect(() => {
     if (!auto) return;
@@ -186,7 +336,7 @@ export function RumboWrapped({ onClose }: { onClose: () => void }) {
     setSlide(next);
   }
 
-  const s = slides[slide];
+  const s = slides[Math.min(slide, slides.length - 1)];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -272,7 +422,7 @@ export function RumboWrapped({ onClose }: { onClose: () => void }) {
                 initial={{ y: 30, opacity: 0, scale: 0.9 }}
                 animate={{ y: 0, opacity: 1, scale: 1 }}
                 transition={{ delay: 0.2, type: "spring", stiffness: 300 }}
-                className="text-4xl md:text-5xl font-black text-white mb-4 leading-tight relative z-10"
+                className="text-4xl md:text-5xl font-black text-white mb-4 leading-tight relative z-10 break-words max-w-full"
               >
                 {s.hero}
               </motion.div>
@@ -282,7 +432,7 @@ export function RumboWrapped({ onClose }: { onClose: () => void }) {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="text-white/70 text-base font-medium mb-4 relative z-10"
+                className="text-white/70 text-base font-medium mb-4 relative z-10 break-words max-w-full"
               >
                 {s.sub}
               </motion.div>
