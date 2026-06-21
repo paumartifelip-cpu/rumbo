@@ -40,18 +40,18 @@ const SIZE_CLASS: Record<NonNullable<FloatItem["size"]>, string> = {
 
 // What you can do in Rumbo.
 const FEATURES = [
-  { emoji: "💰", bg: "bg-lime-200",    title: "Tu patrimonio, claro",   desc: "Mira cuánto tienes hoy y cuánto te falta para tu meta. Cada medición se guarda y ves tu evolución mes a mes." },
-  { emoji: "📥", bg: "bg-emerald-200", title: "Ingresos al instante",   desc: "Apunta cada cobro y tus ingresos recurrentes. El total de lo ganado este mes se actualiza solo." },
-  { emoji: "📊", bg: "bg-cyan-200",    title: "Gastos ordenados",       desc: "Comida, Transporte, Trabajo, Compras… Clasifica tus gastos y descubre dónde se va el dinero." },
-  { emoji: "🔁", bg: "bg-fuchsia-200", title: "Suscripciones a raya",   desc: "Controla tus gastos fijos mensuales y mira de un vistazo cuánto te cuestan al año." },
-  { emoji: "🎯", bg: "bg-amber-200",   title: "Metas con rumbo",        desc: "Define tu objetivo de dinero y para cuándo lo quieres. Rumbo te muestra si vas a tiempo." },
-  { emoji: "✨", bg: "bg-violet-200",  title: "Rumbo Wrapped",          desc: "Tu dinero en cifras: lo que ganaste, gastaste y ahorraste, en un resumen al estilo Spotify Wrapped." },
+  { emoji: "💰", bg: "bg-lime-200",    title: "Cuánto tienes",        desc: "Mira de un vistazo todo el dinero que tienes y cuánto te falta para lo que quieres." },
+  { emoji: "📥", bg: "bg-emerald-200", title: "El dinero que entra",  desc: "Apunta lo que cobras y lo verás sumado al momento. Sin cuentas raras." },
+  { emoji: "📊", bg: "bg-cyan-200",    title: "El dinero que sale",   desc: "Apunta lo que gastas y mira en qué se te va: comida, casa, transporte…" },
+  { emoji: "🔁", bg: "bg-fuchsia-200", title: "Lo que pagas siempre", desc: "El móvil, el gimnasio, las apps… mira todo lo que pagas cada mes y cuánto suma." },
+  { emoji: "🎯", bg: "bg-amber-200",   title: "Tu meta",              desc: "Di cuánto quieres juntar y para cuándo. Te decimos si vas bien o te falta empujar." },
+  { emoji: "✨", bg: "bg-violet-200",  title: "Tu resumen",           desc: "Mira en bonito cuánto ganaste, gastaste y ahorraste. Un repaso fácil de tu dinero." },
 ];
 
 const STEPS = [
-  { n: "1", emoji: "✍️", title: "Apunta", desc: "Tu dinero actual, tus ingresos y tus gastos. En un minuto." },
-  { n: "2", emoji: "📈", title: "Visualiza", desc: "Gráficas claras de patrimonio, ahorro y categorías. Todo en tu moneda." },
-  { n: "3", emoji: "🚀", title: "Avanza", desc: "Ajusta, recorta lo que sobra y acércate a tu meta cada mes." },
+  { n: "1", emoji: "✍️", title: "Apunta", desc: "Escribe cuánto tienes, lo que ganas y lo que gastas." },
+  { n: "2", emoji: "👀", title: "Mira",   desc: "Lo verás todo en dibujos fáciles, de un solo vistazo." },
+  { n: "3", emoji: "🌱", title: "Mejora", desc: "Quita lo que sobra y guarda un poco más cada mes." },
 ];
 
 export default function LandingPage() {
@@ -98,8 +98,8 @@ export default function LandingPage() {
             transition={{ delay: 0.32, duration: 0.5 }}
             className="mt-5 text-base md:text-lg text-rumbo-muted max-w-xl mx-auto leading-relaxed"
           >
-            La app sencilla para tener tu dinero bajo control: patrimonio, ingresos,
-            gastos y metas. Todo claro, en tu moneda y solo para ti.
+            Apunta lo que ganas y lo que gastas, y ve cuánto dinero tienes de verdad.
+            Fácil, claro y solo para ti.
           </motion.p>
 
           <motion.div
@@ -128,7 +128,7 @@ export default function LandingPage() {
             transition={{ delay: 0.7, duration: 0.5 }}
             className="mt-4 text-xs text-rumbo-muted"
           >
-            Gratis para empezar · Sin tarjeta · Tus datos solo tuyos
+            Gratis · Sin tarjeta · Solo lo ves tú
           </motion.p>
         </div>
       </section>
@@ -136,9 +136,9 @@ export default function LandingPage() {
       {/* ── QUÉ PUEDES HACER ─────────────────────────────────────────────── */}
       <Section>
         <SectionHeading
-          kicker="Qué puedes hacer"
-          title="Todo tu dinero, en un solo sitio"
-          subtitle="Sin hojas de cálculo ni líos. Apuntas y Rumbo lo ordena por ti."
+          kicker="Para qué sirve"
+          title="Tu dinero, fácil de entender"
+          subtitle="Tú lo apuntas y Rumbo te lo ordena. Sin líos ni números complicados."
         />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-12">
           {FEATURES.map((f, i) => (
@@ -164,9 +164,9 @@ export default function LandingPage() {
       {/* ── CÓMO FUNCIONA ────────────────────────────────────────────────── */}
       <Section className="bg-white border-y border-rumbo-line/60">
         <SectionHeading
-          kicker="Cómo funciona"
-          title="En tres pasos"
-          subtitle="Tarda menos de un minuto en arrancar."
+          kicker="Cómo se usa"
+          title="Así de fácil"
+          subtitle="Empiezas en menos de un minuto."
         />
         <div className="grid md:grid-cols-3 gap-6 mt-12">
           {STEPS.map((s, i) => (
@@ -200,15 +200,15 @@ export default function LandingPage() {
         >
           <div className="text-5xl mb-4">🔒</div>
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-rumbo-ink">
-            Tu dinero es tuyo. Tus datos también.
+            Solo lo ves tú
           </h2>
           <p className="text-rumbo-muted mt-3 max-w-xl mx-auto leading-relaxed">
-            Cada cuenta está protegida con email y contraseña, y tus datos quedan
-            aislados: nadie más puede verlos ni tocarlos. Multi-moneda (EUR, USD,
-            MXN, ARS) y sincronizados en la nube para tenerlos en cualquier dispositivo.
+            Lo que apuntas es privado. Entras con tu correo y tu contraseña, y nadie
+            más puede ver tu dinero. Lo tienes guardado para mirarlo desde el móvil o
+            el ordenador, cuando quieras.
           </p>
           <div className="flex flex-wrap gap-2 justify-center mt-6">
-            {["🔒 Privado por diseño", "🌍 Multi-moneda", "☁️ En la nube", "📱 En tu móvil"].map((chip) => (
+            {["🔒 Privado", "💶 En tu moneda", "📱 En tu móvil", "✅ Muy fácil"].map((chip) => (
               <span key={chip} className="px-3 py-1.5 rounded-full bg-white/70 border border-rumbo-line text-xs font-semibold text-rumbo-ink">
                 {chip}
               </span>
@@ -227,9 +227,9 @@ export default function LandingPage() {
             transition={{ duration: 0.5 }}
             className="text-4xl md:text-6xl font-black tracking-tight text-rumbo-ink"
           >
-            Empieza a tener <span className="text-emerald-600">rumbo</span>
+            Pon tu dinero <span className="text-emerald-600">en orden</span>
           </motion.h2>
-          <p className="text-rumbo-muted mt-4 text-lg">Gratis. En un minuto. Sin tarjeta.</p>
+          <p className="text-rumbo-muted mt-4 text-lg">Es gratis y se hace en un minuto.</p>
           <Link
             href="/login"
             className="inline-flex items-center gap-2 mt-8 px-8 py-4 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-base shadow-[0_12px_28px_-6px_rgba(16,185,129,0.6)] hover:scale-[1.03] active:scale-[0.97] transition-all"
