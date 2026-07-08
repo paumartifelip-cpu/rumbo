@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { MoneyMetrics } from "@/components/MoneyMetrics";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { Goal, GoalCategory } from "@/lib/types";
@@ -44,6 +45,149 @@ const TIMEFRAME_META: Record<string, { label: string; icon: string; gradient: st
   "":      { label: "GENERAL", icon: "🎯", gradient: "from-slate-50 to-gray-50",    border: "border-slate-200",  header: "text-slate-600" },
 };
 
+// ─── Mini tareas ──────────────────────────────────────────────────────────────
+// Lista de tareas ultra simple: escribir + Enter para añadir, tocar el círculo
+// para completar, ✕ para borrar. Usa las tareas del store (ya sincronizan con
+// Supabase), sin campos extra: solo el título.
+const DONE_SHOWN = 8;
+
+function MiniTasks() {
+  const { tasks, addTask, toggleTask, removeTask } = useRumbo();
+  const [title, setTitle] = useState("");
+
+  const pending = useMemo(
+    () =>
+      tasks
+        .filter((t) => t.status === "pendiente" || t.status === "en_curso")
+        .sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
+    [tasks]
+  );
+  const done = useMemo(
+    () =>
+      tasks
+        .filter((t) => t.status === "completada")
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
+    [tasks]
+  );
+
+  const submit = () => {
+    const t = title.trim();
+    if (!t) return;
+    addTask({ title: t });
+    setTitle("");
+  };
+
+  const clearDone = () => done.forEach((t) => removeTask(t.id));
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">✅</span>
+          <span className="text-xs font-black uppercase tracking-[0.15em] text-slate-600">Tareas rápidas</span>
+        </div>
+        {pending.length > 0 && (
+          <span className="text-xs text-slate-400 font-bold">
+            {pending.length} pendiente{pending.length !== 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
+      {/* Añadir */}
+      <div className="flex gap-2">
+        <input
+          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+          placeholder="¿Qué tienes que hacer? Escribe y pulsa Enter"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+        />
+        <button
+          onClick={submit}
+          disabled={!title.trim()}
+          className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm transition-all active:scale-95"
+        >
+          Añadir
+        </button>
+      </div>
+
+      {/* Pendientes */}
+      {pending.length === 0 && done.length === 0 ? (
+        <p className="text-sm text-slate-400 mt-3">Sin tareas. Apunta la primera arriba: cosas pequeñas que te acercan a tus objetivos.</p>
+      ) : (
+        <div className="mt-3">
+          <AnimatePresence initial={false}>
+            {pending.map((t) => (
+              <motion.div
+                key={t.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                className="flex items-center gap-3 py-2 border-b last:border-0 border-slate-100 group"
+              >
+                <button
+                  onClick={() => toggleTask(t.id)}
+                  aria-label={`Completar tarea ${t.title}`}
+                  className="w-5 h-5 shrink-0 rounded-full border-2 border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors active:scale-90"
+                />
+                <span className="flex-1 min-w-0 text-sm font-semibold text-slate-800 truncate">{t.title}</span>
+                <button
+                  onClick={() => removeTask(t.id)}
+                  aria-label={`Eliminar tarea ${t.title}`}
+                  className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition active:scale-90"
+                >
+                  ✕
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {/* Hechas */}
+          {done.length > 0 && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Hechas ({done.length})
+                </span>
+                <button
+                  onClick={clearDone}
+                  className="text-[11px] font-bold text-slate-400 hover:text-rose-600 transition-colors"
+                >
+                  Limpiar hechas
+                </button>
+              </div>
+              <AnimatePresence initial={false}>
+                {done.slice(0, DONE_SHOWN).map((t) => (
+                  <motion.div
+                    key={t.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-3 py-1.5"
+                  >
+                    <button
+                      onClick={() => toggleTask(t.id)}
+                      aria-label={`Reabrir tarea ${t.title}`}
+                      title="Tocar para desmarcar"
+                      className="w-5 h-5 shrink-0 rounded-full bg-emerald-500 border-2 border-emerald-500 text-white text-[10px] font-black flex items-center justify-center active:scale-90 transition-transform"
+                    >
+                      ✓
+                    </button>
+                    <span className="flex-1 min-w-0 text-sm text-slate-400 line-through truncate">{t.title}</span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+              {done.length > DONE_SHOWN && (
+                <div className="text-[11px] text-slate-300 font-bold mt-1">y {done.length - DONE_SHOWN} más…</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GoalsPage() {
   const { goals, addGoal, updateGoal, removeGoal, primaryCurrency } = useRumbo();
   const formatMoney = useFormatMoney();
@@ -78,6 +222,11 @@ export default function GoalsPage() {
 
       <div className="mb-6">
         <MoneyMetrics />
+      </div>
+
+      {/* Mini apartado de tareas */}
+      <div className="mb-6">
+        <MiniTasks />
       </div>
 
       {/* Empty state */}
