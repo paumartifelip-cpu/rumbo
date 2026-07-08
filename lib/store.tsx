@@ -110,6 +110,13 @@ interface RumboContext extends RumboState {
   updateFinance: (id: string, patch: Partial<FinancialEntry>) => void;
   removeFinance: (id: string) => void;
   /**
+   * Registra un pago de una deuda: crea un gasto normal (categoría "Deudas")
+   * vinculado a la deuda por prefijo de id (`<debtId>__pay__…`), así el vínculo
+   * sobrevive a la sincronización sin columnas nuevas. Lo pendiente de la deuda
+   * se deriva restando sus pagos, de modo que borrar un pago lo "devuelve".
+   */
+  payDebt: (debtId: string, amount: number) => void;
+  /**
    * Robust delete for recurring entries. If `id` is a recurring template it
    * removes the template AND every generated instance (deterministic children
    * by id prefix + legacy children by title/amount). For a normal entry it just
@@ -1131,6 +1138,44 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const payDebt: RumboContext["payDebt"] = useCallback((debtId, rawAmount) => {
+    const amount = Number(rawAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setState((s) => {
+      const debt = s.finances.find((f) => f.id === debtId && f.type === "deuda");
+      if (!debt) return s;
+      // Lo ya pagado se suma en la moneda de la deuda (los pagos se crean
+      // siempre en esa misma moneda, así la resta es exacta).
+      const paid = s.finances
+        .filter((f) => f.type === "gasto" && f.id.startsWith(`${debtId}__pay__`))
+        .reduce((a, f) => a + f.amount, 0);
+      const remaining = debt.amount - paid;
+      if (remaining <= 0) return s;
+      // Nunca pagar más de lo que queda: un pago mayor se recorta al restante.
+      const pay = Math.min(amount, remaining);
+      const from = debt.currency ?? s.primaryCurrency;
+      const now = new Date().toISOString();
+      return {
+        ...s,
+        finances: [
+          ...s.finances,
+          {
+            id: `${debtId}__pay__${uid()}`,
+            user_id: s.user.id,
+            type: "gasto",
+            title: `Pago deuda: ${debt.title}`,
+            amount: pay,
+            currency: debt.currency,
+            amount_in_primary: convertAmount(pay, from, s.primaryCurrency),
+            date: now,
+            category: "Deudas",
+            created_at: now,
+          },
+        ],
+      };
+    });
+  }, []);
+
   const removeFinanceCascade: RumboContext["removeFinanceCascade"] = useCallback((id) => {
     setState((s) => {
       const target = s.finances.find((f) => f.id === id);
@@ -1351,6 +1396,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       addFinance,
       updateFinance,
       removeFinance,
+      payDebt,
       removeFinanceCascade,
       addSnapshot,
       removeSnapshot,
@@ -1383,6 +1429,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       addFinance,
       updateFinance,
       removeFinance,
+      payDebt,
       removeFinanceCascade,
       addSnapshot,
       removeSnapshot,
