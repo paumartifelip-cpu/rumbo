@@ -204,7 +204,9 @@ const BASE_DEFAULT_TOOLS = [
 
 // Bump this on every curated-list change to force a one-time reset of cached
 // user_tools across all profiles. Read by the hydration logic below.
-export const TOOLS_VERSION = "v5";
+// v6: per-user seed ids — the old shared "default-tool-N" ids collided across
+// users on the global primary key and silently broke everyone's tools push.
+export const TOOLS_VERSION = "v6";
 const TOOLS_SEED = "2026-05-07T00:00:00.000Z";
 
 // Names from the previous default list. If any of these are found in the
@@ -227,7 +229,10 @@ export function userToolsAreStale(tools: UserTool[] | undefined): boolean {
 export const buildDefaultUserTools = (userId: string): UserTool[] => {
   return BASE_DEFAULT_TOOLS.map((t, idx) => ({
     ...t,
-    id: `default-tool-${idx}`,
+    // The user id MUST be part of the seed id: ids are a global primary key in
+    // Supabase, so shared ids meant only the first user to push owned them and
+    // every other user's user_tools upsert failed forever (RLS conflict).
+    id: `default-tool-${idx}-${userId}`,
     user_id: userId,
     created_at: TOOLS_SEED,
     order_index: idx,
@@ -550,7 +555,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         onboarding: mergedOnboarding,
         primaryCurrency: remote.primaryCurrency ?? cachedCurrency,
         profileMeta: { id: p.id, name: p.name, initials: p.initials, color: p.color, emoji: p.emoji },
-      }).then((ok) => {
+      }, cur.deletedIds ?? []).then((ok) => {
         if (!ok) setState((s) => ({ ...s, syncStatus: "error" }));
       });
     }
@@ -794,7 +799,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           color: profile.color,
           emoji: profile.emoji,
         },
-      });
+      }, state.deletedIds ?? []);
       pushPendingRef.current = false;
       setState((s) => ({
         ...s,
@@ -825,16 +830,33 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     if (!profile || !supabaseEnabled) return;
 
     let cancelled = false;
+    let refreshInFlight = false;
     const supa = getSupabase();
 
     async function refresh() {
       if (cancelled || !profile) return;
+      // Coalesce: realtime fires one event per table, plus focus/visibility —
+      // a single in-flight pull serves them all instead of a request storm.
+      if (refreshInFlight) return;
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       if (pushPendingRef.current) return;
       if (stateRef.current.syncStatus === "syncing") return;
-      const remote = await pullFromSupabase(profile.user_id);
-      if (cancelled || !profile) return;
-      if (remote) applyRemote(profile, remote);
+      refreshInFlight = true;
+      try {
+        const remote = await pullFromSupabase(profile.user_id);
+        if (cancelled || !profile) return;
+        // Re-check AFTER the await: if the user edited something while this
+        // pull was in flight, applying the (older) remote snapshot would revert
+        // their edit and cancel the pending push. Skip — the next poll/realtime
+        // event will pull again once the push has landed. (The cast defeats
+        // TS narrowing: the ref genuinely changes across the await.)
+        if (pushPendingRef.current) return;
+        const statusNow = stateRef.current.syncStatus as RumboState["syncStatus"];
+        if (statusNow === "syncing") return;
+        if (remote) applyRemote(profile, remote);
+      } finally {
+        refreshInFlight = false;
+      }
     }
 
     const onVisibility = () => {

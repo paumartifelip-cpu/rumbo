@@ -98,6 +98,7 @@ function MiniTasks() {
         <input
           className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
           placeholder="¿Qué tienes que hacer? Escribe y pulsa Enter"
+          autoComplete="off"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") submit(); }}

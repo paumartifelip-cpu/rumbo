@@ -123,7 +123,14 @@ export async function pullFromSupabase(
       tasks: (t.data ?? []).map(normalizeTask),
       finances: (f.data ?? []).map(normalizeFinance),
       snapshots: (s.data ?? []).map(normalizeSnapshot),
-      userTools: (ut.data ?? []).map(normalizeUserTool),
+      // Legacy seed rows used the SAME ids for every user ("default-tool-N").
+      // With a global primary key that meant only the first user could ever
+      // upsert them (everyone else hit an RLS conflict and their whole
+      // user_tools push failed). New seeds embed the user id; the old shared
+      // rows are ignored here so they can't collide or duplicate ever again.
+      userTools: (ut.data ?? [])
+        .filter((r: any) => !/^default-tool-\d+$/.test(r.id))
+        .map(normalizeUserTool),
       onboarding,
       primaryCurrency,
       profileMeta,
@@ -135,17 +142,25 @@ export async function pullFromSupabase(
 }
 
 /**
- * Push current state to Supabase. Strategy: replace all rows for this user_id.
- * Cheap and correct for a small personal dataset.
+ * Push current state to Supabase: upsert every local row, and delete ONLY the
+ * rows the user explicitly deleted (tombstones in `deletedIds`). Absence from
+ * local state is NOT treated as a delete — a stale device that hasn't pulled
+ * yet must never wipe rows another device just added.
+ *
+ * Returns false if ANY table failed to sync, so the caller doesn't advance
+ * lastSyncAt: rows that never reached the server stay protected by the
+ * "created after last sync" rule on the next pull instead of vanishing.
  */
 export async function pushToSupabase(
   userId: string,
-  snap: SyncSnapshot
+  snap: SyncSnapshot,
+  deletedIds: string[] = []
 ): Promise<boolean> {
   const supa = getSupabase();
   if (!supa) return false;
 
   try {
+    let allOk = true;
     // Profile row — upsert whenever there's anything to write.
     if (snap.onboarding || snap.primaryCurrency || snap.profileMeta) {
       const profileRow: Record<string, any> = {
@@ -175,52 +190,84 @@ export async function pushToSupabase(
       const { error: pe } = await supa
         .from("profiles")
         .upsert(profileRow, { onConflict: "user_id" });
-      if (pe) console.warn("profiles upsert error", pe);
+      if (pe) {
+        console.warn("profiles upsert error", pe);
+        allOk = false;
+      }
     }
 
-    await Promise.all([
-      syncTable(userId, "goals", snap.goals.map(stripGoal(userId))),
-      syncTable(userId, "tasks", snap.tasks.map(stripTask(userId))),
+    const tombstoned = new Set(deletedIds);
+    const results = await Promise.all([
+      syncTable(userId, "goals", snap.goals.map(stripGoal(userId)), tombstoned),
+      syncTable(userId, "tasks", snap.tasks.map(stripTask(userId)), tombstoned),
       syncTable(
         userId,
         "financial_entries",
-        snap.finances.map(stripFinance(userId))
+        snap.finances.map(stripFinance(userId)),
+        tombstoned
       ),
       syncTable(
         userId,
         "money_snapshots",
-        snap.snapshots.map(stripSnapshot(userId))
+        snap.snapshots.map(stripSnapshot(userId)),
+        tombstoned
       ),
       syncTable(
         userId,
         "user_tools",
-        (snap.userTools || []).map(stripUserTool(userId))
+        (snap.userTools || []).map(stripUserTool(userId)),
+        tombstoned
       ),
     ]);
 
-    return true;
+    return allOk && results.every(Boolean);
   } catch (e) {
     console.warn("Supabase push threw", e);
     return false;
   }
 }
 
-async function syncTable(userId: string, table: string, rows: any[]) {
+async function syncTable(
+  userId: string,
+  table: string,
+  rows: any[],
+  tombstoned: Set<string>
+): Promise<boolean> {
   const supa = getSupabase()!;
-  const { data } = await supa.from(table).select("id").eq("user_id", userId);
-  const remoteIds = new Set((data || []).map((r: any) => r.id));
+  let ok = true;
+
+  // Upsert BEFORE deleting: if something fails midway, the server can at most
+  // end up with extra rows, never with holes (the old delete-then-upsert order
+  // could wipe rows remotely and then fail to re-insert them).
+  if (rows.length > 0) {
+    const { error: ie } = await supa.from(table).upsert(rows);
+    if (ie) {
+      console.warn(`${table} upsert error`, ie);
+      ok = false;
+    }
+  }
+
+  // Delete ONLY rows that are gone locally AND explicitly tombstoned. Absence
+  // alone is not evidence of deletion — it's usually a device that hasn't
+  // pulled the latest data yet.
+  const { data, error: se } = await supa.from(table).select("id").eq("user_id", userId);
+  if (se) {
+    console.warn(`${table} select error`, se);
+    return false;
+  }
   const localIds = new Set(rows.map((r) => r.id));
-  const idsToDelete = [...remoteIds].filter((id) => !localIds.has(id));
+  const idsToDelete = (data || [])
+    .map((r: any) => r.id as string)
+    .filter((id) => !localIds.has(id) && tombstoned.has(id));
 
   if (idsToDelete.length > 0) {
     const { error: de } = await supa.from(table).delete().in("id", idsToDelete);
-    if (de) console.warn(`${table} delete error`, de);
+    if (de) {
+      console.warn(`${table} delete error`, de);
+      ok = false;
+    }
   }
-
-  if (rows.length > 0) {
-    const { error: ie } = await supa.from(table).upsert(rows);
-    if (ie) console.warn(`${table} upsert error`, ie);
-  }
+  return ok;
 }
 
 /**

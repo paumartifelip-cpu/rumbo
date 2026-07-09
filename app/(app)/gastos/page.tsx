@@ -243,7 +243,8 @@ function DebtsSection() {
               <div className="grid grid-cols-1 md:grid-cols-[1fr_170px_110px_auto] gap-2">
                 <input
                   className="input"
-                  placeholder="¿A quién o qué debes? (ej: coche, tarjeta, Juan)"
+                  placeholder="¿A quién o qué debes? (ej: coche, préstamo, Juan)"
+                  autoComplete="off"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   onKeyDown={(e) => { if (e.key === "Enter") submitDebt(); }}
@@ -255,6 +256,7 @@ function DebtsSection() {
                     step="0.01"
                     className="input pr-10"
                     placeholder="Total que debes"
+                    autoComplete="off"
                     value={form.amount}
                     onChange={(e) => setForm({ ...form, amount: e.target.value === "" ? "" : Number(e.target.value) })}
                     onKeyDown={(e) => { if (e.key === "Enter") submitDebt(); }}
@@ -353,6 +355,7 @@ function DebtsSection() {
                                       min="0"
                                       className="input pr-9 !py-2 text-sm"
                                       placeholder="He pagado…"
+                                      autoComplete="off"
                                       value={payDrafts[d.id] ?? ""}
                                       onChange={(e) => setPayDrafts((p) => ({ ...p, [d.id]: e.target.value }))}
                                       onKeyDown={(e) => { if (e.key === "Enter") submitPay(d.id); }}
@@ -551,6 +554,7 @@ export default function GastosPage() {
             <input
               className="input"
               placeholder="Concepto (ej: Mercadona, Netflix, alquiler)"
+              autoComplete="off"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
@@ -562,6 +566,7 @@ export default function GastosPage() {
                 step="0.01"
                 className="input pr-10"
                 placeholder="Cantidad"
+                autoComplete="off"
                 value={form.amount}
                 onChange={(e) => setForm({ ...form, amount: e.target.value === "" ? "" : Number(e.target.value) })}
                 onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
@@ -579,7 +584,13 @@ export default function GastosPage() {
                 <option key={c} value={c}>{CURRENCIES[c].flag} {c}</option>
               ))}
             </select>
-            <button className="btn-primary" onClick={submit}>Añadir</button>
+            <button
+              className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!form.title.trim() || typeof form.amount !== "number" || form.amount <= 0}
+              onClick={submit}
+            >
+              Añadir
+            </button>
           </div>
 
           {/* Quick category picker */}
