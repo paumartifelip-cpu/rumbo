@@ -16,7 +16,16 @@ let client: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient | null {
   if (!url || !anon) return null;
-  if (!client) client = createClient(url, anon);
+  if (!client) {
+    client = createClient(url, anon, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: "pkce",
+      },
+    });
+  }
   return client;
 }
 
