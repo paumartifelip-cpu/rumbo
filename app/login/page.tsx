@@ -36,8 +36,11 @@ function LoginInner() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -186,33 +189,63 @@ function LoginInner() {
               <>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Nueva contraseña</label>
-                  <input
-                    type="password" autoComplete="new-password" className="input w-full" placeholder="Mínimo 6 caracteres"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"} autoComplete="new-password" className="input w-full pr-10" placeholder="Mínimo 6 caracteres"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted hover:text-rumbo-ink transition-colors"
+                      aria-label={showNewPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showNewPassword ? "🙈" : "👁️"}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Confirmar contraseña</label>
-                  <input
-                    type="password" autoComplete="new-password" className="input w-full" placeholder="Repite tu nueva contraseña"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"} autoComplete="new-password" className="input w-full pr-10" placeholder="Repite tu nueva contraseña"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted hover:text-rumbo-ink transition-colors"
+                      aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    >
+                      {showConfirmPassword ? "🙈" : "👁️"}
+                    </button>
+                  </div>
                 </div>
               </>
             ) : mode !== "reset" && (
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Contraseña</label>
-                <input
-                  type="password"
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  className="input w-full" placeholder="Mínimo 6 caracteres" value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                    className="input w-full pr-10" placeholder="Mínimo 6 caracteres" value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted hover:text-rumbo-ink transition-colors"
+                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
               </div>
             )}
 
