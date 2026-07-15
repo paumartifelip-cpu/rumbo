@@ -285,6 +285,13 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   // so a slow/failed initial pull can never push an empty local state that
   // would wipe the user's cloud data. Reset on every profile (re)boot.
   const initialPullDoneRef = useRef(false);
+  // True desde que el usuario cambia su moneda principal EN ESTE dispositivo
+  // hasta que el cambio llega al servidor. Mientras esté a true: (a) los pulls
+  // no readoptan la moneda remota (pisarían el cambio recién hecho) y (b) el
+  // push incluye la moneda. Cuando está a false los pushes NO envían moneda:
+  // un dispositivo desactualizado que guarda un gasto ya no puede devolver la
+  // cuenta a su moneda vieja (el flip-flop EUR↔MXN que veían los usuarios).
+  const currencyDirtyRef = useRef(false);
 
   // Load a profile's data: local cache first (instant), then authoritative pull.
   function bootProfile(p: Profile) {
@@ -486,7 +493,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const snapshotsUnchanged = listSignature(cur.snapshots) === listSignature(mergedSnapshots);
     const toolsUnchanged = listSignature(cur.userTools || []) === listSignature(mergedUserTools);
     const onboardingUnchanged = onboardingSignature(cur.onboarding) === onboardingSignature(mergedOnboarding);
-    const nextCurrency = remote.primaryCurrency ?? cur.primaryCurrency;
+    // Si hay un cambio de moneda local pendiente de subir, NO adoptamos la
+    // remota (aún vieja): pisaría la elección que el usuario acaba de hacer.
+    const nextCurrency = currencyDirtyRef.current
+      ? cur.primaryCurrency
+      : remote.primaryCurrency ?? cur.primaryCurrency;
     const currencyUnchanged = nextCurrency === cur.primaryCurrency;
 
     const nextGoals = goalsUnchanged ? cur.goals : mergedGoals;
@@ -515,8 +526,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
     justPulledRef.current = true;
     // If the remote profile has a primary_currency, adopt it (and keep the
-    // local profile cache in sync so currency picks survive without Supabase).
-    if (remote.primaryCurrency) {
+    // local profile cache in sync so currency picks survive without Supabase)
+    // — unless a local currency change is still waiting to be pushed.
+    if (remote.primaryCurrency && !currencyDirtyRef.current) {
       try {
         updateProfileCurrency(p.id, remote.primaryCurrency);
       } catch {
@@ -549,7 +561,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         name: remote.profileMeta?.name || mergedOnboarding?.name || p.name,
         email: p.email ?? "",
       },
-      primaryCurrency: remote.primaryCurrency ?? s.primaryCurrency,
+      primaryCurrency: nextCurrency,
       syncStatus: "synced",
       lastSyncAt: new Date().toISOString(),
     }));
@@ -792,6 +804,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     pushPendingRef.current = true;
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(async () => {
+      // La moneda solo viaja si el usuario la cambió AQUÍ (o si el push
+      // inmediato de setPrimaryCurrency falló y esto actúa de reintento).
+      // Enviarla siempre permitía que un dispositivo con la moneda vieja
+      // se la devolviera a toda la cuenta al guardar cualquier cosa.
+      const includeCurrency = currencyDirtyRef.current;
       setState((s) => ({ ...s, syncStatus: "syncing" }));
       const ok = await pushToSupabase(profile.user_id, {
         goals: state.goals,
@@ -800,7 +817,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         snapshots: state.snapshots,
         userTools: state.userTools,
         onboarding: state.onboarding,
-        primaryCurrency: state.primaryCurrency,
+        primaryCurrency: includeCurrency ? state.primaryCurrency : undefined,
         profileMeta: {
           id: profile.id,
           name: profile.name,
@@ -811,6 +828,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         },
       }, state.deletedIds ?? []);
       pushPendingRef.current = false;
+      if (ok && includeCurrency) currencyDirtyRef.current = false;
       setState((s) => ({
         ...s,
         syncStatus: ok ? "synced" : "error",
@@ -908,8 +926,24 @@ export function RumboProvider({ children }: { children: ReactNode }) {
 
   const setPrimaryCurrency = useCallback(
     (c: Currency) => {
+      currencyDirtyRef.current = true;
       setState((s) => ({ ...s, primaryCurrency: c }));
-      if (profile) updateProfileCurrency(profile.id, c);
+      if (profile) {
+        updateProfileCurrency(profile.id, c);
+        // Push inmediato y quirúrgico: la moneda es un ajuste pequeño pero
+        // crítico — no debe esperar al push debounced de estado completo ni
+        // perderse si el usuario cierra la app en esos 800ms.
+        const supa = getSupabase();
+        if (supa) {
+          supa
+            .from("profiles")
+            .update({ primary_currency: c, updated_at: new Date().toISOString() })
+            .eq("user_id", profile.user_id)
+            .then(({ error }) => {
+              if (!error) currencyDirtyRef.current = false;
+            });
+        }
+      }
     },
     [profile]
   );

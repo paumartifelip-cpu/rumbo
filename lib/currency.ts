@@ -54,6 +54,22 @@ interface CachedRates {
 let cachedRates: CachedRates | null = null;
 let inflight: Promise<CachedRates> | null = null;
 
+// Una tasa solo es usable si es un número finito y positivo. Un 0 o un null
+// que se cuele (API caída, caché corrupta) provocaría divisiones por cero y
+// convertiría TODAS las sumas del usuario en NaN/Infinity durante 24h.
+const isValidRate = (v: unknown): v is number =>
+  typeof v === "number" && Number.isFinite(v) && v > 0;
+
+function sanitizeRates(raw: Partial<Record<Currency, unknown>> | undefined): Record<Currency, number> {
+  const usd = raw?.USD, mxn = raw?.MXN, ars = raw?.ARS;
+  return {
+    EUR: 1,
+    USD: isValidRate(usd) ? usd : FALLBACK_RATES.USD,
+    MXN: isValidRate(mxn) ? mxn : FALLBACK_RATES.MXN,
+    ARS: isValidRate(ars) ? ars : FALLBACK_RATES.ARS,
+  };
+}
+
 function loadCached(): CachedRates | null {
   if (cachedRates) return cachedRates;
   if (typeof window === "undefined") return null;
@@ -62,6 +78,9 @@ function loadCached(): CachedRates | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedRates;
     if (Date.now() - parsed.fetchedAt > RATES_TTL_MS) return null;
+    // Sanea también lo que viene de la caché: una tasa corrupta guardada ayer
+    // no debe seguir rompiendo las cuentas hoy.
+    parsed.rates = sanitizeRates(parsed.rates);
     cachedRates = parsed;
     return parsed;
   } catch {
@@ -79,12 +98,7 @@ export async function fetchRates(): Promise<CachedRates> {
       const res = await fetch("https://open.er-api.com/v6/latest/EUR");
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      const rates: Record<Currency, number> = {
-        EUR: 1,
-        USD: data.rates?.USD ?? FALLBACK_RATES.USD,
-        MXN: data.rates?.MXN ?? FALLBACK_RATES.MXN,
-        ARS: data.rates?.ARS ?? FALLBACK_RATES.ARS,
-      };
+      const rates = sanitizeRates(data.rates);
       const result: CachedRates = {
         base: "EUR",
         rates,
@@ -123,8 +137,10 @@ export function convertAmount(
 ): number {
   if (from === to) return amount;
   const rates = getRates();
-  const eurAmount = amount / rates[from];
-  return eurAmount * rates[to];
+  const out = (amount / rates[from]) * rates[to];
+  // Última red de seguridad: un NaN aquí envenenaría todas las sumas del mes
+  // y hasta el push a Supabase (numeric rechaza NaN). Mejor 0 y visible.
+  return Number.isFinite(out) ? out : 0;
 }
 
 export function formatCurrency(amount: number, currency: Currency): string {

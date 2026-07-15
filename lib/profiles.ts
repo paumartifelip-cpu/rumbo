@@ -180,18 +180,23 @@ export function updateProfileCurrency(
 
 const DEFAULT_CURRENCY_KEY = "rumbo_default_profile_currencies";
 
+const isSupportedCurrency = (v: unknown): v is "EUR" | "USD" | "MXN" | "ARS" =>
+  v === "EUR" || v === "USD" || v === "MXN" || v === "ARS";
+
 export function getProfileCurrency(
   id: string
 ): "EUR" | "USD" | "MXN" | "ARS" {
   if (typeof window === "undefined") return "EUR";
   const customs = getCustomProfiles();
   const custom = customs.find((p) => p.id === id);
-  if (custom?.primary_currency) return custom.primary_currency;
+  // Valida SIEMPRE lo que sale de localStorage: un valor corrupto aquí se
+  // propagaría a todas las conversiones y al push del perfil.
+  if (isSupportedCurrency(custom?.primary_currency)) return custom.primary_currency;
   try {
     const raw = localStorage.getItem(DEFAULT_CURRENCY_KEY);
     if (raw) {
       const map = JSON.parse(raw);
-      if (map[id]) return map[id];
+      if (isSupportedCurrency(map[id])) return map[id];
     }
   } catch {}
   return "EUR";
