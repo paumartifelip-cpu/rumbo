@@ -8,6 +8,17 @@ import { Logo } from "@/components/Logo";
 import { getSupabase } from "@/lib/supabase";
 import { signInEmail, signUpEmail, sendPasswordReset } from "@/lib/auth";
 
+// Detectar si Supabase redirigió desde un link de reset (hash fragment)
+function useRecoveryMode() {
+  const [isRecovery, setIsRecovery] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    setIsRecovery(hash.includes("type=recovery"));
+  }, []);
+  return isRecovery;
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
@@ -16,14 +27,17 @@ export default function LoginPage() {
   );
 }
 
-type Mode = "signin" | "signup" | "reset";
+type Mode = "signin" | "signup" | "reset" | "recovery";
 
 function LoginInner() {
   const router = useRouter();
+  const isRecovery = useRecoveryMode();
   const [mode, setMode] = useState<Mode>("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -37,9 +51,34 @@ function LoginInner() {
     });
   }, [router]);
 
+  // Si Supabase redirigió desde un email de reset, cambiar a modo recovery
+  useEffect(() => {
+    if (isRecovery) setMode("recovery");
+  }, [isRecovery]);
+
   async function submit() {
     setError(null);
     setInfo(null);
+
+    if (mode === "recovery") {
+      if (newPassword.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
+      if (newPassword !== confirmPassword) { setError("Las contraseñas no coinciden."); return; }
+
+      setBusy(true);
+      const supa = getSupabase();
+      if (!supa) { setBusy(false); setError("Sin conexión con el servidor."); return; }
+
+      const { error: err } = await supa.auth.updateUser({ password: newPassword });
+      setBusy(false);
+
+      if (err) { setError(err.message || "No se pudo cambiar la contraseña."); return; }
+      setInfo("Contraseña cambiada. Inicia sesión con tu nueva contraseña.");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMode("signin");
+      return;
+    }
+
     const mail = email.trim().toLowerCase();
     if (!mail || !mail.includes("@")) { setError("Introduce un email válido."); return; }
 
@@ -77,12 +116,20 @@ function LoginInner() {
   }
 
   const title =
-    mode === "signin" ? "Inicia sesión" : mode === "signup" ? "Crea tu cuenta" : "Recuperar contraseña";
+    mode === "signin"
+      ? "Inicia sesión"
+      : mode === "signup"
+      ? "Crea tu cuenta"
+      : mode === "recovery"
+      ? "Nueva contraseña"
+      : "Recuperar contraseña";
   const subtitle =
     mode === "signin"
       ? "Entra con tu email y contraseña."
       : mode === "signup"
       ? "Tu dinero, solo tuyo. Empieza en un minuto."
+      : mode === "recovery"
+      ? "Escribe tu nueva contraseña."
       : "Te enviaremos un enlace para crear una nueva.";
 
   return (
@@ -124,16 +171,39 @@ function LoginInner() {
               )}
             </AnimatePresence>
 
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Email</label>
-              <input
-                type="email" autoComplete="email" className="input w-full" placeholder="tu@email.com" value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-              />
-            </div>
+            {mode !== "recovery" && (
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Email</label>
+                <input
+                  type="email" autoComplete="email" className="input w-full" placeholder="tu@email.com" value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                />
+              </div>
+            )}
 
-            {mode !== "reset" && (
+            {mode === "recovery" ? (
+              <>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Nueva contraseña</label>
+                  <input
+                    type="password" autoComplete="new-password" className="input w-full" placeholder="Mínimo 6 caracteres"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Confirmar contraseña</label>
+                  <input
+                    type="password" autoComplete="new-password" className="input w-full" placeholder="Repite tu nueva contraseña"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+                  />
+                </div>
+              </>
+            ) : mode !== "reset" && (
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Contraseña</label>
                 <input
@@ -160,7 +230,13 @@ function LoginInner() {
             >
               {busy
                 ? "Un momento…"
-                : mode === "signin" ? "Entrar →" : mode === "signup" ? "Crear cuenta →" : "Enviar enlace →"}
+                : mode === "signin"
+                ? "Entrar →"
+                : mode === "signup"
+                ? "Crear cuenta →"
+                : mode === "recovery"
+                ? "Cambiar contraseña →"
+                : "Enviar enlace →"}
             </button>
           </div>
 
@@ -189,9 +265,9 @@ function LoginInner() {
                 </button>
               </div>
             )}
-            {mode === "reset" && (
+            {(mode === "reset" || mode === "recovery") && (
               <div>
-                <button onClick={() => { setMode("signin"); setError(null); setInfo(null); }} className="font-semibold text-emerald-700 hover:underline">
+                <button onClick={() => { setMode("signin"); setError(null); setInfo(null); setNewPassword(""); setConfirmPassword(""); }} className="font-semibold text-emerald-700 hover:underline">
                   ← Volver a iniciar sesión
                 </button>
               </div>
