@@ -17,12 +17,15 @@ let client: SupabaseClient | null = null;
 export function getSupabase(): SupabaseClient | null {
   if (!url || !anon) return null;
   if (!client) {
+    // NOTE: keep the default (implicit) flowType. PKCE changes the format of
+    // every email link (?code=... instead of #access_token...&type=recovery),
+    // which breaks the password-recovery detection in /login and would
+    // invalidate the flow that's already tested in production.
     client = createClient(url, anon, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        flowType: "pkce",
       },
     });
   }

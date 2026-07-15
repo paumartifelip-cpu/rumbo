@@ -26,15 +26,41 @@ function friendly(msg?: string): string {
   return msg || "Algo salió mal. Inténtalo de nuevo.";
 }
 
-/** Make sure a profiles row exists for this auth user (idempotent). */
+/**
+ * Make sure a profiles row exists for this auth user (idempotent).
+ * If the row already exists, only backfill fields that are EMPTY: this must
+ * never overwrite a name the user set in onboarding (the old upsert clobbered
+ * it with the auth-metadata name on every app boot), and it restores emails
+ * that an older sync bug erased from the column.
+ */
 export async function ensureProfileRow(uid: string, name: string, email: string) {
   const supa = getSupabase();
   if (!supa) return;
   try {
-    await supa.from("profiles").upsert(
-      { user_id: uid, profile_id: uid, name, email, updated_at: new Date().toISOString() },
-      { onConflict: "user_id" }
-    );
+    const { data } = await supa
+      .from("profiles")
+      .select("user_id, name, email")
+      .eq("user_id", uid)
+      .maybeSingle();
+
+    if (!data) {
+      await supa.from("profiles").insert({
+        user_id: uid,
+        profile_id: uid,
+        name,
+        email,
+        updated_at: new Date().toISOString(),
+      });
+      return;
+    }
+
+    const patch: Record<string, any> = {};
+    if (!data.name && name) patch.name = name;
+    if (!data.email && email) patch.email = email;
+    if (Object.keys(patch).length > 0) {
+      patch.updated_at = new Date().toISOString();
+      await supa.from("profiles").update(patch).eq("user_id", uid);
+    }
   } catch {
     // ignore — the row may already exist; data still works.
   }

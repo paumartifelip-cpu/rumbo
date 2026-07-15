@@ -173,7 +173,10 @@ export async function pushToSupabase(
         profileRow.initials   = snap.profileMeta.initials;
         profileRow.color      = snap.profileMeta.color;
         profileRow.emoji      = snap.profileMeta.emoji ?? null;
-        profileRow.email      = snap.profileMeta.email ?? null;
+        // Email: only write it when we actually have one. Writing null here
+        // erased the stored email on every push — that's how 22 of 24
+        // profiles ended up with email null in production.
+        if (snap.profileMeta.email) profileRow.email = snap.profileMeta.email;
       }
       if (snap.onboarding) {
         profileRow.name                    = snap.onboarding.name ?? profileRow.name ?? null;

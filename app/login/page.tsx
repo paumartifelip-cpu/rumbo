@@ -2,22 +2,15 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { getSupabase } from "@/lib/supabase";
 import { signInEmail, signUpEmail, sendPasswordReset } from "@/lib/auth";
 
-// Detectar si Supabase redirigió desde un link de reset (hash fragment)
-function useRecoveryMode() {
-  const [isRecovery, setIsRecovery] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const hash = window.location.hash;
-    setIsRecovery(hash.includes("type=recovery"));
-  }, []);
-  return isRecovery;
-}
+// El link de reset de Supabase aterriza con el marcador en el hash de la URL.
+const urlLooksLikeRecovery = () =>
+  typeof window !== "undefined" && window.location.hash.includes("type=recovery");
 
 export default function LoginPage() {
   return (
@@ -31,7 +24,10 @@ type Mode = "signin" | "signup" | "reset" | "recovery";
 
 function LoginInner() {
   const router = useRouter();
-  const isRecovery = useRecoveryMode();
+  // True desde el momento en que sabemos que esta visita viene de un link de
+  // reset de contraseña. Es un ref (no estado) para que el redirect de sesión
+  // de más abajo pueda consultarlo dentro de su .then sin problemas de cierre.
+  const recoveryRef = useRef(false);
   const [mode, setMode] = useState<Mode>("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -45,19 +41,37 @@ function LoginInner() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  // If already signed in, skip straight to the app.
+  // Detectar la visita desde un link de reset: por la URL (síncrono, antes de
+  // que el redirect de sesión pueda dispararse) y por el evento
+  // PASSWORD_RECOVERY de supabase-js (cubre cualquier variante del flujo).
+  useEffect(() => {
+    if (urlLooksLikeRecovery()) {
+      recoveryRef.current = true;
+      setMode("recovery");
+    }
+    const supa = getSupabase();
+    if (!supa) return;
+    const { data: sub } = supa.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        recoveryRef.current = true;
+        setMode("recovery");
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // If already signed in, skip straight to the app — EXCEPT when this visit
+  // comes from a password-reset link: the link itself signs the user in, and
+  // redirecting here would skip the "new password" form (users landed on the
+  // dashboard without ever being able to change their password).
   useEffect(() => {
     const supa = getSupabase();
     if (!supa) return;
     supa.auth.getSession().then(({ data }) => {
+      if (recoveryRef.current || urlLooksLikeRecovery()) return;
       if (data.session) router.replace("/dashboard");
     });
   }, [router]);
-
-  // Si Supabase redirigió desde un email de reset, cambiar a modo recovery
-  useEffect(() => {
-    if (isRecovery) setMode("recovery");
-  }, [isRecovery]);
 
   async function submit() {
     setError(null);
@@ -75,10 +89,9 @@ function LoginInner() {
       setBusy(false);
 
       if (err) { setError(err.message || "No se pudo cambiar la contraseña."); return; }
-      setInfo("Contraseña cambiada. Inicia sesión con tu nueva contraseña.");
-      setNewPassword("");
-      setConfirmPassword("");
-      setMode("signin");
+      // El link de recovery ya dejó la sesión iniciada: directo a la app.
+      recoveryRef.current = false;
+      router.replace("/dashboard");
       return;
     }
 

@@ -554,7 +554,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         userTools: mergedUserTools,
         onboarding: mergedOnboarding,
         primaryCurrency: remote.primaryCurrency ?? cachedCurrency,
-        profileMeta: { id: p.id, name: p.name, initials: p.initials, color: p.color, emoji: p.emoji },
+        profileMeta: { id: p.id, name: p.name, initials: p.initials, color: p.color, emoji: p.emoji, email: p.email },
       }, cur.deletedIds ?? []).then((ok) => {
         if (!ok) setState((s) => ({ ...s, syncStatus: "error" }));
       });
@@ -798,6 +798,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
           initials: profile.initials,
           color: profile.color,
           emoji: profile.emoji,
+          email: profile.email,
         },
       }, state.deletedIds ?? []);
       pushPendingRef.current = false;
