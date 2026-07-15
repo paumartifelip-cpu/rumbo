@@ -120,6 +120,29 @@ export function MonthlyIncome() {
 
   const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
   const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([]);
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const toggleGroup = (key: string) =>
+    setOpenGroups((o) => (o.includes(key) ? o.filter((x) => x !== key) : [...o, key]));
+
+  // Movimientos del mes agrupados en desplegables (como las categorías de
+  // gastos): puntuales por un lado, instancias de recurrentes por otro. Una
+  // instancia generada se reconoce por el id determinista (__rec__) o porque
+  // es la propia plantilla recurrente fechada este mes.
+  const movementGroups = useMemo(() => {
+    const isRecurrentRow = (f: (typeof thisMonthEntries)[number]) =>
+      Boolean(f.recurrence) || f.id.includes("__rec__");
+    const groups = [
+      { key: "puntuales", icon: "💵", name: "Ingresos del mes", items: thisMonthEntries.filter((f) => !isRecurrentRow(f)) },
+      { key: "recurrentes", icon: "🔁", name: "Recurrentes mensuales", items: thisMonthEntries.filter(isRecurrentRow) },
+    ];
+    return groups
+      .map((g) => ({
+        ...g,
+        total: g.items.reduce((a, f) => a + amountInPrimary(f), 0),
+        count: g.items.length,
+      }))
+      .filter((g) => g.count > 0);
+  }, [thisMonthEntries, amountInPrimary]);
 
   // Deleting a recurring income removes the template AND all its generated months.
   const deleteSubscriptionCascade = (subId: string) => removeFinanceCascade(subId);
@@ -214,6 +237,7 @@ export function MonthlyIncome() {
             <input
               className="input bg-white group-hover:border-emerald-400 transition-colors pl-10"
               placeholder="Concepto (ej: Pago cliente, venta Wallapop...)"
+              autoComplete="off"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
@@ -223,9 +247,11 @@ export function MonthlyIncome() {
           <div className="relative group">
             <input
               type="number"
-              inputMode="numeric"
+              inputMode="decimal"
+              step="0.01"
               className="input bg-white pr-10 group-hover:border-emerald-400 transition-colors"
               placeholder="Cantidad"
+              autoComplete="off"
               value={form.amount}
               onChange={(e) =>
                 setForm({
@@ -381,67 +407,112 @@ export function MonthlyIncome() {
             </button>
           )}
         </div>
-        <AnimatePresence>
-          {thisMonthEntries.length === 0 ? (
-            <div className="text-sm text-rumbo-muted py-3">
-              Aún no has registrado ingresos este mes.
-            </div>
-          ) : (
-            thisMonthEntries.map((f) => {
-              const entryCurrency = f.currency ?? primaryCurrency;
-              const isForeign = entryCurrency !== primaryCurrency;
+        {thisMonthEntries.length === 0 ? (
+          <div className="text-sm text-rumbo-muted py-3">
+            Aún no has registrado ingresos este mes.
+          </div>
+        ) : (
+          <div className="mt-2 flex flex-col gap-2.5">
+            {movementGroups.map((g) => {
+              const open = openGroups.includes(g.key);
               return (
-                <motion.div
-                  key={f.id}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center justify-between py-2.5 border-b last:border-0 border-rumbo-line group"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <input
-                      type="checkbox"
-                      checked={selectedMoveIds.includes(f.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedMoveIds([...selectedMoveIds, f.id]);
-                        } else {
-                          setSelectedMoveIds(selectedMoveIds.filter((id) => id !== f.id));
-                        }
-                      }}
-                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
-                    />
-                    <div>
-                      <div className="font-medium">{f.title}</div>
-                      <div className="text-xs text-rumbo-muted">
-                        {formatDate(f.date)}
-                      </div>
+                <div key={g.key} className="border border-rumbo-line rounded-2xl overflow-hidden bg-white">
+                  {/* Cabecera del grupo — toca para desplegar */}
+                  <button
+                    onClick={() => toggleGroup(g.key)}
+                    aria-expanded={open}
+                    className="w-full flex items-center gap-3 px-3.5 py-3 text-left hover:bg-slate-50 transition-colors active:scale-[0.99]"
+                  >
+                    <span className="text-xl leading-none shrink-0">{g.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-rumbo-ink truncate">{g.name}</div>
+                      <div className="text-xs text-rumbo-muted">{g.count} {g.count === 1 ? "ingreso" : "ingresos"}</div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-2">
-                    <div className="text-right">
-                      <span className="text-emerald-600 font-medium">
-                        +{formatCurrency(f.amount, entryCurrency)}
-                      </span>
-                      {isForeign && (
-                        <div className="text-[10px] text-rumbo-muted">
-                          ≈ +{format(amountInPrimary(f))}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => deleteMovementCascade(f.id)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
-                      aria-label="Eliminar ingreso"
+                    <span className="font-bold text-emerald-600 tabular-nums shrink-0">+{format(g.total)}</span>
+                    <svg
+                      width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                      className={`shrink-0 text-rumbo-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
                     >
-                      ✕
-                    </button>
-                  </div>
-                </motion.div>
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+
+                  {/* Lista desplegada */}
+                  <AnimatePresence initial={false}>
+                    {open && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.22, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-3.5 pb-1 border-t border-rumbo-line">
+                          {g.items.map((f) => {
+                            const entryCurrency = f.currency ?? primaryCurrency;
+                            const isForeign = entryCurrency !== primaryCurrency;
+                            return (
+                              <div
+                                key={f.id}
+                                className="flex items-center justify-between py-2.5 border-b last:border-0 border-rumbo-line/70 group"
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedMoveIds.includes(f.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedMoveIds([...selectedMoveIds, f.id]);
+                                      } else {
+                                        setSelectedMoveIds(selectedMoveIds.filter((id) => id !== f.id));
+                                      }
+                                    }}
+                                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors"
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="font-medium truncate flex items-center gap-1.5">
+                                      {f.title}
+                                      {(f.recurrence || f.id.includes("__rec__")) && (
+                                        <span title="Ingreso recurrente mensual" className="text-[10px] bg-emerald-100 text-emerald-900 px-1 rounded">🔁</span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-rumbo-muted">
+                                      {formatDate(f.date)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0 ml-2">
+                                  <div className="text-right">
+                                    <span className="text-emerald-600 font-medium">
+                                      +{formatCurrency(f.amount, entryCurrency)}
+                                    </span>
+                                    {isForeign && (
+                                      <div className="text-[10px] text-rumbo-muted">
+                                        ≈ +{format(amountInPrimary(f))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => deleteMovementCascade(f.id)}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
+                                    aria-label="Eliminar ingreso"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               );
-            })
-          )}
-        </AnimatePresence>
+            })}
+          </div>
+        )}
       </div>
 
       {/* Historical Chart at bottom */}
