@@ -73,6 +73,12 @@ const addTombstones = (existing: string[] | undefined, ...ids: string[]): string
 // pull carries the exact same data we already have, so we can skip replacing
 // state entirely. This is what prevents the UI from flickering / reordering
 // every time the 30s poll or a realtime echo fires with unchanged data.
+//
+// IMPORTANT: every USER-EDITABLE field must be listed here. A field missing
+// from the signature makes remote edits to it invisible ("unchanged") — the
+// stale device keeps its old copy and overwrites the edit on its next push.
+// Deliberately excluded: ai_priority_score / ai_reason / amount_in_primary,
+// which are recomputed locally and would cause endless pull/push churn.
 function listSignature(arr: Array<Record<string, any>>): string {
   return arr
     .map((x) =>
@@ -82,6 +88,9 @@ function listSignature(arr: Array<Record<string, any>>): string {
         x.current_amount, x.target_amount, x.deadline, x.importance,
         x.total, x.note, x.name, x.cost, x.rating, x.icon, x.is_favorite,
         x.highlight, x.order_index, x.updated_at,
+        x.description, x.timeframe, x.unit, x.due_date, x.goal_id,
+        x.manual_order_index, x.estimated_minutes, x.energy_level,
+        x.difficulty, x.urgency, x.money_impact, x.url,
       ].join("")
     )
     .sort()
