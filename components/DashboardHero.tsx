@@ -156,6 +156,7 @@ function useCounter(target: number, duration = 1200) {
     };
     animationFrame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(animationFrame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
   return count;
 }

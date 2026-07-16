@@ -87,7 +87,7 @@ export function MoneyHero() {
           </>
         ) : (
           <div className="mt-2 text-xs text-rumbo-muted">
-            Define tu meta mensual en "Mis metas" para ver la línea de progreso.
+            Define tu meta mensual en &quot;Mis metas&quot; para ver la línea de progreso.
           </div>
         )}
       </div>

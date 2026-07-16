@@ -43,7 +43,7 @@ export function IncomeVsExpensesChart() {
       buckets.push({ label, ingresos: income, gastos: expenses });
     }
     return buckets;
-  }, [finances, amountInPrimary, onboarding, adjustedBaseSalary]);
+  }, [finances, amountInPrimary, adjustedBaseSalary]);
 
   return (
     <div className="h-96 mt-6">

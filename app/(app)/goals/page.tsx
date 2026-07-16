@@ -571,7 +571,7 @@ function GoalForm({
               <span className="text-sm font-black text-slate-700">🔢 Seguimiento por clics</span>
               <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-700 font-bold rounded-full uppercase tracking-widest">Opcional</span>
             </div>
-            <p className="text-xs text-slate-400">Si defines una unidad y un número, podrás pulsar <strong className="text-slate-600">+1</strong> cada vez que completes una acción (ej: "vídeos", "sesiones", "km").</p>
+            <p className="text-xs text-slate-400">Si defines una unidad y un número, podrás pulsar <strong className="text-slate-600">+1</strong> cada vez que completes una acción (ej: &quot;vídeos&quot;, &quot;sesiones&quot;, &quot;km&quot;).</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-bold text-slate-500 mb-1 block">Unidad (ej: vídeos)</label>
