@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, ProgressBar, SectionTitle } from "./Card";
+import { Card, SectionTitle } from "./Card";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/utils";
@@ -22,7 +22,6 @@ export function MonthlyIncome() {
     addFinance,
     removeFinance,
     removeFinanceCascade,
-    onboarding,
     primaryCurrency,
     amountInPrimary,
     adjustedBaseSalary,
@@ -33,8 +32,6 @@ export function MonthlyIncome() {
   const monthLabel = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
   const currentKey = monthKey(now);
-
-  const monthlyTarget = onboarding?.monthly_target ?? 0;
 
   const thisMonthEntries = useMemo(
     () =>
@@ -65,17 +62,6 @@ export function MonthlyIncome() {
     () => recurringIncomes.reduce((acc, f) => acc + amountInPrimary(f), 0),
     [recurringIncomes, amountInPrimary]
   );
-
-  const currentBaseSalary = adjustedBaseSalary(currentKey);
-  const earnedThisMonth =
-    currentBaseSalary +
-    thisMonthEntries.reduce((a, b) => a + amountInPrimary(b), 0);
-
-  const animated = useCounter(earnedThisMonth);
-
-  const progress = monthlyTarget
-    ? Math.min(100, (earnedThisMonth / monthlyTarget) * 100)
-    : 0;
 
   const last6 = useMemo(() => {
     const buckets = new Map<string, { label: string; total: number }>();
@@ -179,49 +165,11 @@ export function MonthlyIncome() {
     <Card>
       <SectionTitle
         title={`Ingresos de ${monthLabel}`}
-        hint="Apunta cada cobro o ingreso. Tu contador se actualiza al instante."
+        hint="Apunta cada cobro o ingreso. El contador de arriba se actualiza al instante."
       />
 
-      <div className="flex flex-col gap-6">
-        <div className="rounded-3xl bg-gradient-to-br from-emerald-50 via-white to-violet-50 border border-rumbo-line p-8 text-center">
-          <div className="text-xs uppercase tracking-[0.2em] text-rumbo-muted font-bold mb-2">
-            Total ganado en {monthLabel.split(' ')[0]}
-          </div>
-          <motion.div
-            key={earnedThisMonth}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-4xl md:text-5xl font-black tracking-tighter tabular-nums text-rumbo-ink"
-          >
-            {format(animated)}
-          </motion.div>
-          
-          {monthlyTarget > 0 && (
-            <div className="max-w-md mx-auto mt-6">
-              <div className="flex justify-between text-xs font-bold uppercase tracking-wider mb-2">
-                <span className="text-rumbo-muted">Meta: {format(monthlyTarget)}</span>
-                <span className="text-violet-600">{Math.round(progress)}%</span>
-              </div>
-              <ProgressBar value={progress} tone="violet" />
-              <div className="text-sm text-rumbo-muted mt-3 font-medium">
-                {earnedThisMonth >= monthlyTarget 
-                  ? "🎉 ¡Objetivo conseguido!" 
-                  : `Faltan ${format(monthlyTarget - earnedThisMonth)} para tu meta`
-                }
-              </div>
-            </div>
-          )}
-
-          {currentBaseSalary > 0 && (
-            <div className="text-[10px] text-rumbo-muted mt-6 inline-block px-3 py-1 bg-white/50 rounded-full border border-rumbo-line">
-              Incluye sueldo base de {format(currentBaseSalary)}/mes
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Entry Form Section — cantidad protagonista, estilo wallet */}
-      <div className="mt-10 relative overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 p-5 sm:p-6">
+      <div className="mt-2 relative overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 p-5 sm:p-6">
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-200/30 rounded-full blur-3xl pointer-events-none" />
         <div className="relative">
           <div className="mb-5">
@@ -562,24 +510,4 @@ export function MonthlyIncome() {
       </div>
     </Card>
   );
-}
-
-function useCounter(target: number, duration = 800) {
-  const [value, setValue] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const start = performance.now();
-    const initial = value;
-    const delta = target - initial;
-    const step = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setValue(initial + delta * eased);
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target]);
-  return value;
 }
