@@ -97,11 +97,10 @@ create table if not exists user_tools (
 );
 create index if not exists user_tools_user_id_idx on user_tools(user_id);
 
--- Paywall: Stripe payments are upserted here by the stripe-webhook Edge
--- Function. The app generates an 8-char access code BEFORE redirecting to
--- Stripe and passes it as `client_reference_id`. The webhook stores it here.
--- Every NEW custom profile (i.e. anyone other than Pau & Michelle) must match
--- an unused row in this table.
+-- Paywall: cada pago de Stripe queda registrado aquí por la Edge Function
+-- verify-payment (code = checkout session id). Crear una cuenta nueva exige
+-- un pago verificado; `used` garantiza que un pago solo crea UNA cuenta.
+-- El email se actualiza al de la cuenta creada para que Ajustes muestre el plan.
 create table if not exists paid_codes (
   code text primary key,
   name text,
@@ -163,5 +162,10 @@ create policy "own_financial_entries" on financial_entries for all using (auth.u
 create policy "own_money_snapshots" on money_snapshots for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own_user_tools" on user_tools for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- paid_codes: tabla del paywall antiguo (ya no se usa). Sin políticas =
--- inaccesible vía API. Los Edge Functions (service role) la saltan si hiciera falta.
+-- paid_codes: las Edge Functions (service role) leen y escriben saltándose RLS.
+-- Desde el cliente solo se permite UNA lectura: la fila cuyo email coincide con
+-- el del propio JWT, para que Ajustes muestre el plan. Nada de escrituras.
+drop policy if exists "read_own_paid_code" on paid_codes;
+create policy "read_own_paid_code" on paid_codes
+  for select to authenticated
+  using (email is not null and email = lower(coalesce(auth.jwt()->>'email', '')));

@@ -1,12 +1,13 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { getSupabase } from "@/lib/supabase";
-import { signInEmail, signUpEmail, sendPasswordReset } from "@/lib/auth";
+import { signInEmail, sendPasswordReset } from "@/lib/auth";
+import { PLAN_PRICE_LABEL, STRIPE_PAYMENT_URL, buildSupportWhatsAppUrl } from "@/lib/payment";
 
 // El link de reset de Supabase aterriza con el marcador en el hash de la URL.
 const urlLooksLikeRecovery = () =>
@@ -24,12 +25,14 @@ type Mode = "signin" | "signup" | "reset" | "recovery";
 
 function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   // True desde el momento en que sabemos que esta visita viene de un link de
   // reset de contraseña. Es un ref (no estado) para que el redirect de sesión
   // de más abajo pueda consultarlo dentro de su .then sin problemas de cierre.
   const recoveryRef = useRef(false);
-  const [mode, setMode] = useState<Mode>("signin");
-  const [name, setName] = useState("");
+  const [mode, setMode] = useState<Mode>(
+    searchParams.get("mode") === "signup" ? "signup" : "signin"
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -110,20 +113,6 @@ function LoginInner() {
     if (password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
 
     setBusy(true);
-    if (mode === "signup") {
-      if (!name.trim()) { setBusy(false); setError("Escribe tu nombre."); return; }
-      const res = await signUpEmail(mail, password, name);
-      setBusy(false);
-      if (!res.ok) { setError(res.error ?? "No se pudo crear la cuenta."); return; }
-      if (res.needsConfirm) {
-        setInfo("Cuenta creada. Confirma tu email desde el enlace que te hemos enviado y luego inicia sesión.");
-        setMode("signin");
-        return;
-      }
-      router.replace("/onboarding");
-      return;
-    }
-
     // signin
     const res = await signInEmail(mail, password);
     setBusy(false);
@@ -143,7 +132,7 @@ function LoginInner() {
     mode === "signin"
       ? "Entra con tu email y contraseña."
       : mode === "signup"
-      ? "Tu dinero, solo tuyo. Empieza en un minuto."
+      ? `Tu dinero, solo tuyo, por ${PLAN_PRICE_LABEL}. Paga y crea tu cuenta al momento.`
       : mode === "recovery"
       ? "Escribe tu nueva contraseña."
       : "Te enviaremos un enlace para crear una nueva.";
@@ -168,25 +157,32 @@ function LoginInner() {
             <p className="text-rumbo-muted mt-2 text-sm">{subtitle}</p>
           </div>
 
+          {mode === "signup" ? (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black tracking-tight">3,99 €</span>
+                  <span className="text-sm text-rumbo-muted">al mes</span>
+                </div>
+                <ul className="mt-3 space-y-1.5 text-sm text-rumbo-ink/80">
+                  <li>✓ Todos tus ingresos y gastos, claros</li>
+                  <li>✓ Objetivos y evolución de tu dinero</li>
+                  <li>✓ Sincronizado y privado, solo para ti</li>
+                  <li>✓ Date de baja cuando quieras por WhatsApp</li>
+                </ul>
+              </div>
+              <a
+                href={STRIPE_PAYMENT_URL}
+                className="block w-full text-center px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors"
+              >
+                Pagar y crear mi cuenta →
+              </a>
+              <p className="text-[11px] text-rumbo-muted text-center leading-relaxed">
+                Pago seguro con Stripe. Nada más pagar volverás aquí para poner tu contraseña y entrar a tu cuenta.
+              </p>
+            </div>
+          ) : (
           <div className="space-y-3">
-            <AnimatePresence initial={false}>
-              {mode === "signup" && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden"
-                >
-                  <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Nombre</label>
-                  <input
-                    className="input w-full" placeholder="Cómo te llamas" value={name} maxLength={24}
-                    onChange={(e) => setName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
             {mode !== "recovery" && (
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-rumbo-muted block mb-1">Email</label>
@@ -245,7 +241,7 @@ function LoginInner() {
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
-                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                    autoComplete="current-password"
                     className="input w-full pr-10" placeholder="Mínimo 6 caracteres" value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
@@ -278,13 +274,12 @@ function LoginInner() {
                 ? "Un momento…"
                 : mode === "signin"
                 ? "Entrar →"
-                : mode === "signup"
-                ? "Crear cuenta →"
                 : mode === "recovery"
                 ? "Cambiar contraseña →"
                 : "Enviar enlace →"}
             </button>
           </div>
+          )}
 
           {/* Mode switches */}
           <div className="mt-6 text-center text-sm text-rumbo-muted space-y-2">
@@ -304,12 +299,24 @@ function LoginInner() {
               </>
             )}
             {mode === "signup" && (
-              <div>
-                ¿Ya tienes cuenta?{" "}
-                <button onClick={() => { setMode("signin"); setError(null); setInfo(null); }} className="font-semibold text-emerald-700 hover:underline">
-                  Inicia sesión
-                </button>
-              </div>
+              <>
+                <div>
+                  ¿Ya tienes cuenta?{" "}
+                  <button onClick={() => { setMode("signin"); setError(null); setInfo(null); }} className="font-semibold text-emerald-700 hover:underline">
+                    Inicia sesión
+                  </button>
+                </div>
+                <div>
+                  <a
+                    href={buildSupportWhatsAppUrl("Hola, pagué Rumbo pero no pude crear mi cuenta.")}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs hover:underline"
+                  >
+                    ¿Pagaste y no pudiste crear tu cuenta? Escríbenos por WhatsApp
+                  </a>
+                </div>
+              </>
             )}
             {(mode === "reset" || mode === "recovery") && (
               <div>

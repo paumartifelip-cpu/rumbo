@@ -109,7 +109,7 @@ export default function LandingPage() {
             className="mt-8 flex flex-wrap gap-3 justify-center"
           >
             <Link
-              href="/login"
+              href="/login?mode=signup"
               className="px-6 py-3.5 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm tracking-wide shadow-lg shadow-emerald-500/30 transition-all hover:scale-[1.03]"
             >
               Empezar →
@@ -231,7 +231,7 @@ export default function LandingPage() {
           </motion.h2>
           <p className="text-rumbo-muted mt-4 text-lg">Se hace en un minuto.</p>
           <Link
-            href="/login"
+            href="/login?mode=signup"
             className="inline-flex items-center gap-2 mt-8 px-8 py-4 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-base shadow-[0_12px_28px_-6px_rgba(16,185,129,0.6)] hover:scale-[1.03] active:scale-[0.97] transition-all"
           >
             Crear mi cuenta →

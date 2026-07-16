@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/Card";
 import { SettingsAccordion } from "@/components/SettingsAccordion";
@@ -9,6 +9,12 @@ import { supabaseEnabled } from "@/lib/supabase";
 import { CURRENCIES, Currency } from "@/lib/currency";
 import { sendPasswordReset } from "@/lib/auth";
 import { RumboWrapped } from "@/components/RumboWrapped";
+import {
+  PLAN_NAME,
+  PLAN_PRICE_LABEL,
+  buildCancelWhatsAppUrl,
+  fetchIsPremium,
+} from "@/lib/payment";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -39,6 +45,14 @@ export default function SettingsPage() {
   const [showWrapped, setShowWrapped] = useState(false);
   const [pwBusy, setPwBusy] = useState(false);
   const [pwHint, setPwHint] = useState<string | null>(null);
+
+  // null = aún cargando; true = suscripción de pago; false = cuenta fundadora.
+  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetchIsPremium(user.email).then((v) => { if (active) setIsPremium(v); });
+    return () => { active = false; };
+  }, [user.email]);
 
   async function handleChangePassword() {
     const email = user.email;
@@ -216,6 +230,45 @@ export default function SettingsPage() {
                 <span className="text-sm text-rose-900 font-medium">Borrando todos tus datos…</span>
               </div>
             )}
+          </div>
+        </SettingsAccordion>
+
+        <SettingsAccordion
+          id="plan"
+          title="Mi plan"
+          icon="💳"
+          hint="Tu suscripción a Rumbo y cómo darte de baja."
+          activeId={activeSection}
+          onToggle={toggleSection}
+        >
+          <div className="grid gap-3 text-sm bg-white p-4 rounded-xl border border-rumbo-line">
+            <div className="flex justify-between items-center py-1 border-b border-slate-100">
+              <span className="text-rumbo-muted">Plan</span>
+              <span className="font-medium">
+                {isPremium === null
+                  ? "…"
+                  : isPremium
+                  ? `${PLAN_NAME} · ${PLAN_PRICE_LABEL}`
+                  : "Cuenta fundadora · sin coste"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-1">
+              <span className="text-rumbo-muted">Estado</span>
+              <span className="font-medium text-emerald-600">Activo</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 mt-5">
+            <a
+              href={buildCancelWhatsAppUrl(user.email)}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-soft"
+            >
+              Darme de baja por WhatsApp
+            </a>
+            <p className="text-xs text-rumbo-muted max-w-xs">
+              Escríbenos y tramitamos tu baja enseguida, sin preguntas raras.
+            </p>
           </div>
         </SettingsAccordion>
 
