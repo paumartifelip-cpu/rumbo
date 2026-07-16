@@ -191,7 +191,7 @@ export function MonthlyIncome() {
             key={earnedThisMonth}
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-5xl md:text-7xl font-black tracking-tighter tabular-nums text-rumbo-ink"
+            className="text-4xl md:text-5xl font-black tracking-tighter tabular-nums text-rumbo-ink"
           >
             {format(animated)}
           </motion.div>
@@ -220,90 +220,104 @@ export function MonthlyIncome() {
         </div>
       </div>
 
-      {/* Entry Form Section */}
-      <div className="mt-12 bg-slate-50/50 rounded-3xl p-6 border border-rumbo-line shadow-inner">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-xl shadow-lg">
-            💰
+      {/* Entry Form Section — cantidad protagonista, estilo wallet */}
+      <div className="mt-10 relative overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 p-5 sm:p-6">
+        <div className="absolute -right-10 -top-10 w-40 h-40 bg-emerald-200/30 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative">
+          <div className="mb-5">
+            <h3 className="text-lg font-black tracking-tight">💸 ¿Has recibido dinero?</h3>
+            <p className="text-xs text-rumbo-muted mt-0.5">Apúntalo y tu contador se actualiza al momento.</p>
           </div>
-          <div>
-            <h3 className="text-lg font-black tracking-tight">¿Has recibido dinero?</h3>
-            <p className="text-xs text-rumbo-muted font-medium italic">Anota cualquier entrada para que tu balance sea real.</p>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-3">
-          <div className="relative group">
+          <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-3">
+            {/* Cantidad — el campo dominante */}
+            <div className="flex items-baseline gap-2 bg-white border border-rumbo-line rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent transition-shadow">
+              <span className="text-2xl text-rumbo-muted font-light">
+                {CURRENCIES[form.currency].symbol}
+              </span>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0"
+                placeholder="0"
+                autoComplete="off"
+                aria-label="Cantidad del ingreso"
+                className="w-full text-3xl font-semibold tabular-nums bg-transparent outline-none placeholder:text-slate-300"
+                value={form.amount}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    amount: e.target.value === "" ? "" : Number(e.target.value),
+                  })
+                }
+                onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+              />
+            </div>
             <input
-              className="input bg-white group-hover:border-emerald-400 transition-colors pl-10"
-              placeholder="Concepto (ej: Pago cliente, venta Wallapop...)"
+              className="input bg-white rounded-2xl !py-3 self-stretch h-auto"
+              placeholder="Concepto (ej: Pago cliente, venta Wallapop…)"
               autoComplete="off"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
             />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg opacity-50 group-focus-within:opacity-100 transition-opacity">📝</span>
           </div>
-          <div className="relative group">
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              className="input bg-white pr-10 group-hover:border-emerald-400 transition-colors"
-              placeholder="Cantidad"
-              autoComplete="off"
-              value={form.amount}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  amount: e.target.value === "" ? "" : Number(e.target.value),
-                })
-              }
-              onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rumbo-muted text-sm font-bold">
-              {CURRENCIES[form.currency].symbol}
-            </span>
-          </div>
-          <button className="btn-primary bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200 px-8" onClick={submit}>
-            + Guardar ingreso
-          </button>
-        </div>
 
-        {/* Moneda — botones (como categorías), no desplegable */}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] uppercase tracking-wider text-rumbo-muted font-bold mr-1">Moneda</span>
-          {(Object.keys(CURRENCIES) as Currency[]).map((c) => {
-            const active = form.currency === c;
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setForm({ ...form, currency: c })}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all active:scale-95 ${
-                  active
-                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                    : "bg-white text-rumbo-muted border-rumbo-line hover:border-emerald-400 hover:text-emerald-700"
+          {/* Moneda — pills */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {(Object.keys(CURRENCIES) as Currency[]).map((c) => {
+              const active = form.currency === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setForm({ ...form, currency: c })}
+                  aria-pressed={active}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all active:scale-95 ${
+                    active
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                      : "bg-white text-rumbo-muted border-rumbo-line hover:border-emerald-400 hover:text-emerald-700"
+                  }`}
+                >
+                  <span>{CURRENCIES[c].flag}</span>
+                  <span>{c}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Recurrente (switch) + CTA */}
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.recurrence === "mensual"}
+              onClick={() => setForm({ ...form, recurrence: form.recurrence ? "" : "mensual" })}
+              className="flex items-center gap-2.5 bg-white px-3.5 py-2 rounded-2xl border border-rumbo-line hover:border-emerald-400 transition-colors group"
+            >
+              <span
+                className={`relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors ${
+                  form.recurrence ? "bg-emerald-500" : "bg-slate-200"
                 }`}
               >
-                <span>{CURRENCIES[c].flag}</span>
-                <span>{c}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-3 flex items-center gap-3 text-sm text-rumbo-muted">
-          <label className="flex items-center gap-2 cursor-pointer group bg-white px-3 py-1.5 rounded-full border border-rumbo-line hover:border-emerald-400 transition-colors">
-            <input
-              type="checkbox"
-              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-600 cursor-pointer"
-              checked={form.recurrence === "mensual"}
-              onChange={(e) => setForm({ ...form, recurrence: e.target.checked ? "mensual" : "" })}
-            />
-            <span className="font-bold text-[11px] uppercase tracking-wider group-hover:text-emerald-700">🔁 Es un ingreso recurrente</span>
-          </label>
-          <span className="text-[10px] opacity-60">Ideal para nóminas o alquileres</span>
+                <span
+                  className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                    form.recurrence ? "translate-x-5" : "translate-x-1"
+                  }`}
+                />
+              </span>
+              <span className="text-xs font-bold text-rumbo-ink">🔁 Se repite cada mes</span>
+              <span className="text-[10px] text-rumbo-muted hidden sm:inline">nóminas, alquileres…</span>
+            </button>
+            <button
+              className="sm:ml-auto px-8 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm shadow-lg shadow-emerald-200/60 transition active:scale-95"
+              disabled={!form.title.trim() || typeof form.amount !== "number" || form.amount <= 0}
+              onClick={submit}
+            >
+              Guardar ingreso →
+            </button>
+          </div>
         </div>
       </div>
 
