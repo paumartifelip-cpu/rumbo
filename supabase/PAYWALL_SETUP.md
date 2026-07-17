@@ -9,7 +9,7 @@ Todo usuario nuevo paga ANTES de crear su cuenta. Las cuentas que ya existían
    botón **"Pagar y crear mi cuenta →"** que abre el Payment Link de Stripe
    (`https://buy.stripe.com/eVqcN74R81YFd9q7xz5Ne0t`, 3,99 €/mes).
 2. Al completar el pago, Stripe redirige a
-   `https://rumbo-efg.pages.dev/activar?session_id={CHECKOUT_SESSION_ID}`.
+   `https://usarumbo.com/activar?session_id={CHECKOUT_SESSION_ID}`.
 3. `/activar` llama a la Edge Function **`verify-payment`** con ese
    `session_id`. La función lo comprueba contra la API de Stripe
    (`payment_status === "paid"`) y lo registra en `public.paid_codes`
@@ -47,7 +47,7 @@ botón de reintento y contacto por WhatsApp; ningún pago se pierde).
 ### Redirección del Payment Link
 
 Ya configurada por API: tras el pago, el link redirige a
-`https://rumbo-efg.pages.dev/activar?session_id={CHECKOUT_SESSION_ID}`.
+`https://usarumbo.com/activar?session_id={CHECKOUT_SESSION_ID}`.
 Si algún día cambias de dominio, actualízala en
 https://dashboard.stripe.com/payment-links.
 
