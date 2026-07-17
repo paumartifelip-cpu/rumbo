@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { getSupabase } from "@/lib/supabase";
 import { signInEmail, sendPasswordReset } from "@/lib/auth";
-import { PLAN_PRICE_LABEL, STRIPE_PAYMENT_URL, buildSupportWhatsAppUrl } from "@/lib/payment";
+import { STRIPE_PAYMENT_URL, buildSupportWhatsAppUrl } from "@/lib/payment";
 
 // El link de reset de Supabase aterriza con el marcador en el hash de la URL.
 const urlLooksLikeRecovery = () =>
@@ -132,7 +132,7 @@ function LoginInner() {
     mode === "signin"
       ? "Entra con tu email y contraseña."
       : mode === "signup"
-      ? `Tu dinero, solo tuyo, por ${PLAN_PRICE_LABEL}. Paga y crea tu cuenta al momento.`
+      ? "En 5 minutos al día sabes cuánto dinero tienes de verdad y a dónde se va."
       : mode === "recovery"
       ? "Escribe tu nueva contraseña."
       : "Te enviaremos un enlace para crear una nueva.";
@@ -164,11 +164,14 @@ function LoginInner() {
                   <span className="text-3xl font-black tracking-tight">3,99 €</span>
                   <span className="text-sm text-rumbo-muted">al mes</span>
                 </div>
-                <ul className="mt-3 space-y-1.5 text-sm text-rumbo-ink/80">
-                  <li>✓ Todos tus ingresos y gastos, claros</li>
-                  <li>✓ Objetivos y evolución de tu dinero</li>
-                  <li>✓ Sincronizado y privado, solo para ti</li>
-                  <li>✓ Date de baja cuando quieras por WhatsApp</li>
+                <p className="text-xs font-semibold text-emerald-700 mt-1">
+                  Unos 13 céntimos al día · menos que un café a la semana
+                </p>
+                <ul className="mt-4 space-y-1.5 text-sm text-rumbo-ink/80">
+                  <li>✓ Sabes cuánto dinero tienes de verdad, sin sustos</li>
+                  <li>✓ Ves a dónde se va cada euro y dejas de perderlo</li>
+                  <li>✓ Tus metas de dinero, claras y a la vista</li>
+                  <li>✓ 5 minutos al día. Privado. Solo para ti.</li>
                 </ul>
               </div>
 
