@@ -171,6 +171,21 @@ function LoginInner() {
                   <li>✓ Date de baja cuando quieras por WhatsApp</li>
                 </ul>
               </div>
+
+              {/* Garantía prominente: elimina el miedo justo antes de pagar */}
+              <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 flex items-center gap-3.5">
+                <span className="text-4xl shrink-0" aria-hidden>🛡️</span>
+                <div>
+                  <div className="font-black text-emerald-800 text-lg leading-tight tracking-tight">
+                    Garantía de 30 días
+                  </div>
+                  <p className="text-[13px] text-emerald-700/90 mt-0.5 leading-snug">
+                    Si no te convence, te devolvemos el dinero.{" "}
+                    <span className="font-semibold">Sin preguntas.</span>
+                  </p>
+                </div>
+              </div>
+
               <a
                 href={STRIPE_PAYMENT_URL}
                 className="block w-full text-center px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition-colors"
