@@ -1,3 +1,5 @@
+import type { Currency } from "./currency";
+
 export type GoalCategory =
   | "dinero"
   | "negocio"
@@ -66,7 +68,7 @@ export interface FinancialEntry {
   type: FinancialType;
   title: string;
   amount: number;
-  currency?: "EUR" | "USD" | "MXN" | "ARS"; // if absent, treat as primary
+  currency?: Currency; // if absent, treat as primary
   amount_in_primary?: number; // Snapshot of the value in primary currency at creation time
   date: string;
   category?: string;

@@ -574,7 +574,12 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         snapshots: mergedSnapshots,
         userTools: mergedUserTools,
         onboarding: mergedOnboarding,
-        primaryCurrency: remote.primaryCurrency ?? cachedCurrency,
+        // Usa nextCurrency (respeta el guard de cambio pendiente): si el usuario
+        // acaba de elegir moneda en este dispositivo, empuja SU elección, nunca
+        // la remota vieja. Con `remote.primaryCurrency ?? cachedCurrency` una
+        // carrera (cambio de moneda + alta local a la vez) reescribía en el
+        // servidor la moneda nueva con la vieja y luego se la devolvía al usuario.
+        primaryCurrency: nextCurrency,
         profileMeta: { id: p.id, name: p.name, initials: p.initials, color: p.color, emoji: p.emoji, email: p.email },
       }, cur.deletedIds ?? []).then((ok) => {
         if (!ok) setState((s) => ({ ...s, syncStatus: "error" }));

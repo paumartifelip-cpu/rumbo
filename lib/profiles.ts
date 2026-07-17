@@ -1,3 +1,5 @@
+import { Currency, CURRENCIES } from "./currency";
+
 export interface Profile {
   id: string;
   user_id: string; // UUID estable usado para Supabase
@@ -7,7 +9,7 @@ export interface Profile {
   emoji?: string;
   email?: string;
   custom?: boolean;
-  primary_currency?: "EUR" | "USD" | "MXN" | "ARS";
+  primary_currency?: Currency;
   pin_hash?: string; // SHA-256 hash of the PIN, synced from Supabase
 }
 
@@ -124,7 +126,7 @@ export function isNameTaken(name: string): boolean {
 
 export function addCustomProfile(
   name: string,
-  primary_currency: "EUR" | "USD" | "MXN" | "ARS" = "EUR"
+  primary_currency: Currency = "EUR"
 ): Profile {
   const trimmed = name.trim();
   if (!trimmed) throw new Error("Nombre vacío");
@@ -158,7 +160,7 @@ export function removeCustomProfile(id: string) {
 
 export function updateProfileCurrency(
   id: string,
-  currency: "EUR" | "USD" | "MXN" | "ARS"
+  currency: Currency
 ) {
   if (typeof window === "undefined") return;
   // Custom profiles: persist on the profile itself.
@@ -180,12 +182,12 @@ export function updateProfileCurrency(
 
 const DEFAULT_CURRENCY_KEY = "rumbo_default_profile_currencies";
 
-const isSupportedCurrency = (v: unknown): v is "EUR" | "USD" | "MXN" | "ARS" =>
-  v === "EUR" || v === "USD" || v === "MXN" || v === "ARS";
+const isSupportedCurrency = (v: unknown): v is Currency =>
+  typeof v === "string" && Object.prototype.hasOwnProperty.call(CURRENCIES, v);
 
 export function getProfileCurrency(
   id: string
-): "EUR" | "USD" | "MXN" | "ARS" {
+): Currency {
   if (typeof window === "undefined") return "EUR";
   const customs = getCustomProfiles();
   const custom = customs.find((p) => p.id === id);

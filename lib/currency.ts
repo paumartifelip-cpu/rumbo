@@ -1,4 +1,4 @@
-export type Currency = "EUR" | "USD" | "MXN" | "ARS";
+export type Currency = "EUR" | "USD" | "MXN" | "ARS" | "COP" | "CLP" | "PEN" | "PYG";
 
 export const CURRENCIES: Record<
   Currency,
@@ -32,6 +32,34 @@ export const CURRENCIES: Record<
     flag: "🇦🇷",
     short: "AR",
   },
+  COP: {
+    code: "COP",
+    symbol: "$",
+    name: "Pesos colombianos",
+    flag: "🇨🇴",
+    short: "CO",
+  },
+  CLP: {
+    code: "CLP",
+    symbol: "$",
+    name: "Pesos chilenos",
+    flag: "🇨🇱",
+    short: "CL",
+  },
+  PEN: {
+    code: "PEN",
+    symbol: "S/",
+    name: "Soles peruanos",
+    flag: "🇵🇪",
+    short: "PEN",
+  },
+  PYG: {
+    code: "PYG",
+    symbol: "₲",
+    name: "Guaraníes paraguayos",
+    flag: "🇵🇾",
+    short: "PYG",
+  },
 };
 
 // Approximate fallback rates relative to EUR (1 EUR = X). Updated 2025.
@@ -40,6 +68,10 @@ const FALLBACK_RATES: Record<Currency, number> = {
   USD: 1.08,
   MXN: 22,
   ARS: 1100,
+  COP: 3700,
+  CLP: 1060,
+  PEN: 3.9,
+  PYG: 6900,
 };
 
 const RATES_KEY = "rumbo_fx_rates_v1";
@@ -61,13 +93,16 @@ const isValidRate = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v) && v > 0;
 
 function sanitizeRates(raw: Partial<Record<Currency, unknown>> | undefined): Record<Currency, number> {
-  const usd = raw?.USD, mxn = raw?.MXN, ars = raw?.ARS;
-  return {
-    EUR: 1,
-    USD: isValidRate(usd) ? usd : FALLBACK_RATES.USD,
-    MXN: isValidRate(mxn) ? mxn : FALLBACK_RATES.MXN,
-    ARS: isValidRate(ars) ? ars : FALLBACK_RATES.ARS,
-  };
+  // Recorre TODAS las monedas soportadas: usa la tasa de la API si es válida y,
+  // si no (0, null, API caída), cae al valor de respaldo. EUR es siempre 1
+  // porque es la base. Así, añadir una moneda a CURRENCIES no obliga a tocar
+  // esta función.
+  const out = {} as Record<Currency, number>;
+  for (const code of Object.keys(CURRENCIES) as Currency[]) {
+    const v = raw?.[code];
+    out[code] = code === "EUR" ? 1 : isValidRate(v) ? v : FALLBACK_RATES[code];
+  }
+  return out;
 }
 
 function loadCached(): CachedRates | null {
@@ -150,6 +185,10 @@ export function formatCurrency(amount: number, currency: Currency): string {
     maximumFractionDigits: 0,
   }).format(rounded);
   if (currency === "EUR") return `${formatted} €`;
+  // El dólar es el "$" por defecto: sin sufijo.
   if (currency === "USD") return `$${formatted}`;
+  // Monedas cuyo símbolo NO es "$" (sol S/, guaraní ₲): símbolo delante + espacio.
+  if (meta.symbol !== "$") return `${meta.symbol} ${formatted}`;
+  // Resto de pesos con símbolo "$": sufijo corto para no confundirlos con el dólar.
   return `$${formatted} ${meta.short}`;
 }

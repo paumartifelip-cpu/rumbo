@@ -1,4 +1,4 @@
-import { Currency } from "./currency";
+import { Currency, CURRENCIES } from "./currency";
 import { Profile } from "./profiles";
 import { getSupabase } from "./supabase";
 import {
@@ -22,7 +22,7 @@ export interface SyncSnapshot {
 }
 
 const isCurrency = (v: any): v is Currency =>
-  v === "EUR" || v === "USD" || v === "MXN" || v === "ARS";
+  typeof v === "string" && Object.prototype.hasOwnProperty.call(CURRENCIES, v);
 
 const DEFAULT_PROFILE_IDS = new Set(["pau", "michelle"]);
 
