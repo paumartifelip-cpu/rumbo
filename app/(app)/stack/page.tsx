@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/Card";
 import { useRumbo } from "@/lib/store";
 import { UserTool } from "@/lib/types";
 
@@ -70,20 +71,19 @@ export default function StackPage() {
         <span className="hidden sm:inline text-xs font-black uppercase tracking-widest bg-white/20 px-3 py-1.5 rounded-full">Suscríbete</span>
       </a>
 
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Stack de herramientas</h1>
-          <p className="text-rumbo-muted text-sm mt-1">
-            Click en una tarjeta para abrirla. El corazón la marca como favorita.
-          </p>
-        </div>
-        <button
-          onClick={() => setCreating(true)}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rumbo-ink text-white text-sm font-medium hover:bg-slate-800 transition-colors shadow-sm self-start md:self-auto"
-        >
-          + Añadir herramienta
-        </button>
-      </div>
+      {/* Título unificado con el resto de páginas (PageHeader) */}
+      <PageHeader
+        title="Stack de herramientas"
+        subtitle="Click en una tarjeta para abrirla. El corazón la marca como favorita."
+        action={
+          <button
+            onClick={() => setCreating(true)}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rumbo-ink text-white text-sm font-medium hover:bg-slate-800 transition-colors shadow-sm self-start md:self-auto"
+          >
+            + Añadir herramienta
+          </button>
+        }
+      />
 
       {/* Search */}
       <div className="mb-4">

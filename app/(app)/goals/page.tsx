@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MoneyMetrics } from "@/components/MoneyMetrics";
+import { PageHeader } from "@/components/Card";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { Goal, GoalCategory } from "@/lib/types";
 import { formatDate } from "@/lib/utils";
@@ -207,19 +208,19 @@ export default function GoalsPage() {
 
   return (
     <div className="pb-16">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Objetivos</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Define lo que importa. Organiza tu rumbo por tiempo.</p>
-        </div>
-        <button
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-2 bg-slate-900 hover:bg-slate-700 text-white font-bold text-sm px-5 py-2.5 rounded-full shadow-lg transition-all hover:scale-105 active:scale-95"
-        >
-          <span className="text-lg leading-none">+</span> Nuevo objetivo
-        </button>
-      </div>
+      {/* Header — mismo PageHeader que Dinero y Gastos, para un título unificado */}
+      <PageHeader
+        title="Objetivos"
+        subtitle="Define lo que importa. Organiza tu rumbo por tiempo."
+        action={
+          <button
+            onClick={() => setOpen(true)}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-700 text-white font-bold text-sm px-5 py-2.5 rounded-full shadow-lg transition-all hover:scale-105 active:scale-95"
+          >
+            <span className="text-lg leading-none">+</span> Nuevo objetivo
+          </button>
+        }
+      />
 
       <div className="mb-6">
         <MoneyMetrics />
