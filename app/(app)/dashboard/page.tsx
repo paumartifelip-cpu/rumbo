@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Card, SectionTitle } from "@/components/Card";
@@ -9,18 +9,59 @@ import { Reveal } from "@/components/Reveal";
 import { SavingsChart } from "@/components/SavingsChart";
 import { useRumbo } from "@/lib/store";
 
-function useGreeting() {
-  return useMemo(() => {
-    const h = new Date().getHours();
-    if (h < 12) return "Buenos días";
-    if (h < 20) return "Buenas tardes";
-    return "Buenas noches";
+type Funny = { t: string; e: string };
+
+// Saludo con humor (dinero + Rumbo) que cambia según la franja horaria.
+// La hora es la del DISPOSITIVO del usuario: new Date() usa la zona horaria
+// local del navegador, así que cada persona ve su hora real (México, Argentina,
+// España…) sin depender de ningún servidor. El nombre lo pone user.name, o sea
+// el de cada usuario, no uno fijo.
+const FUNNY: Record<"morning" | "afternoon" | "night", Funny[]> = {
+  morning: [
+    { t: "El que madruga, cuadra sus cuentas", e: "📊" },
+    { t: "Arriba, que el dinero no se cuenta solo", e: "☕" },
+    { t: "Hoy toca gastar menos de lo que ganas", e: "😏" },
+    { t: "Café, y a ponerle rumbo a tu dinero", e: "☕" },
+    { t: "Buenos días… y buenos ahorros", e: "💸" },
+  ],
+  afternoon: [
+    { t: "Ni la siesta te va a quitar el rumbo", e: "😴" },
+    { t: "A media tarde, medio presupuesto", e: "💶" },
+    { t: "Que la tarde no se te escape… ni el dinero", e: "👀" },
+    { t: "Cada café de la tarde también cuenta", e: "☕" },
+    { t: "Tarde productiva: revisa, apunta, respira", e: "🧾" },
+  ],
+  night: [
+    { t: "Cuentas claras de día… y travesuras de noche", e: "😏" },
+    { t: "A oscuras se gasta más: cuidado con lo que tocas", e: "🔥" },
+    { t: "No todo lo que sube de noche es tu saldo", e: "😏" },
+    { t: "Deja que esta noche se caliente… tu hucha", e: "🔥" },
+    { t: "Lo que gastas de noche, se paga de día", e: "😏" },
+  ],
+};
+
+function timeBucket(): "morning" | "afternoon" | "night" {
+  const h = new Date().getHours();
+  if (h < 12) return "morning";
+  if (h < 20) return "afternoon";
+  return "night";
+}
+
+function useFunnyGreeting() {
+  // Inicial estable (la 1ª de la franja) para que el primer render coincida con
+  // el HTML prerenderizado; ya en el cliente elige una AL AZAR de esa franja,
+  // así en cada visita sale una distinta sin romper la hidratación.
+  const [phrase, setPhrase] = useState<Funny>(() => FUNNY[timeBucket()][0]);
+  useEffect(() => {
+    const list = FUNNY[timeBucket()];
+    setPhrase(list[Math.floor(Math.random() * list.length)]);
   }, []);
+  return phrase;
 }
 
 export default function DashboardPage() {
   const { user, onboarding } = useRumbo();
-  const greeting = useGreeting();
+  const phrase = useFunnyGreeting();
 
   // Show the big welcome CTA when there's no onboarding data — this happens on
   // a brand-new profile OR right after "Borrar todos mis datos".
@@ -36,7 +77,7 @@ export default function DashboardPage() {
     <div className="max-w-6xl mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-          {greeting}{user.name ? `, ${user.name}` : ""} 👋
+          {phrase.t}{user.name ? `, ${user.name}` : ""} {phrase.e}
         </h1>
         <p className="text-rumbo-muted mt-1">Tu centro de control. Sin distracciones.</p>
       </div>
