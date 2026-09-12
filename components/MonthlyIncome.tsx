@@ -28,10 +28,11 @@ export function MonthlyIncome() {
   } = useRumbo();
   const format = useFormatMoney();
 
-  const now = new Date();
-  const monthLabel = now.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  const today = new Date();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const monthLabel = selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
   const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`;
-  const currentKey = monthKey(now);
+  const currentKey = monthKey(selectedDate);
 
   const thisMonthEntries = useMemo(
     () =>
@@ -66,7 +67,7 @@ export function MonthlyIncome() {
   const last6 = useMemo(() => {
     const buckets = new Map<string, { label: string; total: number }>();
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const key = monthKey(d);
       buckets.set(key, {
         label: d.toLocaleDateString("es-ES", { month: "short" }),
@@ -155,7 +156,7 @@ export function MonthlyIncome() {
       title: form.title,
       amount: form.amount,
       currency: form.currency,
-      date: new Date().toISOString(),
+      date: selectedDate.toISOString(),
       ...(form.recurrence ? { recurrence: form.recurrence } : {}),
     });
     setForm({ title: "", amount: "", currency: primaryCurrency, recurrence: "" });
@@ -163,10 +164,28 @@ export function MonthlyIncome() {
 
   return (
     <Card>
-      <SectionTitle
-        title={`Ingresos de ${monthLabel}`}
-        hint="Apunta cada cobro o ingreso. El contador de arriba se actualiza al instante."
-      />
+      <div className="flex items-center gap-2 mb-1">
+        <button
+          onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1))}
+          aria-label="Mes anterior"
+          className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-xl hover:bg-slate-100 text-rumbo-muted hover:text-rumbo-ink transition-colors active:scale-95 shrink-0"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <div className="flex-1 min-w-0">
+          <SectionTitle
+            title={`Ingresos de ${monthLabel}`}
+            hint="Apunta cada cobro o ingreso. El contador de arriba se actualiza al instante."
+          />
+        </div>
+        <button
+          onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1))}
+          aria-label="Mes siguiente"
+          className="w-9 h-9 -mr-1.5 flex items-center justify-center rounded-xl hover:bg-slate-100 text-rumbo-muted hover:text-rumbo-ink transition-colors active:scale-95 shrink-0"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
 
       {/* Entry Form Section — cantidad protagonista, estilo wallet */}
       <div className="mt-2 relative overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 p-5 sm:p-6">
