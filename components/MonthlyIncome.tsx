@@ -64,6 +64,15 @@ export function MonthlyIncome() {
     [recurringIncomes, amountInPrimary]
   );
 
+  // Total ganado en el mes que se está viendo (incluye el sueldo base si no
+  // se ha registrado explícitamente ese mes, igual que el cálculo de Gastos).
+  const totalMonthIncome = useMemo(
+    () =>
+      adjustedBaseSalary(currentKey) +
+      thisMonthEntries.reduce((acc, f) => acc + amountInPrimary(f), 0),
+    [adjustedBaseSalary, currentKey, thisMonthEntries, amountInPrimary]
+  );
+
   const last6 = useMemo(() => {
     const buckets = new Map<string, { label: string; total: number }>();
     for (let i = 5; i >= 0; i--) {
@@ -185,6 +194,13 @@ export function MonthlyIncome() {
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
         </button>
+      </div>
+
+      <div className="mb-6 flex items-baseline gap-2 flex-wrap">
+        <span className="text-3xl sm:text-4xl font-black tracking-tighter tabular-nums text-emerald-700">
+          {format(totalMonthIncome)}
+        </span>
+        <span className="text-sm text-rumbo-muted">ganados en {monthLabel}</span>
       </div>
 
       {/* Entry Form Section — cantidad protagonista, estilo wallet */}
