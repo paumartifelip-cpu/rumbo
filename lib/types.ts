@@ -96,6 +96,23 @@ export interface MoneySnapshot {
   created_at: string;
 }
 
+/**
+ * Límite mensual de gasto en una categoría. Se guarda en la moneda en que se
+ * definió y se convierte en vivo a la principal, así que al cambiar de moneda
+ * el presupuesto cambia con ella. `month` (YYYY-MM) queda reservado para
+ * presupuestos distintos por mes; null = vale todos los meses.
+ */
+export interface Budget {
+  id: string;
+  user_id: string;
+  category: string;
+  amount: number;
+  currency?: Currency;
+  month?: string;
+  updated_at?: string;
+  created_at: string;
+}
+
 export interface AIPriorityResult {
   ordered_tasks: Array<{
     task_id: string;

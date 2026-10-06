@@ -6,6 +6,7 @@ import { Card, EmptyState, PageHeader, SectionTitle } from "@/components/Card";
 import { CashflowHero } from "@/components/CashflowHero";
 import { SpendingTrend } from "@/components/SpendingTrend";
 import { Reveal } from "@/components/Reveal";
+import { BudgetsCard } from "@/components/BudgetsCard";
 import { AddExpenseSheet } from "@/components/AddExpenseSheet";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
@@ -749,6 +750,12 @@ export default function GastosPage() {
       {/* Deudas — apartado activable con switch */}
       <Reveal delay={0.14}>
         <DebtsSection />
+      </Reveal>
+
+      <Reveal delay={0.09}>
+        <div className="mb-6">
+          <BudgetsCard selectedDate={selectedDate} />
+        </div>
       </Reveal>
 
       <div className="mb-6">

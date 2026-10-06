@@ -29,6 +29,7 @@ import { pullFromSupabase, pushToSupabase, SyncSnapshot, wipeProfileData } from 
 import { ensureProfileRow, profileFromAuthUser, signOutAuth } from "./auth";
 import { getSupabase, supabaseEnabled } from "./supabase";
 import {
+  Budget,
   FinancialEntry,
   Goal,
   MoneySnapshot,
@@ -38,6 +39,7 @@ import {
   UserTool,
 } from "./types";
 import { uid } from "./utils";
+import { BudgetAlert, budgetAlertForNewExpense, budgetId } from "./budgets";
 
 interface RumboState {
   user: User;
@@ -46,6 +48,7 @@ interface RumboState {
   finances: FinancialEntry[];
   snapshots: MoneySnapshot[];
   userTools: UserTool[];
+  budgets: Budget[];
   onboarding?: OnboardingData;
   onboardingDone: boolean;
   aiAdvice?: { today_focus: string; financial_advice: string };
@@ -90,7 +93,7 @@ function listSignature(arr: Array<Record<string, any>>): string {
         x.highlight, x.order_index, x.updated_at,
         x.description, x.timeframe, x.unit, x.due_date, x.goal_id,
         x.manual_order_index, x.estimated_minutes, x.energy_level,
-        x.difficulty, x.urgency, x.money_impact, x.url,
+        x.difficulty, x.urgency, x.money_impact, x.url, x.month,
       ].join("")
     )
     .sort()
@@ -139,6 +142,12 @@ interface RumboContext extends RumboState {
   updateUserTool: (id: string, patch: Partial<UserTool>) => void;
   toggleToolFavorite: (id: string) => void;
   reorderUserTools: (orderedIds: string[]) => void;
+  /** Crea o actualiza el presupuesto mensual de una categoría (en moneda principal). */
+  setBudget: (category: string, amount: number) => void;
+  removeBudget: (category: string) => void;
+  /** Último aviso de presupuesto (80 % / 100 %) pendiente de mostrar. */
+  budgetAlert: BudgetAlert | null;
+  dismissBudgetAlert: () => void;
   saveOnboarding: (data: OnboardingData) => void;
   updateOnboarding: (patch: Partial<OnboardingData>) => void;
   /** Devuelve false si el borrado en la nube falló (no se toca nada local). */
@@ -256,6 +265,7 @@ const defaultState: RumboState = {
   finances: mockFinances,
   snapshots: mockSnapshots,
   userTools: [],
+  budgets: [],
   onboardingDone: false,
   prioritizing: false,
   aiSource: "idle",
@@ -270,6 +280,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [state, setState] = useState<RumboState>(defaultState);
   const [hydrated, setHydrated] = useState(false);
+  const [budgetAlert, setBudgetAlert] = useState<BudgetAlert | null>(null);
+  const dismissBudgetAlert = useCallback(() => setBudgetAlert(null), []);
   const stateRef = useRef(state);
   stateRef.current = state;
   // Set right before applyRemote runs so the next push-effect tick skips
@@ -431,9 +443,9 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     // whose updated_at is newer. Local mutations bump updated_at to now() so
     // a heart-toggle that hasn't been pushed yet still wins over a stale
     // remote pull. Falls back to created_at if no updated_at exists.
-    const mergeToolsByUpdated = (local: UserTool[], rem: UserTool[]): UserTool[] => {
-      const map = new Map<string, UserTool>();
-      const ts = (t: UserTool) => t.updated_at || t.created_at || "";
+    const mergeToolsByUpdated = <T extends { id: string; created_at?: string; updated_at?: string }>(local: T[], rem: T[]): T[] => {
+      const map = new Map<string, T>();
+      const ts = (t: T) => t.updated_at || t.created_at || "";
       for (const r of rem) {
         if (tombstoned.has(r.id)) continue;
         map.set(r.id, r);
@@ -452,6 +464,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       return Array.from(map.values());
     };
 
+    const mergedBudgets = mergeToolsByUpdated(cur.budgets || [], remote.budgets || []);
     let mergedUserTools = mergeToolsByUpdated(cur.userTools || [], remote.userTools || []).sort((a, b) => {
       const ai = a.order_index;
       const bi = b.order_index;
@@ -482,6 +495,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       mergedFinances.length > remote.finances.length ||
       mergedSnapshots.length > remote.snapshots.length ||
       mergedUserTools.length > (remote.userTools || []).length ||
+      mergedBudgets.length > (remote.budgets || []).length ||
       currencyMissingOnRemote;
 
     // Idempotency guard: if a list's content is identical to what we already
@@ -493,6 +507,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const financesUnchanged = listSignature(cur.finances) === listSignature(mergedFinances);
     const snapshotsUnchanged = listSignature(cur.snapshots) === listSignature(mergedSnapshots);
     const toolsUnchanged = listSignature(cur.userTools || []) === listSignature(mergedUserTools);
+    const budgetsUnchanged = listSignature(cur.budgets || []) === listSignature(mergedBudgets);
     const onboardingUnchanged = onboardingSignature(cur.onboarding) === onboardingSignature(mergedOnboarding);
     // Si hay un cambio de moneda local pendiente de subir, NO adoptamos la
     // remota (aún vieja): pisaría la elección que el usuario acaba de hacer.
@@ -506,10 +521,11 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const nextFinances = financesUnchanged ? cur.finances : mergedFinances;
     const nextSnapshots = snapshotsUnchanged ? cur.snapshots : mergedSnapshots;
     const nextUserTools = toolsUnchanged ? (cur.userTools || []) : mergedUserTools;
+    const nextBudgets = budgetsUnchanged ? (cur.budgets || []) : mergedBudgets;
 
     const nothingChanged =
       goalsUnchanged && tasksUnchanged && financesUnchanged &&
-      snapshotsUnchanged && toolsUnchanged && onboardingUnchanged &&
+      snapshotsUnchanged && toolsUnchanged && budgetsUnchanged && onboardingUnchanged &&
       currencyUnchanged && !localAddedItems;
 
     if (nothingChanged) {
@@ -550,6 +566,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       finances: nextFinances,
       snapshots: nextSnapshots,
       userTools: nextUserTools,
+      budgets: nextBudgets,
       onboarding: mergedOnboarding,
       onboardingDone: Boolean(
         mergedOnboarding &&
@@ -574,6 +591,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         finances: mergedFinances,
         snapshots: mergedSnapshots,
         userTools: mergedUserTools,
+        budgets: mergedBudgets,
         onboarding: mergedOnboarding,
         // Usa nextCurrency (respeta el guard de cambio pendiente): si el usuario
         // acaba de elegir moneda en este dispositivo, empuja SU elección, nunca
@@ -822,6 +840,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
         finances: state.finances,
         snapshots: state.snapshots,
         userTools: state.userTools,
+        budgets: state.budgets || [],
         onboarding: state.onboarding,
         primaryCurrency: includeCurrency ? state.primaryCurrency : undefined,
         profileMeta: {
@@ -852,6 +871,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     state.finances,
     state.snapshots,
     state.userTools,
+    state.budgets,
     state.onboarding,
     state.primaryCurrency,
     profile,
@@ -912,6 +932,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "money_snapshots", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "user_tools", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "budgets", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles", filter: `user_id=eq.${profile.user_id}` }, () => { if (!pushPendingRef.current) refresh(); })
       .subscribe();
 
@@ -1170,6 +1191,24 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const amount = Number(f.amount);
     if (!Number.isFinite(amount) || amount <= 0) return;
     f = { ...f, amount };
+    // Aviso de presupuesto: se calcula ANTES de añadir, con el estado actual,
+    // y solo salta al cruzar el 80 % o el 100 % de la categoría.
+    {
+      const cur = stateRef.current;
+      const toPrimary = (e: FinancialEntry) => {
+        const from = e.currency ?? cur.primaryCurrency;
+        return from === cur.primaryCurrency ? e.amount : convertAmount(e.amount, from, cur.primaryCurrency);
+      };
+      const alert = budgetAlertForNewExpense({
+        finances: cur.finances,
+        budgets: cur.budgets || [],
+        primary: cur.primaryCurrency,
+        toPrimary,
+        entry: f,
+        format: (v) => formatCurrency(v, cur.primaryCurrency),
+      });
+      if (alert) setBudgetAlert(alert);
+    }
     const id = uid();
     setState((s) => {
       const from = f.currency ?? s.primaryCurrency;
@@ -1369,6 +1408,45 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setBudget: RumboContext["setBudget"] = useCallback((category, rawAmount) => {
+    const amount = Number(rawAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setState((s) => {
+      const id = budgetId(s.user.id, category);
+      const now = new Date().toISOString();
+      const existing = (s.budgets || []).find((b) => b.id === id);
+      const next: Budget = {
+        id,
+        user_id: s.user.id,
+        category,
+        amount,
+        // Siempre en la moneda principal ACTUAL: así lo que ve el usuario al
+        // editar es lo que se guarda, y al cambiar de moneda se convierte solo.
+        currency: s.primaryCurrency,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+      };
+      return {
+        ...s,
+        budgets: [...(s.budgets || []).filter((b) => b.id !== id), next],
+        // Id determinista: si se borró antes, su tombstone bloquearía la
+        // versión nueva en cada pull. Al recrearlo se retira.
+        deletedIds: (s.deletedIds ?? []).filter((x) => x !== id),
+      };
+    });
+  }, []);
+
+  const removeBudget: RumboContext["removeBudget"] = useCallback((category) => {
+    setState((s) => {
+      const id = budgetId(s.user.id, category);
+      return {
+        ...s,
+        budgets: (s.budgets || []).filter((b) => b.id !== id),
+        deletedIds: addTombstones(s.deletedIds, id),
+      };
+    });
+  }, []);
+
   const saveOnboarding: RumboContext["saveOnboarding"] = useCallback((data) => {
     setState((s) => {
       const now = new Date().toISOString();
@@ -1483,6 +1561,10 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       updateUserTool,
       toggleToolFavorite,
       reorderUserTools,
+      setBudget,
+      removeBudget,
+      budgetAlert,
+      dismissBudgetAlert,
       saveOnboarding,
       updateOnboarding,
       resetDemo,
@@ -1516,6 +1598,10 @@ export function RumboProvider({ children }: { children: ReactNode }) {
       updateUserTool,
       toggleToolFavorite,
       reorderUserTools,
+      setBudget,
+      removeBudget,
+      budgetAlert,
+      dismissBudgetAlert,
       saveOnboarding,
       updateOnboarding,
       resetDemo,

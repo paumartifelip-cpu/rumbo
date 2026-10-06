@@ -97,6 +97,21 @@ create table if not exists user_tools (
 );
 create index if not exists user_tools_user_id_idx on user_tools(user_id);
 
+-- Presupuesto mensual por categoría. `currency` = moneda en que se definió; la
+-- app lo convierte en vivo a la moneda principal. `month` (YYYY-MM) reservado
+-- para presupuestos distintos por mes; null = vale todos los meses.
+create table if not exists budgets (
+  id text primary key,
+  user_id uuid not null,
+  category text not null,
+  amount numeric not null check (amount > 0),
+  currency text,
+  month text,
+  updated_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+create index if not exists budgets_user_id_idx on budgets(user_id);
+
 -- Paywall: cada pago de Stripe queda registrado aquí por la Edge Function
 -- verify-payment (code = checkout session id). Crear una cuenta nueva exige
 -- un pago verificado; `used` garantiza que un pago solo crea UNA cuenta.
@@ -136,6 +151,7 @@ alter table tasks enable row level security;
 alter table financial_entries enable row level security;
 alter table money_snapshots enable row level security;
 alter table user_tools enable row level security;
+alter table budgets enable row level security;
 alter table paid_codes enable row level security;
 
 -- Borra políticas previas (abiertas o no) para que el script sea repetible.
@@ -153,6 +169,7 @@ drop policy if exists "own_tasks" on tasks;
 drop policy if exists "own_financial_entries" on financial_entries;
 drop policy if exists "own_money_snapshots" on money_snapshots;
 drop policy if exists "own_user_tools" on user_tools;
+drop policy if exists "own_budgets" on budgets;
 
 -- Cada usuario solo puede ver/editar sus propias filas.
 create policy "own_profiles" on profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
@@ -161,6 +178,10 @@ create policy "own_tasks" on tasks for all using (auth.uid() = user_id) with che
 create policy "own_financial_entries" on financial_entries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own_money_snapshots" on money_snapshots for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own_user_tools" on user_tools for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_budgets" on budgets for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Realtime para que otros dispositivos vean los cambios al instante.
+alter publication supabase_realtime add table budgets;
 
 -- paid_codes: las Edge Functions (service role) leen y escriben saltándose RLS.
 -- Desde el cliente solo se permite UNA lectura: la fila cuyo email coincide con

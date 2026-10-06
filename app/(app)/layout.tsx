@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BudgetAlertToast } from "@/components/BudgetAlertToast";
 import { MobileHeader, MobileNav, Sidebar } from "@/components/Sidebar";
 import { useRumbo } from "@/lib/store";
 import { getSupabase } from "@/lib/supabase";
@@ -55,6 +56,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <MobileNav />
+      <BudgetAlertToast />
     </div>
   );
 }
