@@ -164,8 +164,9 @@ No incluyas texto adicional fuera del JSON.`;
  * Fast rule-based categorizer. Returns null when no rule matches so the
  * caller knows it needs to fall back to AI.
  */
-// IMPORTANT: only the 6 fixed categories may ever be produced:
-// Comida · Transporte · Alojamiento · Trabajo · Compras · Otros.
+// IMPORTANT: only the 9 fixed categories may ever be produced:
+// Comida · Transporte · Alojamiento · Trabajo · Compras · Educación · Salud ·
+// Caridad · Otros.
 // "Trabajo" is assigned manually by the user; the heuristic detects the rest
 // and returns null (→ caller defaults to "Otros") when nothing matches.
 export const EXPENSE_CATEGORIES = [
@@ -174,6 +175,9 @@ export const EXPENSE_CATEGORIES = [
   "Alojamiento",
   "Trabajo",
   "Compras",
+  "Educación",
+  "Salud",
+  "Caridad",
   "Otros",
 ] as const;
 
@@ -182,6 +186,24 @@ export function heuristicCategorize(title: string): string | null {
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
+
+  // Caridad (donaciones)
+  if (
+    /(donacion|donativo|caridad|\bong\b|cruz roja|caritas|unicef|oxfam|medicos sin fronteras|greenpeace|manos unidas|diezmo|ofrenda|limosna|crowdfunding solidario|charity|donation|donate)/.test(t)
+  )
+    return "Caridad";
+
+  // Salud
+  if (
+    /(farmacia|medico|doctor|dentista|ortodoncia|hospital|clinica|urgencias|fisio|psicolog|terapia|oculista|optica|gafas|lentillas|dermatolog|podolog|nutricionista|analitica|vacuna|medicamento|ibuprofeno|paracetamol|sanitas|adeslas|asisa|dkv|seguro medico|health|pharmacy|dentist)/.test(t)
+  )
+    return "Salud";
+
+  // Educación
+  if (
+    /(curso|universidad|matricula|colegio|escuela|academia|clases|\bmaster\b|grado|oposicion|udemy|coursera|domestika|skillshare|duolingo|idiomas|guarderia|libros de texto|tutoria|formacion|bootcamp|tuition|school|university)/.test(t)
+  )
+    return "Educación";
 
   // Alojamiento (vivienda, suministros, hoteles y viajes)
   if (

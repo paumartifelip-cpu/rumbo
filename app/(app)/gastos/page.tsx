@@ -18,16 +18,19 @@ const QUICK_CATS = [
   { key: "Alojamiento", icon: "🏠", label: "Alojamiento" },
   { key: "Trabajo",     icon: "💼", label: "Trabajo" },
   { key: "Compras",     icon: "🛍️", label: "Compras" },
+  { key: "Educación",   icon: "🎓", label: "Educación" },
+  { key: "Salud",       icon: "🩺", label: "Salud" },
+  { key: "Caridad",     icon: "🤝", label: "Caridad" },
   { key: "Otros",       icon: "📦", label: "Otros" },
 ] as const;
 
 type QuickCat = (typeof QUICK_CATS)[number]["key"] | null;
 
-// Icon for each of the 6 fixed categories (anything else falls back to Otros).
+// Icon for each of the 9 fixed categories (anything else falls back to Otros).
 // "Deudas" is not user-pickable: it's assigned automatically to debt payments,
 // but it needs an icon here so those payments group under their own accordion.
 const CAT_ICONS: Record<string, string> = {
-  Comida: "🍽️", Transporte: "🚗", Alojamiento: "🏠", Trabajo: "💼", Compras: "🛍️", Otros: "📦", Deudas: "💳",
+  Comida: "🍽️", Transporte: "🚗", Alojamiento: "🏠", Trabajo: "💼", Compras: "🛍️", Educación: "🎓", Salud: "🩺", Caridad: "🤝", Otros: "📦", Deudas: "💳",
 };
 const catIcon = (name: string) => CAT_ICONS[name] ?? "📦";
 

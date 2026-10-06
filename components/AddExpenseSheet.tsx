@@ -11,6 +11,9 @@ const QUICK_CATS = [
   { key: "Alojamiento", icon: "🏠", label: "Alojamiento" },
   { key: "Trabajo",     icon: "💼", label: "Trabajo" },
   { key: "Compras",     icon: "🛍️", label: "Compras" },
+  { key: "Educación",   icon: "🎓", label: "Educación" },
+  { key: "Salud",       icon: "🩺", label: "Salud" },
+  { key: "Caridad",     icon: "🤝", label: "Caridad" },
   { key: "Otros",       icon: "📦", label: "Otros" },
 ] as const;
 
@@ -161,7 +164,7 @@ export function AddExpenseSheet({
             <div className="text-[11px] uppercase tracking-wider text-rumbo-muted mb-2">
               Categoría
             </div>
-            <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="Categoría del gasto">
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Categoría del gasto">
               {QUICK_CATS.map((c) => {
                 const active = category === c.key;
                 return (
