@@ -31,6 +31,7 @@ export default function SettingsPage() {
 
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState<"idle" | "asking" | "wiping">("idle");
+  const [wipeFailed, setWipeFailed] = useState(false);
 
   function toggleSection(id: string) {
     setActiveSection((prev) => (prev === id ? null : id));
@@ -206,7 +207,8 @@ export default function SettingsPage() {
                       <button
                         onClick={async () => {
                           setConfirmReset("wiping");
-                          await resetDemo();
+                          const ok = await resetDemo();
+                          setWipeFailed(!ok);
                           setConfirmReset("idle");
                         }}
                         className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase tracking-wider transition-colors"
@@ -222,6 +224,11 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+            {wipeFailed && confirmReset === "idle" && (
+              <div className="w-full mt-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+                No se pudo borrar en la nube, así que no hemos tocado nada. Revisa tu conexión e inténtalo de nuevo.
               </div>
             )}
             {confirmReset === "wiping" && (

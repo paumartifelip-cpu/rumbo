@@ -283,16 +283,23 @@ export async function wipeProfileData(userId: string): Promise<boolean> {
   const supa = getSupabase();
   if (!supa) return false;
   try {
-    await Promise.all([
+    // supabase-js NO lanza ante errores de la API: los devuelve en `error`.
+    // Hay que mirarlos todos, o un borrado fallido parece un éxito.
+    const results = await Promise.all([
       supa.from("financial_entries").delete().eq("user_id", userId),
       supa.from("goals").delete().eq("user_id", userId),
       supa.from("tasks").delete().eq("user_id", userId),
       supa.from("money_snapshots").delete().eq("user_id", userId),
       supa.from("user_tools").delete().eq("user_id", userId),
     ]);
+    const failed = results.filter((r) => r.error);
+    if (failed.length > 0) {
+      console.warn("wipeProfileData delete error", failed.map((r) => r.error));
+      return false;
+    }
     // Reset onboarding-derived numeric fields on the profile row, but leave
     // the identity columns (profile_id, name, email, color, emoji, currency).
-    await supa
+    const { error: pe } = await supa
       .from("profiles")
       .update({
         current_money: 0,
@@ -304,6 +311,10 @@ export async function wipeProfileData(userId: string): Promise<boolean> {
         updated_at: new Date().toISOString(),
       })
       .eq("user_id", userId);
+    if (pe) {
+      console.warn("wipeProfileData profile reset error", pe);
+      return false;
+    }
     return true;
   } catch (e) {
     console.warn("wipeProfileData threw", e);
@@ -319,7 +330,7 @@ export async function deleteProfileFromSupabase(userId: string): Promise<boolean
   const supa = getSupabase();
   if (!supa) return false;
   try {
-    await Promise.all([
+    const results = await Promise.all([
       supa.from("financial_entries").delete().eq("user_id", userId),
       supa.from("goals").delete().eq("user_id", userId),
       supa.from("tasks").delete().eq("user_id", userId),
@@ -327,6 +338,11 @@ export async function deleteProfileFromSupabase(userId: string): Promise<boolean
       supa.from("user_tools").delete().eq("user_id", userId),
       supa.from("profiles").delete().eq("user_id", userId),
     ]);
+    const failed = results.filter((r) => r.error);
+    if (failed.length > 0) {
+      console.warn("deleteProfileFromSupabase error", failed.map((r) => r.error));
+      return false;
+    }
     return true;
   } catch (e) {
     console.warn("deleteProfileFromSupabase threw", e);

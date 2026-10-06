@@ -141,7 +141,8 @@ interface RumboContext extends RumboState {
   reorderUserTools: (orderedIds: string[]) => void;
   saveOnboarding: (data: OnboardingData) => void;
   updateOnboarding: (patch: Partial<OnboardingData>) => void;
-  resetDemo: () => Promise<void> | void;
+  /** Devuelve false si el borrado en la nube falló (no se toca nada local). */
+  resetDemo: () => Promise<boolean>;
   prioritize: () => Promise<void>;
   setPrimaryCurrency: (c: Currency) => void;
   /** Returns the entry's amount converted into the user's primary currency. */
@@ -1424,14 +1425,19 @@ export function RumboProvider({ children }: { children: ReactNode }) {
    * Defaults (tools, etc.) are re-seeded on the next mount.
    */
   const resetDemo = useCallback(async () => {
-    if (!profile) return;
+    if (!profile) return false;
     // Mark this state push as a clean wipe so the debounced push doesn't
     // race the delete (and re-create rows we're trying to remove).
     pushPendingRef.current = true;
 
-    // 1) Server-side wipe.
+    // 1) Server-side wipe. Si falla, NO tocamos lo local: vaciarlo mientras la
+    // nube conserva los datos haría que el siguiente pull los resucitara.
     if (supabaseEnabled) {
-      await wipeProfileData(profile.user_id).catch(() => {});
+      const wiped = await wipeProfileData(profile.user_id).catch(() => false);
+      if (!wiped) {
+        pushPendingRef.current = false;
+        return false;
+      }
     }
 
     // 2) Local cache wipe.
@@ -1448,6 +1454,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     });
 
     pushPendingRef.current = false;
+    return true;
   }, [profile]);
 
   const value = useMemo<RumboContext>(
