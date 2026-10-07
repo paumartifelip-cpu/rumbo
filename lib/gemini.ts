@@ -181,11 +181,42 @@ export const EXPENSE_CATEGORIES = [
   "Otros",
 ] as const;
 
+/**
+ * Vocabulario muy habitual en México y Latinoamérica que las reglas pensadas para
+ * España no reconocían (un usuario real tuvo 10 de 14 gastos en "Otros"). Va PRIMERO y
+ * solo contiene palabras poco ambiguas; el orden importa: "mercado libre" es Compras
+ * aunque "mercado" a secas sea Comida.
+ * Recibe el texto ya en minúsculas y sin tildes.
+ */
+function latamCategorize(t: string): string | null {
+  if (/(mercado ?libre|mercadolibre|liverpool|coppel|elektra|\btemu\b)/.test(t)) return "Compras";
+
+  // Alojamiento: cuota de mantenimiento del edificio, predial y servicios del hogar.
+  if (
+    /(\bmantto\b|cuota de mantenimiento|mantenimiento (de |del )?(edificio|casa|depa|departamento|condominio|fraccionamiento)|predial|\bcfe\b|telmex|totalplay|izzi|megacable|infonavit)/.test(t)
+  )
+    return "Alojamiento";
+
+  if (/(pemex|\bcaseta\b|\bcamion\b|metrobus|\bdidi\b|\bcombi\b|\btransporte\b|estacionamiento)/.test(t))
+    return "Transporte";
+
+  // "mercado" a secas es de comida, salvo Mercado Libre (compras) y Mercado Pago (pagos).
+  if (
+    /(\bsuper\b|tianguis|\bmercado\b(?! ?(libre|pago))|oxxo|walmart|soriana|chedraui|\bheb\b|bodega aurrera|costco|sams club|la comer|tortiller|abarrotes|taqueria|antojitos|\bcomida\b|\bcomer\b)/.test(t)
+  )
+    return "Comida";
+
+  return null;
+}
+
 export function heuristicCategorize(title: string): string | null {
   const t = title
     .toLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
+
+  const latam = latamCategorize(t);
+  if (latam) return latam;
 
   // Caridad (donaciones)
   if (
