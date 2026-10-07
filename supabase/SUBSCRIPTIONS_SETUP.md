@@ -53,10 +53,12 @@ Hacer una compra de prueba (tarjeta `4242 4242 4242 4242`) y comprobar que apare
 en `subscriptions` y otra en `stripe_events` con `processed_at` relleno.
 Repetir con una cancelación y con un cobro fallido (tarjeta `4000 0000 0000 0341`).
 
-### 7. (Fase 2) Poner al día a quien ya paga
-Stripe no reenvía avisos antiguos. Los pagos existentes se incorporan haciendo que Stripe
-emita un aviso nuevo de cada suscripción, o con un script de una sola vez. Se hace juntos,
-después de comprobar el paso 6.
+### 7. (Fase 2) Poner al día a quien ya paga — HECHO el 2026-10-07
+Stripe no reenvía avisos antiguos, así que se usó una función de un solo uso
+(`backfill-subscriptions`) que preguntó a Stripe por las suscripciones de Rumbo y las apuntó
+en la libreta (3 activas; las canceladas no se apuntan). Ya está APAGADA: el código que queda
+en `supabase/functions/backfill-subscriptions/` es un stub que responde 410. Si hiciera falta
+repetirlo, se puede recuperar la versión completa desde el historial de git (commit 63ead9f).
 
 ## Qué NO hace todavía
 No bloquea el acceso, no cierra el registro libre y no añade el botón de baja. Eso son las
