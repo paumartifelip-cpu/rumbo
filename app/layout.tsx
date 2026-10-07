@@ -1,9 +1,22 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { RegistrarSW } from "@/components/RegistrarSW";
 import { RumboProvider } from "@/lib/store";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://usarumbo.com"),
+  manifest: "/manifest.webmanifest",
+  applicationName: "Rumbo",
+  // Al instalarla en el iPhone: nombre bajo el icono y modo "app" a pantalla completa.
+  appleWebApp: { capable: true, title: "Rumbo", statusBarStyle: "default" },
+  formatDetection: { telephone: false },
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   title: "Rumbo · Foco real hacia tus objetivos",
   description:
     "Rumbo es la app que ordena tus tareas según lo que más te acerca a tus objetivos personales, profesionales y financieros.",
@@ -48,6 +61,7 @@ export default function RootLayout({
     <html lang="es">
       <body className="min-h-screen font-sans">
         <RumboProvider>{children}</RumboProvider>
+        <RegistrarSW />
       </body>
     </html>
   );
