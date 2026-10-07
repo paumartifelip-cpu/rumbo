@@ -423,6 +423,16 @@ export default function GastosPage() {
   const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
   const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([]);
   const [openCats, setOpenCats] = useState<string[]>([]);
+  const [view, setView] = useState<"categoria" | "dia">("categoria");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("rumbo_gastos_view") === "dia") setView("dia");
+    } catch {}
+  }, []);
+  const changeView = (v: "categoria" | "dia") => {
+    setView(v);
+    try { localStorage.setItem("rumbo_gastos_view", v); } catch {}
+  };
   const toggleCat = (name: string) =>
     setOpenCats((o) => (o.includes(name) ? o.filter((x) => x !== name) : [...o, name]));
 
@@ -486,6 +496,30 @@ export default function GastosPage() {
       .sort((a, b) => b.total - a.total);
   }, [thisMonth, amountInPrimary]);
 
+  // Gastos agrupados por día (más reciente primero), con el total de cada día.
+  const dayGroups = useMemo(() => {
+    const map = new Map<string, { key: string; date: Date; items: typeof thisMonth; total: number }>();
+    thisMonth.forEach((f) => {
+      const d = new Date(f.date);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      if (!map.has(key)) map.set(key, { key, date: d, items: [], total: 0 });
+      const g = map.get(key)!;
+      g.items.push(f);
+      g.total += amountInPrimary(f);
+    });
+    return Array.from(map.values()).sort((a, b) => +b.date - +a.date);
+  }, [thisMonth, amountInPrimary]);
+
+  const dayLabel = (d: Date) => {
+    const sameDay = (a: Date, b: Date) =>
+      a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    const now = new Date();
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    if (sameDay(d, now)) return "Hoy";
+    if (sameDay(d, yesterday)) return "Ayer";
+    return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+  };
+
   const subscriptions = useMemo(() => {
     // Dedupe defensively: never show the same subscription twice. Key by
     // normalized title + amount + recurrence; keep the earliest-created one.
@@ -509,6 +543,59 @@ export default function GastosPage() {
     }, 0),
     [subscriptions, amountInPrimary]
   );
+
+  // Fila de un gasto: la comparten las dos vistas (por categoría y por día).
+  const renderRow = (f: (typeof thisMonth)[number]) => {
+                              const entryCurrency = f.currency ?? primaryCurrency;
+                              const isForeign = entryCurrency !== primaryCurrency;
+                              return (
+                                <div
+                                  key={f.id}
+                                  className="flex items-start justify-between py-2.5 border-b last:border-0 border-rumbo-line/70 group"
+                                >
+                                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedMoveIds.includes(f.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedMoveIds([...selectedMoveIds, f.id]);
+                                        } else {
+                                          setSelectedMoveIds(selectedMoveIds.filter((id) => id !== f.id));
+                                        }
+                                      }}
+                                      className="mt-1 w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors shrink-0"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-medium truncate flex items-center gap-1.5">
+                                        {f.title}
+                                        {f.recurrence && <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>}
+                                      </div>
+                                      <div className="text-xs text-rumbo-muted mt-0.5">{formatDate(f.date)}</div>
+                                      <div className="mt-1.5">
+                                        <CategoryPicker
+                                          current={f.category}
+                                          onChange={(cat) => updateFinance(f.id, { category: cat })}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 shrink-0 ml-2">
+                                    <div className="text-right">
+                                      <span className="text-rose-600 font-medium">-{formatCurrency(f.amount, entryCurrency)}</span>
+                                      {isForeign && <div className="text-[10px] text-rumbo-muted">≈ -{format(amountInPrimary(f))}</div>}
+                                    </div>
+                                    <button
+                                      onClick={() => deleteMovementCascade(f.id)}
+                                      className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
+                                      aria-label={`Eliminar gasto ${f.title}`}
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+  };
 
   function submit() {
     if (!form.title || typeof form.amount !== "number" || form.amount <= 0) return;
@@ -806,6 +893,20 @@ export default function GastosPage() {
               title="Movimientos del mes"
               hint={`${thisMonth.length} gastos en ${selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`}
             />
+            <div role="group" aria-label="Cómo ver los gastos" className="flex rounded-xl bg-slate-100 p-0.5 text-xs font-semibold shrink-0">
+              {([["categoria", "Por categoría"], ["dia", "Por día"]] as const).map(([k, label]) => (
+                <button
+                  key={k}
+                  onClick={() => changeView(k)}
+                  aria-pressed={view === k}
+                  className={`px-3 py-1.5 rounded-[10px] transition-colors ${
+                    view === k ? "bg-white text-rumbo-ink shadow-sm" : "text-rumbo-muted hover:text-rumbo-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             {selectedMoveIds.length > 0 && (
               <button
                 onClick={deleteSelectedMovements}
@@ -818,6 +919,24 @@ export default function GastosPage() {
           {thisMonth.length === 0 ? (
             <EmptyState icon="🧾" title="Sin gastos este mes" description="Apunta el primero arriba." />
           ) : (
+            view === "dia" ? (
+              <div className="mt-2 flex flex-col gap-2.5">
+                {dayGroups.map((g) => (
+                  <div key={g.key} className="border border-rumbo-line rounded-2xl overflow-hidden bg-white">
+                    <div className="flex items-center justify-between gap-3 px-3.5 py-3 bg-slate-50/70">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-rumbo-ink capitalize truncate">{dayLabel(g.date)}</div>
+                        <div className="text-xs text-rumbo-muted">{g.items.length} {g.items.length === 1 ? "gasto" : "gastos"}</div>
+                      </div>
+                      <span className="font-bold text-rose-600 tabular-nums shrink-0">-{format(g.total)}</span>
+                    </div>
+                    <div className="px-3.5 pb-1 border-t border-rumbo-line">
+                      {g.items.map(renderRow)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="mt-2 flex flex-col gap-2.5">
               {expenseGroups.map((g) => {
                 const open = openCats.includes(g.name);
@@ -855,57 +974,7 @@ export default function GastosPage() {
                           className="overflow-hidden"
                         >
                           <div className="px-3.5 pb-1 border-t border-rumbo-line">
-                            {g.items.map((f) => {
-                              const entryCurrency = f.currency ?? primaryCurrency;
-                              const isForeign = entryCurrency !== primaryCurrency;
-                              return (
-                                <div
-                                  key={f.id}
-                                  className="flex items-start justify-between py-2.5 border-b last:border-0 border-rumbo-line/70 group"
-                                >
-                                  <div className="flex items-start gap-3 min-w-0 flex-1">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedMoveIds.includes(f.id)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedMoveIds([...selectedMoveIds, f.id]);
-                                        } else {
-                                          setSelectedMoveIds(selectedMoveIds.filter((id) => id !== f.id));
-                                        }
-                                      }}
-                                      className="mt-1 w-4 h-4 rounded text-rose-600 focus:ring-rose-500 border-slate-300 transition-colors shrink-0"
-                                    />
-                                    <div className="min-w-0 flex-1">
-                                      <div className="font-medium truncate flex items-center gap-1.5">
-                                        {f.title}
-                                        {f.recurrence && <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>}
-                                      </div>
-                                      <div className="text-xs text-rumbo-muted mt-0.5">{formatDate(f.date)}</div>
-                                      <div className="mt-1.5">
-                                        <CategoryPicker
-                                          current={f.category}
-                                          onChange={(cat) => updateFinance(f.id, { category: cat })}
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-3 shrink-0 ml-2">
-                                    <div className="text-right">
-                                      <span className="text-rose-600 font-medium">-{formatCurrency(f.amount, entryCurrency)}</span>
-                                      {isForeign && <div className="text-[10px] text-rumbo-muted">≈ -{format(amountInPrimary(f))}</div>}
-                                    </div>
-                                    <button
-                                      onClick={() => deleteMovementCascade(f.id)}
-                                      className="w-8 h-8 rounded-lg flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-rose-100/50 shadow-sm transition active:scale-90"
-                                      aria-label={`Eliminar gasto ${f.title}`}
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                            {g.items.map(renderRow)}
                           </div>
                         </motion.div>
                       )}
@@ -914,6 +983,7 @@ export default function GastosPage() {
                 );
               })}
             </div>
+            )
           )}
         </Card>
       </Reveal>
