@@ -350,6 +350,7 @@ export async function deleteProfileFromSupabase(userId: string): Promise<boolean
       supa.from("money_snapshots").delete().eq("user_id", userId),
       supa.from("user_tools").delete().eq("user_id", userId),
       supa.from("budgets").delete().eq("user_id", userId),
+      supa.from("notification_prefs").delete().eq("user_id", userId),
       supa.from("profiles").delete().eq("user_id", userId),
     ]);
     const failed = results.filter((r) => r.error);

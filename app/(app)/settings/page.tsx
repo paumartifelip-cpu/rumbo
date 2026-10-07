@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/Card";
+import { AvisosSettings } from "@/components/AvisosSettings";
 import { SettingsAccordion } from "@/components/SettingsAccordion";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { supabaseEnabled } from "@/lib/supabase";
@@ -16,6 +17,7 @@ import {
   fetchIsPremium,
 } from "@/lib/payment";
 import { CONTACT_EMAIL, INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/contact";
+import { EVENTO_BETA, aplicarParametroAvisos, avisosBetaActivo } from "@/lib/avisos";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -31,6 +33,22 @@ export default function SettingsPage() {
   } = useRumbo();
 
   const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  // Candado de pruebas de los avisos: la sección solo se ve si se activó con /settings/?avisos=1.
+  const avisosBeta = useSyncExternalStore(
+    (avisar) => {
+      window.addEventListener(EVENTO_BETA, avisar);
+      window.addEventListener("storage", avisar);
+      return () => { window.removeEventListener(EVENTO_BETA, avisar); window.removeEventListener("storage", avisar); };
+    },
+    () => avisosBetaActivo(window.localStorage),
+    () => false
+  );
+  useEffect(() => {
+    if (aplicarParametroAvisos(window.localStorage, window.location.search)) {
+      window.dispatchEvent(new Event(EVENTO_BETA));
+    }
+  }, []);
   const [confirmReset, setConfirmReset] = useState<"idle" | "asking" | "wiping">("idle");
   const [wipeFailed, setWipeFailed] = useState(false);
 
@@ -240,6 +258,19 @@ export default function SettingsPage() {
             )}
           </div>
         </SettingsAccordion>
+
+        {avisosBeta && profile && (
+          <SettingsAccordion
+            id="avisos"
+            title="Avisos y recordatorios"
+            icon="🔔"
+            hint="Un recordatorio al día para apuntar tus gastos (en pruebas)."
+            activeId={activeSection}
+            onToggle={toggleSection}
+          >
+            <AvisosSettings userId={profile.user_id} />
+          </SettingsAccordion>
+        )}
 
         <SettingsAccordion
           id="plan"

@@ -70,6 +70,11 @@ const REAL: Record<string, Col[]> = {
     ["id", "text", "NO", null], ["user_id", "uuid", "NO", null], ["category", "text", "NO", null], ["amount", "numeric", "NO", null],
     ["currency", "text", "YES", null], ["month", "text", "YES", null], ["updated_at", TS, "YES", "now()"], ["created_at", TS, "YES", "now()"],
   ],
+  notification_prefs: [
+    ["user_id", "uuid", "NO", null], ["reminder_enabled", "boolean", "NO", "false"],
+    ["reminder_time", "text", "NO", "'21:00'::text"], ["timezone", "text", "NO", "'UTC'::text"],
+    ["skip_if_logged", "boolean", "NO", "true"], ["updated_at", TS, "NO", "now()"],
+  ],
   paid_codes: [
     ["code", "text", "NO", null], ["name", "text", "YES", null], ["paid_at", TS, "YES", "now()"],
     ["stripe_session_id", "text", "YES", null], ["used", "boolean", "YES", "false"], ["created_at", TS, "YES", "now()"],
@@ -97,6 +102,7 @@ const INDICES = [
 const POLITICAS: Record<string, string> = {
   profiles: "own_profiles", goals: "own_goals", tasks: "own_tasks", financial_entries: "own_financial_entries",
   money_snapshots: "own_money_snapshots", user_tools: "own_user_tools", budgets: "own_budgets",
+  notification_prefs: "own_notification_prefs",
   paid_codes: "read_own_paid_code", subscriptions: "read_own_subscription",
 };
 
@@ -138,7 +144,7 @@ describe("schema.sql reconstruye la base de datos real", () => {
          on tc.constraint_name = kcu.constraint_name and tc.table_schema = kcu.table_schema
        where tc.table_schema='public' and tc.constraint_type='PRIMARY KEY' group by tc.table_name order by 1`);
     const esperado: Record<string, string> = Object.fromEntries(
-      Object.entries(REAL).map(([t, cols]) => [t, t === "profiles" ? "user_id" : t === "paid_codes" ? "code" : "id"])
+      Object.entries(REAL).map(([t, cols]) => [t, t === "profiles" || t === "notification_prefs" ? "user_id" : t === "paid_codes" ? "code" : "id"])
     );
     expect(Object.fromEntries(r.rows.map((x) => [x.t, x.c]))).toEqual(esperado);
   });
@@ -176,6 +182,17 @@ describe("schema.sql reconstruye la base de datos real", () => {
     for (const n of ["budgets_amount_check", "user_tools_rating_check", "subscriptions_plan_kind_check", "subscriptions_email_check", "subscriptions_stripe_subscription_id_key"]) {
       expect(nombres, n).toContain(n);
     }
+  });
+
+  it("las preferencias de avisos solo admiten horas válidas (HH:MM)", async () => {
+    const uid = "44444444-4444-4444-4444-444444444444";
+    for (const mala of ["25:00", "9:00", "21:60", "las nueve", ""]) {
+      await expect(db.query(`insert into public.notification_prefs (user_id, reminder_time) values ($1, $2)`, [uid, mala]), mala).rejects.toThrow();
+    }
+    await db.query(`insert into public.notification_prefs (user_id, reminder_time) values ($1, '07:30')`, [uid]);
+    const r = await db.query<{ reminder_enabled: boolean; skip_if_logged: boolean; timezone: string }>(
+      `select reminder_enabled, skip_if_logged, timezone from public.notification_prefs where user_id=$1`, [uid]);
+    expect(r.rows[0]).toEqual({ reminder_enabled: false, skip_if_logged: true, timezone: "UTC" }); // por defecto: apagado
   });
 
   it("el disparador de herramientas actualiza updated_at en cada cambio", async () => {
