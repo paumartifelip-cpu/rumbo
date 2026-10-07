@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CLAVE_BETA, HORAS, HORA_POR_DEFECTO, ZONAS_COMUNES, aplicarParametroAvisos, avisosBetaActivo,
-  esHora, esZonaHoraria, filaParaGuardar, hayCambios, normalizarPrefs, zonaDelDispositivo,
+  esHora, esZonaHoraria, filaParaGuardar, hayCambios, mostrarAvisos, normalizarPrefs, zonaDelDispositivo,
 } from "@/lib/avisos";
 
 describe("horas", () => {
@@ -121,6 +121,15 @@ describe("candado de pruebas de los avisos", () => {
     const roto = { getItem: () => { throw new Error("bloqueado"); }, setItem: () => { throw new Error("bloqueado"); }, removeItem: () => { throw new Error("bloqueado"); } };
     expect(() => aplicarParametroAvisos(roto, "?avisos=1")).not.toThrow();
     expect(avisosBetaActivo(roto)).toBe(false);
+  });
+});
+
+describe("mostrarAvisos: cuándo se enseña la sección en Ajustes", () => {
+  it("cerrada para todos, salvo candado abierto o cuenta que ya usa los avisos", () => {
+    expect(mostrarAvisos(false, false)).toBe(false); // un usuario normal: no la ve
+    expect(mostrarAvisos(true, false)).toBe(true); // candado abierto en este aparato
+    expect(mostrarAvisos(false, true)).toBe(true); // la app de iPhone: la memoria no se comparte con Safari
+    expect(mostrarAvisos(true, true)).toBe(true);
   });
 });
 

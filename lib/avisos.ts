@@ -108,6 +108,16 @@ export function filaParaGuardar(userId: string, p: PrefsAvisos, ahora: Date = ne
 export const CLAVE_BETA = "rumbo_avisos_beta";
 export const EVENTO_BETA = "rumbo-avisos-beta";
 
+/**
+ * ¿Se enseña la sección de avisos? Sí si el candado está abierto en este dispositivo O si la
+ * cuenta ya tiene preferencias guardadas. Lo segundo es necesario porque en iPhone la app de
+ * la pantalla de inicio tiene su propia memoria, separada de Safari: el candado abierto en
+ * Safari no existe allí (y sin barra de direcciones no se puede escribir ?avisos=1). Las
+ * preferencias, en cambio, viven en la base de datos y son las mismas en todos los aparatos.
+ */
+export const mostrarAvisos = (candadoAbierto: boolean, cuentaTienePreferencias: boolean): boolean =>
+  candadoAbierto || cuentaTienePreferencias;
+
 type Almacen = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 /** ¿Está activado el candado de pruebas en este dispositivo? Solo lee. */
