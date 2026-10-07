@@ -13,6 +13,7 @@
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=denonext';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import {
+  describeIgnored,
   isHandledEvent,
   isRumboSubscription,
   normalizeEmail,
@@ -65,10 +66,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    await handleEvent(event);
+    // handleEvent devuelve una nota cuando decide ignorar el aviso (no es un error).
+    const note = await handleEvent(event);
     await supa
       .from('stripe_events')
-      .update({ processed_at: new Date().toISOString(), error: null })
+      .update({ processed_at: new Date().toISOString(), error: note ?? null })
       .eq('id', event.id);
     return new Response('ok', { status: 200 });
   } catch (err) {
@@ -82,13 +84,13 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-async function handleEvent(event: Stripe.Event) {
+async function handleEvent(event: Stripe.Event): Promise<string | undefined> {
   let sub: Stripe.Subscription;
   let email = '';
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    if (session.mode !== 'subscription' || !session.subscription) return; // pago suelto: no es suscripción
+    if (session.mode !== 'subscription' || !session.subscription) return 'ignorado: pago suelto, no es una suscripción';
     const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
     sub = await stripe.subscriptions.retrieve(subId);
     email = normalizeEmail(session.customer_details?.email);
@@ -97,7 +99,7 @@ async function handleEvent(event: Stripe.Event) {
   }
 
   // La cuenta de Stripe es compartida con otros negocios: solo suscripciones de Rumbo.
-  if (!isRumboSubscription(sub, rumboPriceIds)) return;
+  if (!isRumboSubscription(sub, rumboPriceIds)) return describeIgnored(sub, rumboPriceIds);
 
   if (!email) {
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
@@ -114,9 +116,10 @@ async function handleEvent(event: Stripe.Event) {
     .eq('stripe_subscription_id', sub.id)
     .maybeSingle();
   if (selErr) throw new Error(`select subscriptions: ${selErr.message}`);
-  if (existing && !shouldApplyEvent(existing.last_event_at, event.created)) return;
+  if (existing && !shouldApplyEvent(existing.last_event_at, event.created)) return 'ignorado: aviso más antiguo que el ya guardado';
 
   const row = rowFromSubscription(sub, email, event.created);
   const { error } = await supa.from('subscriptions').upsert(row, { onConflict: 'stripe_subscription_id' });
   if (error) throw new Error(`upsert subscriptions: ${error.message}`);
+  return undefined;
 }

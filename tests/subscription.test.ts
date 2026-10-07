@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   GRACE_DAYS,
+  describeIgnored,
   hasAccess,
   isHandledEvent,
   isRumboSubscription,
@@ -181,5 +182,24 @@ describe("fin del periodo según la versión de la API de Stripe", () => {
       "a@b.c", 1_789_000_000, NOW
     );
     expect(hasAccess([{ plan_kind: "paid", status: row.status, current_period_end: row.current_period_end }], NOW)).toBe(true);
+  });
+});
+
+describe("describeIgnored (para diagnosticar por qué se ignoró un aviso)", () => {
+  const sub = { id: "s", status: "active", customer: "c", items: { data: [{ price: { id: "price_visto" } }] } };
+
+  it("muestra el precio recibido y los permitidos, para ver una letra mal copiada", () => {
+    const t = describeIgnored(sub, ["price_esperado"]);
+    expect(t).toContain("price_visto");
+    expect(t).toContain("price_esperado");
+    expect(t).toContain("ignorado");
+  });
+
+  it("avisa claramente si la lista de precios permitidos está vacía", () => {
+    expect(describeIgnored(sub, [])).toContain("STRIPE_RUMBO_PRICE_IDS");
+  });
+
+  it("funciona aunque no haya precios", () => {
+    expect(describeIgnored({ id: "s", status: "active", customer: "c" }, ["price_x"])).toContain("recibidos=[]");
   });
 });

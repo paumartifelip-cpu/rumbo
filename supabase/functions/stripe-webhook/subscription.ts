@@ -87,6 +87,17 @@ export function isRumboSubscription(sub: StripeSubscriptionLike, allowedPriceIds
 }
 
 /**
+ * Texto para dejar en el registro de avisos cuando se ignora una suscripción:
+ * qué precios traía y cuáles estaban permitidos. Los ids de precio no son secretos
+ * y así se ve a simple vista si un código está mal copiado.
+ */
+export function describeIgnored(sub: StripeSubscriptionLike, allowedPriceIds: string[]): string {
+  const received = (sub.items?.data ?? []).map((i) => i.price?.id).filter((x): x is string => Boolean(x));
+  if (allowedPriceIds.length === 0) return "ignorado: STRIPE_RUMBO_PRICE_IDS vacío o sin ids price_ válidos";
+  return `ignorado: no es de Rumbo. precios recibidos=[${received.join(",")}] permitidos=[${allowedPriceIds.join(",")}]`;
+}
+
+/**
  * Fin del periodo pagado. Según la versión de la API de Stripe del aviso, está en la
  * suscripción (antigua) o en sus items (nueva); se acepta cualquiera de las dos.
  */
