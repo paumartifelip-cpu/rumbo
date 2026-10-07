@@ -16,6 +16,7 @@ const ESTRUCTURA_SUPABASE = `
   do $$ begin
     if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated; end if;
     if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon; end if;
+    if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role; end if;
   end $$;
   create publication supabase_realtime;
 `;
@@ -74,6 +75,7 @@ const REAL: Record<string, Col[]> = {
     ["user_id", "uuid", "NO", null], ["reminder_enabled", "boolean", "NO", "false"],
     ["reminder_time", "text", "NO", "'21:00'::text"], ["timezone", "text", "NO", "'UTC'::text"],
     ["skip_if_logged", "boolean", "NO", "true"], ["updated_at", TS, "NO", "now()"],
+    ["last_reminder_on", "date", "YES", null],
   ],
   push_subscriptions: [
     ["id", "uuid", "NO", "gen_random_uuid()"], ["user_id", "uuid", "NO", null], ["endpoint", "text", "NO", null],
