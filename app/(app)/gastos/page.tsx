@@ -295,7 +295,7 @@ function DebtsSection() {
                     {format(totalRemaining)}
                     <span className="text-sm font-normal text-rumbo-muted ml-1.5">pendiente en total</span>
                   </div>
-                  <div className="mt-3 grid sm:grid-cols-2 gap-3">
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <AnimatePresence>
                       {debts.map(({ entry: d, paid, remaining }) => {
                         const entryCurrency = d.currency ?? primaryCurrency;
@@ -799,7 +799,7 @@ export default function GastosPage() {
                 {format(totalMonthlySubscriptions)}
                 <span className="text-sm font-normal text-rumbo-muted ml-1">/mes</span>
               </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <AnimatePresence>
                   {subscriptions.map((s) => {
                     const entryCurrency = s.currency ?? primaryCurrency;

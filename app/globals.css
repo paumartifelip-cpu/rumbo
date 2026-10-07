@@ -9,6 +9,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  /* Red de seguridad: en el móvil la pantalla NUNCA se mueve de izquierda a derecha, aunque
+     algún elemento se desborde. `clip` recorta sin convertir la página en una zona con
+     scroll propio (a diferencia de `hidden`, no rompe los elementos "pegajosos"). */
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 * {

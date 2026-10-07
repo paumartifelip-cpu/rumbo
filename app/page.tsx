@@ -142,7 +142,7 @@ export default function LandingPage() {
           title="Tu dinero, fácil de entender"
           subtitle="Tú lo apuntas y Rumbo te lo ordena. Sin líos ni números complicados."
         />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-12">
           {FEATURES.map((f, i) => (
             <motion.div
               key={f.title}
@@ -170,7 +170,7 @@ export default function LandingPage() {
           title="Así de fácil"
           subtitle="Empiezas en menos de un minuto."
         />
-        <div className="grid md:grid-cols-3 gap-6 mt-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
           {STEPS.map((s, i) => (
             <motion.div
               key={s.n}

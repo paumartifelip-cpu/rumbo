@@ -94,7 +94,7 @@ export function SpendingDonut() {
       </div>
 
       {/* Manual Legend for better control */}
-      <div className="flex-1 grid gap-2">
+      <div className="flex-1 grid grid-cols-1 gap-2">
         {data.map((entry, index) => (
           <div key={entry.name} className="flex items-center justify-between group">
             <div className="flex items-center gap-2">

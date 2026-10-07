@@ -265,7 +265,7 @@ export default function GoalsPage() {
                 <span className="text-xs text-slate-400 font-bold">{grouped[tf].length} objetivo{grouped[tf].length !== 1 ? "s" : ""}</span>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {grouped[tf].map((g) => {
                   const isIncremental = !!g.unit && !!g.target_amount;
                   const computed = isIncremental

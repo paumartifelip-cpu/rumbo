@@ -199,7 +199,7 @@ export function AvisosSettings({ userId }: { userId: string }) {
         </button>
       </div>
 
-      <div className={`grid gap-4 sm:grid-cols-2 ${prefs.reminder_enabled ? "" : "opacity-50"}`}>
+      <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${prefs.reminder_enabled ? "" : "opacity-50"}`}>
         <label className="block">
           <span className="label">A qué hora</span>
           <select

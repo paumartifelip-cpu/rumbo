@@ -169,7 +169,7 @@ export default function SettingsPage() {
           activeId={activeSection}
           onToggle={toggleSection}
         >
-          <div className="grid gap-3 text-sm bg-white p-4 rounded-xl border border-rumbo-line">
+          <div className="grid grid-cols-1 gap-3 text-sm bg-white p-4 rounded-xl border border-rumbo-line">
             <div className="flex justify-between items-center py-1 border-b border-slate-100">
               <span className="text-rumbo-muted">Nombre</span>
               <span className="font-medium">{user.name || "—"}</span>
@@ -298,7 +298,7 @@ export default function SettingsPage() {
           activeId={activeSection}
           onToggle={toggleSection}
         >
-          <div className="grid gap-3 text-sm bg-white p-4 rounded-xl border border-rumbo-line">
+          <div className="grid grid-cols-1 gap-3 text-sm bg-white p-4 rounded-xl border border-rumbo-line">
             <div className="flex justify-between items-center py-1 border-b border-slate-100">
               <span className="text-rumbo-muted">Plan</span>
               <span className="font-medium">
@@ -367,7 +367,7 @@ export default function SettingsPage() {
           activeId={activeSection}
           onToggle={toggleSection}
         >
-          <div className="grid gap-3 text-sm">
+          <div className="grid grid-cols-1 gap-3 text-sm">
             <div className="flex justify-between items-center p-3 rounded-lg border border-rumbo-line bg-white">
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${supabaseEnabled ? "bg-emerald-500" : "bg-slate-300"}`} />

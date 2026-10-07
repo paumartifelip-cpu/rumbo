@@ -159,7 +159,7 @@ export default function MoneyPage() {
             description="Cada vez que actualices tu dinero total se guardará aquí. Ideal una vez al mes."
           />
         ) : (
-          <div className="grid gap-1">
+          <div className="grid grid-cols-1 gap-1">
             {[...sorted].reverse().map((s, i, arr) => {
               const next = arr[i + 1];
               const diff = next ? s.total - next.total : 0;
