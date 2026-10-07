@@ -1,14 +1,31 @@
--- Rumbo · Supabase schema
--- Ejecuta este SQL en Supabase (SQL Editor) para preparar la base de datos.
--- Este script es idempotente: puedes ejecutarlo varias veces.
-
-create extension if not exists "pgcrypto";
+-- Rumbo · esquema de la base de datos (Supabase / PostgreSQL)
+--
+-- Refleja la base de datos REAL de producción, leída el 2026-10-07.
+-- Se puede ejecutar entero en Supabase → SQL Editor las veces que haga falta:
+--   · En una base vacía crea todo desde cero.
+--   · En una base antigua añade lo que falta (sección 2) sin tocar los datos.
+-- Está probado en tests/schema.test.ts: ejecutarlo en una base vacía da exactamente
+-- la estructura de producción, y repetirlo no cambia nada.
+--
+-- Cuando se cambie la base de datos, actualiza ESTE archivo (y supabase/migrations/)
+-- y ejecuta `npm test`: el test avisa si dejan de coincidir.
+--
+-- NO está aquí a propósito:
+--   · Los disparadores propios de Supabase (p. ej. `ensure_rls`, que activa la seguridad
+--     por filas en cada tabla nueva), ni las extensiones que trae por defecto.
+--   · `paid_codes_backup_20261007`: copia de seguridad puntual de los pagos, hecha antes de
+--     crear la tabla de suscripciones. Se puede borrar cuando ya no haga falta.
+--   · Los perfiles de demostración que traía la primera versión de este archivo: una base
+--     nueva no debe nacer con cuentas falsas.
 
 -- =============================================
--- Tablas
+-- 1. Tablas
 -- =============================================
 
-create table if not exists profiles (
+-- Una fila por usuario. `user_id` = auth.uid() (Supabase Auth). Sin clave foránea a
+-- auth.users: la app siempre ha vivido con ids propios, y borrar un usuario exige borrar
+-- también sus filas (ver wipeProfileData / deleteProfileFromSupabase en lib/sync.ts).
+create table if not exists public.profiles (
   user_id uuid primary key,
   name text,
   email text,
@@ -17,10 +34,17 @@ create table if not exists profiles (
   current_monthly_income numeric default 0,
   monthly_target numeric default 0,
   target_date timestamptz,
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  primary_currency text,        -- EUR, USD, MXN, ARS, COP, CLP, PEN, PYG
+  profile_id text,
+  emoji text,
+  color text,
+  initials text,
+  income_type text,             -- salariado | empresario
+  pin_hash text                 -- SHA-256 del PIN de 4 cifras (bloqueo "suave")
 );
 
-create table if not exists goals (
+create table if not exists public.goals (
   id text primary key,
   user_id uuid not null,
   title text not null,
@@ -29,50 +53,53 @@ create table if not exists goals (
   target_amount numeric,
   current_amount numeric default 0,
   deadline timestamptz,
-  importance int default 5,
+  importance integer default 5,
   status text default 'activo',
-  progress int default 0,
-  created_at timestamptz default now()
+  progress integer default 0,
+  created_at timestamptz default now(),
+  timeframe text,               -- diario | semanal | mensual | anual
+  unit text
 );
-create index if not exists goals_user_id_idx on goals(user_id);
 
-create table if not exists tasks (
+create table if not exists public.tasks (
   id text primary key,
   user_id uuid not null,
   goal_id text,
   title text not null,
   description text,
   due_date timestamptz,
-  estimated_minutes int,
+  estimated_minutes integer,
   energy_level text,
-  difficulty int,
-  urgency int,
+  difficulty integer,
+  urgency integer,
   money_impact numeric default 0,
-  ai_priority_score int,
+  ai_priority_score integer,
   ai_reason text,
   status text default 'pendiente',
-  manual_order_index int,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  recurrence text,              -- diaria | semanal | mensual
+  last_generated_date timestamptz,
+  manual_order_index integer
 );
-create index if not exists tasks_user_id_idx on tasks(user_id);
 
-create table if not exists financial_entries (
+create table if not exists public.financial_entries (
   id text primary key,
   user_id uuid not null,
-  type text not null,
+  type text not null,           -- ingreso | gasto | ahorro | deuda
   title text not null,
   amount numeric not null,
   date timestamptz default now(),
   category text,
-  payment_method text,   -- efectivo | debito | credito | transferencia | bizum (opcional)
-  payment_account text,  -- nombre de la tarjeta, solo débito/crédito (opcional)
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  currency text,
+  amount_in_primary numeric,
+  recurrence text,              -- mensual | anual
+  last_generated_date timestamptz,
+  payment_method text,          -- efectivo | debito | credito | transferencia | bizum (opcional)
+  payment_account text          -- nombre de la tarjeta, solo débito/crédito (opcional)
 );
-alter table financial_entries add column if not exists payment_method text;
-alter table financial_entries add column if not exists payment_account text;
-create index if not exists financial_entries_user_id_idx on financial_entries(user_id);
 
-create table if not exists money_snapshots (
+create table if not exists public.money_snapshots (
   id text primary key,
   user_id uuid not null,
   date timestamptz not null,
@@ -80,9 +107,8 @@ create table if not exists money_snapshots (
   note text,
   created_at timestamptz default now()
 );
-create index if not exists money_snapshots_user_id_idx on money_snapshots(user_id);
 
-create table if not exists user_tools (
+create table if not exists public.user_tools (
   id text primary key,
   user_id uuid not null,
   name text not null,
@@ -91,20 +117,21 @@ create table if not exists user_tools (
   category text not null default 'Productividad',
   tags text[] default '{}',
   free boolean default true,
-  cost numeric default 0,
-  billing_period text default 'monthly',
-  rating int default 5 check (rating between 1 and 5),
+  rating integer default 5 check (rating >= 1 and rating <= 5),
   icon text default '🔧',
   highlight boolean default false,
-  created_at timestamptz default now()
-  -- NOTE: no FK to auth.users — app uses custom UUIDs without Supabase Auth
+  created_at timestamptz default now(),
+  cost numeric default 0,
+  billing_period text default 'monthly',
+  order_index integer,
+  is_favorite boolean default false,
+  updated_at timestamptz default now()
 );
-create index if not exists user_tools_user_id_idx on user_tools(user_id);
 
--- Presupuesto mensual por categoría. `currency` = moneda en que se definió; la
--- app lo convierte en vivo a la moneda principal. `month` (YYYY-MM) reservado
--- para presupuestos distintos por mes; null = vale todos los meses.
-create table if not exists budgets (
+-- Presupuesto mensual por categoría. `currency` = moneda en que se definió (la app lo
+-- convierte en vivo a la principal). `month` (YYYY-MM) reservado para presupuestos
+-- distintos por mes; null = vale todos los meses.
+create table if not exists public.budgets (
   id text primary key,
   user_id uuid not null,
   category text not null,
@@ -114,83 +141,198 @@ create table if not exists budgets (
   updated_at timestamptz default now(),
   created_at timestamptz default now()
 );
-create index if not exists budgets_user_id_idx on budgets(user_id);
 
--- Paywall: cada pago de Stripe queda registrado aquí por la Edge Function
--- verify-payment (code = checkout session id). Crear una cuenta nueva exige
--- un pago verificado; `used` garantiza que un pago solo crea UNA cuenta.
--- El email se actualiza al de la cuenta creada para que Ajustes muestre el plan.
-create table if not exists paid_codes (
+-- Pagos: cada compra verificada por la Edge Function verify-payment
+-- (code = id de la sesión de Stripe; `used` = ya se creó una cuenta con ese pago).
+create table if not exists public.paid_codes (
   code text primary key,
   name text,
-  email text,                      -- customer email from Stripe, used for lookup
   paid_at timestamptz default now(),
   stripe_session_id text,
   used boolean default false,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  email text                    -- correo de la CUENTA de Rumbo (no el de Stripe)
 );
-create index if not exists paid_codes_session_idx on paid_codes(stripe_session_id);
-create index if not exists paid_codes_email_idx   on paid_codes(email);
+
+-- La "libreta" de suscripciones: quién tiene acceso y por qué. La mantiene la Edge
+-- Function stripe-webhook a partir de los avisos de Stripe.
+create table if not exists public.subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,                          -- siempre en minúsculas
+  user_id uuid,
+  plan_kind text not null default 'paid' check (plan_kind in ('paid', 'free_forever')),
+  status text not null,                         -- active, trialing, past_due, canceled, unpaid…
+  stripe_customer_id text,
+  stripe_subscription_id text unique,           -- null en las cuentas gratis
+  current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
+  trial_end timestamptz,
+  last_event_at timestamptz,                    -- último aviso de Stripe aplicado (anti-desorden)
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (email = lower(email))
+);
+
+-- Avisos de Stripe ya recibidos: si Stripe repite uno, no se procesa dos veces.
+create table if not exists public.stripe_events (
+  id text primary key,                          -- id del evento de Stripe (evt_...)
+  type text not null,
+  received_at timestamptz not null default now(),
+  processed_at timestamptz,
+  error text                                    -- nota si se ignoró o falló
+);
 
 -- =============================================
--- Pre-cargar las dos sesiones (Pau y Michelle)
+-- 2. Actualización de bases antiguas
+--    (columnas que se añadieron después de crear las tablas; no hace nada si ya existen)
 -- =============================================
 
-insert into profiles (user_id, name, email)
-values
-  ('11111111-1111-1111-1111-111111111111', 'Pau', 'pau@rumbo.app'),
-  ('22222222-2222-2222-2222-222222222222', 'Michelle', 'michelle@rumbo.app')
-on conflict (user_id) do nothing;
+alter table public.profiles add column if not exists primary_currency text;
+alter table public.profiles add column if not exists profile_id text;
+alter table public.profiles add column if not exists emoji text;
+alter table public.profiles add column if not exists color text;
+alter table public.profiles add column if not exists initials text;
+alter table public.profiles add column if not exists income_type text;
+alter table public.profiles add column if not exists pin_hash text;
+
+alter table public.goals add column if not exists timeframe text;
+alter table public.goals add column if not exists unit text;
+
+alter table public.tasks add column if not exists recurrence text;
+alter table public.tasks add column if not exists last_generated_date timestamptz;
+alter table public.tasks add column if not exists manual_order_index integer;
+
+alter table public.financial_entries add column if not exists currency text;
+alter table public.financial_entries add column if not exists amount_in_primary numeric;
+alter table public.financial_entries add column if not exists recurrence text;
+alter table public.financial_entries add column if not exists last_generated_date timestamptz;
+alter table public.financial_entries add column if not exists payment_method text;
+alter table public.financial_entries add column if not exists payment_account text;
+
+alter table public.user_tools add column if not exists cost numeric default 0;
+alter table public.user_tools add column if not exists billing_period text default 'monthly';
+alter table public.user_tools add column if not exists order_index integer;
+alter table public.user_tools add column if not exists is_favorite boolean default false;
+alter table public.user_tools add column if not exists updated_at timestamptz default now();
 
 -- =============================================
--- RLS por usuario (Supabase Auth)
--- Cada usuario inicia sesión con email + contraseña; user_id = auth.uid().
--- La base de datos GARANTIZA que cada uno solo lee/escribe sus propias filas,
--- aunque tenga la clave anon. NO uses políticas "using(true)": reabren todo.
+-- 3. Índices
 -- =============================================
 
-alter table profiles enable row level security;
-alter table goals enable row level security;
-alter table tasks enable row level security;
-alter table financial_entries enable row level security;
-alter table money_snapshots enable row level security;
-alter table user_tools enable row level security;
-alter table budgets enable row level security;
-alter table paid_codes enable row level security;
+create index if not exists goals_user_id_idx on public.goals (user_id);
+create index if not exists tasks_user_id_idx on public.tasks (user_id);
+create index if not exists financial_entries_user_id_idx on public.financial_entries (user_id);
+create index if not exists money_snapshots_user_id_idx on public.money_snapshots (user_id);
+create index if not exists budgets_user_id_idx on public.budgets (user_id);
+create index if not exists user_tools_favorite_idx on public.user_tools (user_id, is_favorite);
+create index if not exists user_tools_order_idx on public.user_tools (user_id, order_index);
+create index if not exists paid_codes_session_idx on public.paid_codes (stripe_session_id);
+create index if not exists paid_codes_email_idx on public.paid_codes (email);
+create index if not exists subscriptions_email_idx on public.subscriptions (email);
+create index if not exists subscriptions_user_idx on public.subscriptions (user_id);
+-- Una persona solo puede tener UNA fila de "gratis para siempre".
+create unique index if not exists subscriptions_one_free_per_email
+  on public.subscriptions (email) where plan_kind = 'free_forever';
 
--- Borra políticas previas (abiertas o no) para que el script sea repetible.
-drop policy if exists "open_all_profiles" on profiles;
-drop policy if exists "open_all_goals" on goals;
-drop policy if exists "open_all_tasks" on tasks;
-drop policy if exists "open_all_financial_entries" on financial_entries;
-drop policy if exists "open_all_money_snapshots" on money_snapshots;
-drop policy if exists "open_all_user_tools" on user_tools;
-drop policy if exists "anon_read_paid_codes"   on paid_codes;
-drop policy if exists "anon_update_paid_codes" on paid_codes;
-drop policy if exists "own_profiles" on profiles;
-drop policy if exists "own_goals" on goals;
-drop policy if exists "own_tasks" on tasks;
-drop policy if exists "own_financial_entries" on financial_entries;
-drop policy if exists "own_money_snapshots" on money_snapshots;
-drop policy if exists "own_user_tools" on user_tools;
-drop policy if exists "own_budgets" on budgets;
+-- =============================================
+-- 4. Disparador: `updated_at` de las herramientas se actualiza solo en cada cambio
+--    (la sincronización lo usa para decidir qué edición es más reciente)
+-- =============================================
 
--- Cada usuario solo puede ver/editar sus propias filas.
-create policy "own_profiles" on profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "own_goals" on goals for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "own_tasks" on tasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "own_financial_entries" on financial_entries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "own_money_snapshots" on money_snapshots for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "own_user_tools" on user_tools for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "own_budgets" on budgets for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create or replace function public.user_tools_touch_updated_at()
+returns trigger
+language plpgsql
+set search_path to 'pg_catalog'
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
 
--- Realtime para que otros dispositivos vean los cambios al instante.
-alter publication supabase_realtime add table budgets;
+drop trigger if exists user_tools_touch_updated_at_trg on public.user_tools;
+create trigger user_tools_touch_updated_at_trg
+  before update on public.user_tools
+  for each row execute function public.user_tools_touch_updated_at();
 
--- paid_codes: las Edge Functions (service role) leen y escriben saltándose RLS.
--- Desde el cliente solo se permite UNA lectura: la fila cuyo email coincide con
--- el del propio JWT, para que Ajustes muestre el plan. Nada de escrituras.
-drop policy if exists "read_own_paid_code" on paid_codes;
-create policy "read_own_paid_code" on paid_codes
+-- =============================================
+-- 5. Seguridad por filas (RLS)
+--    Cada usuario solo lee y escribe sus propias filas, aunque tenga la clave anon.
+--    NO uses políticas "using (true)": reabren todo.
+-- =============================================
+
+alter table public.profiles enable row level security;
+alter table public.goals enable row level security;
+alter table public.tasks enable row level security;
+alter table public.financial_entries enable row level security;
+alter table public.money_snapshots enable row level security;
+alter table public.user_tools enable row level security;
+alter table public.budgets enable row level security;
+alter table public.paid_codes enable row level security;
+alter table public.subscriptions enable row level security;
+alter table public.stripe_events enable row level security;
+
+-- Políticas antiguas (abiertas o con otro nombre), por si se ejecuta sobre una base vieja.
+drop policy if exists "open_all_profiles" on public.profiles;
+drop policy if exists "open_all_goals" on public.goals;
+drop policy if exists "open_all_tasks" on public.tasks;
+drop policy if exists "open_all_financial_entries" on public.financial_entries;
+drop policy if exists "open_all_money_snapshots" on public.money_snapshots;
+drop policy if exists "open_all_user_tools" on public.user_tools;
+drop policy if exists "anon_read_paid_codes" on public.paid_codes;
+drop policy if exists "anon_update_paid_codes" on public.paid_codes;
+
+drop policy if exists "own_profiles" on public.profiles;
+drop policy if exists "own_goals" on public.goals;
+drop policy if exists "own_tasks" on public.tasks;
+drop policy if exists "own_financial_entries" on public.financial_entries;
+drop policy if exists "own_money_snapshots" on public.money_snapshots;
+drop policy if exists "own_user_tools" on public.user_tools;
+drop policy if exists "own_budgets" on public.budgets;
+drop policy if exists "read_own_paid_code" on public.paid_codes;
+drop policy if exists "read_own_subscription" on public.subscriptions;
+
+create policy "own_profiles" on public.profiles for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_goals" on public.goals for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_tasks" on public.tasks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_financial_entries" on public.financial_entries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_money_snapshots" on public.money_snapshots for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_user_tools" on public.user_tools for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_budgets" on public.budgets for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- paid_codes y subscriptions: las Edge Functions (service role) escriben saltándose RLS.
+-- Desde el cliente solo se permite LEER la fila propia; nada de escrituras.
+-- stripe_events: sin políticas = invisible para el cliente.
+create policy "read_own_paid_code" on public.paid_codes
   for select to authenticated
-  using (email is not null and email = lower(coalesce(auth.jwt()->>'email', '')));
+  using (email is not null and email = lower(coalesce(auth.jwt() ->> 'email', '')));
+
+create policy "read_own_subscription" on public.subscriptions
+  for select to authenticated
+  using (
+    user_id = auth.uid()
+    or email = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
+
+-- =============================================
+-- 6. Tiempo real: la app se suscribe a estas tablas para ver los cambios al instante
+--    desde otros dispositivos.
+-- =============================================
+
+do $$
+declare
+  t text;
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    foreach t in array array['profiles','goals','tasks','financial_entries','money_snapshots','user_tools','budgets']
+    loop
+      if not exists (
+        select 1 from pg_publication_tables
+        where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+      ) then
+        execute format('alter publication supabase_realtime add table public.%I', t);
+      end if;
+    end loop;
+  end if;
+end $$;

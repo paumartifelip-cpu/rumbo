@@ -1,4 +1,5 @@
 -- Rumbo · suscripciones (fase 0 y 1 del plan de pago seguro)
+-- Ya incluido en supabase/schema.sql (que refleja la base de datos real).
 -- Ejecutar UNA vez en Supabase → SQL Editor. Es idempotente: se puede repetir.
 -- No toca ninguna tabla existente salvo hacer una copia de seguridad de paid_codes.
 
