@@ -109,5 +109,5 @@ values ('GRANT-<algo-unico>', 'su@email.com', 'Su Nombre', true);
 
 ## Nota sobre la función `stripe-webhook`
 
-Es del paywall antiguo (códigos de acceso). Sigue desplegada pero ya no se usa;
-se puede borrar cuando quieras.
+Antes era del paywall antiguo (códigos de acceso) y no se usaba. Ahora es el receptor de
+avisos de Stripe que mantiene la tabla `subscriptions`. Ver `supabase/SUBSCRIPTIONS_SETUP.md`.

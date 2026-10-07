@@ -1,0 +1,57 @@
+# Suscripciones — fases 0 y 1 (guía sencilla)
+
+Objetivo: que Rumbo **sepa de verdad quién paga**, haciéndole caso a Stripe.
+Estas fases solo ANOTAN; **no bloquean a nadie**.
+
+Cómo funciona: Stripe "llama por teléfono" a la función `stripe-webhook` cada vez que
+algo cambia (alta, renovación, cobro fallido, cancelación) y esta lo apunta en la tabla
+`subscriptions`. La regla "¿tiene acceso?" está en
+`supabase/functions/stripe-webhook/subscription.ts` (`hasAccess`) y tiene tests.
+
+## Pasos (en este orden)
+
+### 1. Crear las tablas (Supabase)
+Pega **todo** `supabase/migrations/20261007_subscriptions.sql` en Supabase → SQL Editor → Run.
+Hace una copia de seguridad de los pagos actuales y crea `subscriptions` y `stripe_events`.
+No toca nada existente.
+
+### 2. Marcar las cuentas "gratis para siempre"
+En el SQL Editor (los correos NO se guardan en el repositorio porque es público):
+
+```sql
+insert into public.subscriptions (email, user_id, plan_kind, status, note)
+select lower(u.email), u.id, 'free_forever', 'active', 'cuenta fundadora'
+from auth.users u
+where lower(u.email) in ('correo1@...', 'correo2@...')   -- pon aquí los correos
+on conflict do nothing;
+```
+
+### 3. Crear el aviso en Stripe
+Stripe → Developers → Webhooks → **Add endpoint**:
+- URL: `https://rwizskngajpmuisbdsaz.supabase.co/functions/v1/stripe-webhook`
+- Eventos: `checkout.session.completed`, `customer.subscription.created`,
+  `customer.subscription.updated`, `customer.subscription.deleted`
+- Copia el "Signing secret" (empieza por `whsec_`).
+
+Haz primero todo esto en **modo de pruebas** de Stripe; el modo real después.
+
+### 4. Guardar el secreto en Supabase
+Supabase → Edge Functions → Secrets → `STRIPE_WEBHOOK_SECRET` = el `whsec_...`.
+(`STRIPE_SECRET_KEY` ya existe: la usa `verify-payment`.)
+
+### 5. Publicar la función
+Publicar `supabase/functions/stripe-webhook` en Supabase con JWT verification **desactivado**.
+
+### 6. Probar con dinero de mentira
+Hacer una compra de prueba (tarjeta `4242 4242 4242 4242`) y comprobar que aparece una fila
+en `subscriptions` y otra en `stripe_events` con `processed_at` relleno.
+Repetir con una cancelación y con un cobro fallido (tarjeta `4000 0000 0000 0341`).
+
+### 7. (Fase 2) Poner al día a quien ya paga
+Stripe no reenvía avisos antiguos. Los pagos existentes se incorporan haciendo que Stripe
+emita un aviso nuevo de cada suscripción, o con un script de una sola vez. Se hace juntos,
+después de comprobar el paso 6.
+
+## Qué NO hace todavía
+No bloquea el acceso, no cierra el registro libre y no añade el botón de baja. Eso son las
+fases 3, 4 y 5 del plan.
