@@ -39,6 +39,7 @@ import {
   UserTool,
 } from "./types";
 import { uid } from "./utils";
+import { sanitizePayment } from "./paymentMethods";
 import { BudgetAlert, budgetAlertForNewExpense, budgetId } from "./budgets";
 
 interface RumboState {
@@ -93,7 +94,7 @@ function listSignature(arr: Array<Record<string, any>>): string {
         x.highlight, x.order_index, x.updated_at,
         x.description, x.timeframe, x.unit, x.due_date, x.goal_id,
         x.manual_order_index, x.estimated_minutes, x.energy_level,
-        x.difficulty, x.urgency, x.money_impact, x.url, x.month,
+        x.difficulty, x.urgency, x.money_impact, x.url, x.month, x.payment_method, x.payment_account,
       ].join("")
     )
     .sort()
@@ -1190,7 +1191,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     // every downstream sum well-defined no matter what the form passes in.
     const amount = Number(f.amount);
     if (!Number.isFinite(amount) || amount <= 0) return;
-    f = { ...f, amount };
+    const { payment_method: _pm, payment_account: _pa, ...rest } = f;
+    f = { ...rest, amount, ...sanitizePayment(f.payment_method, f.payment_account) };
     // Aviso de presupuesto: se calcula ANTES de añadir, con el estado actual,
     // y solo salta al cruzar el 80 % o el 100 % de la categoría.
     {

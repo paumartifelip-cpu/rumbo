@@ -15,6 +15,8 @@ export type EnergyLevel = "baja" | "media" | "alta";
 
 export type TaskStatus = "pendiente" | "en_curso" | "completada" | "descartada";
 
+export type PaymentMethod = "efectivo" | "debito" | "credito" | "transferencia" | "bizum";
+
 export type FinancialType = "ingreso" | "gasto" | "ahorro" | "deuda";
 
 export interface User {
@@ -72,6 +74,8 @@ export interface FinancialEntry {
   amount_in_primary?: number; // Snapshot of the value in primary currency at creation time
   date: string;
   category?: string;
+  payment_method?: PaymentMethod; // opcional: cómo se pagó el gasto
+  payment_account?: string; // opcional: nombre de la tarjeta (solo débito/crédito)
   recurrence?: "mensual" | "anual";
   last_generated_date?: string; // ISO date of last duplication
   created_at: string;

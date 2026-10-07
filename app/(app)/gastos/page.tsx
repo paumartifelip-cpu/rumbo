@@ -7,6 +7,9 @@ import { CashflowHero } from "@/components/CashflowHero";
 import { SpendingTrend } from "@/components/SpendingTrend";
 import { Reveal } from "@/components/Reveal";
 import { BudgetsCard } from "@/components/BudgetsCard";
+import { PaymentMethodPicker } from "@/components/PaymentMethodPicker";
+import { paymentLabel } from "@/lib/paymentMethods";
+import type { PaymentMethod } from "@/lib/types";
 import { AddExpenseSheet } from "@/components/AddExpenseSheet";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES, Currency, formatCurrency } from "@/lib/currency";
@@ -418,7 +421,9 @@ export default function GastosPage() {
     recurrence: "" | "mensual";
     currency: Currency;
     category: QuickCat;
-  }>({ title: "", amount: "", recurrence: "", currency: primaryCurrency, category: null });
+    payMethod: PaymentMethod | null;
+    payAccount: string;
+  }>({ title: "", amount: "", recurrence: "", currency: primaryCurrency, category: null, payMethod: null, payAccount: "" });
 
   const [selectedSubIds, setSelectedSubIds] = useState<string[]>([]);
   const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([]);
@@ -571,7 +576,12 @@ export default function GastosPage() {
                                         {f.title}
                                         {f.recurrence && <span title="Gasto fijo mensual" className="text-[10px] bg-slate-100 px-1 rounded">🔁</span>}
                                       </div>
-                                      <div className="text-xs text-rumbo-muted mt-0.5">{formatDate(f.date)}</div>
+                                      <div className="text-xs text-rumbo-muted mt-0.5">
+                        {formatDate(f.date)}
+                        {f.payment_method && (
+                          <span> · {paymentLabel(f.payment_method)}{f.payment_account ? ` ${f.payment_account}` : ""}</span>
+                        )}
+                      </div>
                                       <div className="mt-1.5">
                                         <CategoryPicker
                                           current={f.category}
@@ -607,8 +617,9 @@ export default function GastosPage() {
       date: selectedDate.toISOString(),
       ...(form.recurrence ? { recurrence: form.recurrence } : {}),
       ...(form.category ? { category: form.category } : {}),
+      ...(form.payMethod ? { payment_method: form.payMethod, payment_account: form.payAccount } : {}),
     });
-    setForm({ title: "", amount: "", recurrence: "", currency: primaryCurrency, category: null });
+    setForm({ title: "", amount: "", recurrence: "", currency: primaryCurrency, category: null, payMethod: null, payAccount: "" });
   }
 
   return (
@@ -711,6 +722,14 @@ export default function GastosPage() {
                 Clasificación automática
               </button>
             )}
+          </div>
+
+          <div className="mt-3">
+            <PaymentMethodPicker
+              method={form.payMethod}
+              account={form.payAccount}
+              onChange={(m, a) => setForm({ ...form, payMethod: m, payAccount: a })}
+            />
           </div>
 
           {form.currency !== primaryCurrency && typeof form.amount === "number" && form.amount > 0 && (

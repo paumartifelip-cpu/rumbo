@@ -64,8 +64,12 @@ create table if not exists financial_entries (
   amount numeric not null,
   date timestamptz default now(),
   category text,
+  payment_method text,   -- efectivo | debito | credito | transferencia | bizum (opcional)
+  payment_account text,  -- nombre de la tarjeta, solo débito/crédito (opcional)
   created_at timestamptz default now()
 );
+alter table financial_entries add column if not exists payment_method text;
+alter table financial_entries add column if not exists payment_account text;
 create index if not exists financial_entries_user_id_idx on financial_entries(user_id);
 
 create table if not exists money_snapshots (

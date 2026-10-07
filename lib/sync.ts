@@ -1,5 +1,6 @@
 import { Currency, CURRENCIES } from "./currency";
 import { Profile } from "./profiles";
+import { isPaymentMethod } from "./paymentMethods";
 import { getSupabase } from "./supabase";
 import {
   Budget,
@@ -413,6 +414,8 @@ const stripFinance = (userId: string) => (f: FinancialEntry) => ({
   amount_in_primary: f.amount_in_primary ?? null,
   date: f.date,
   category: f.category ?? null,
+  payment_method: f.payment_method ?? null,
+  payment_account: f.payment_account ?? null,
   recurrence: f.recurrence ?? null,
   last_generated_date: f.last_generated_date ?? null,
   created_at: f.created_at,
@@ -530,6 +533,8 @@ function normalizeFinance(r: any): FinancialEntry {
     amount_in_primary: r.amount_in_primary != null ? Number(r.amount_in_primary) : undefined,
     date: r.date,
     category: r.category ?? undefined,
+    payment_method: isPaymentMethod(r.payment_method) ? r.payment_method : undefined,
+    payment_account: r.payment_account ?? undefined,
     recurrence: r.recurrence ?? undefined,
     last_generated_date: r.last_generated_date ?? undefined,
     created_at: r.created_at,

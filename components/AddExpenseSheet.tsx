@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Sheet } from "./Sheet";
 import { useFormatMoney, useRumbo } from "@/lib/store";
 import { CURRENCIES, Currency } from "@/lib/currency";
+import { PaymentMethodPicker } from "@/components/PaymentMethodPicker";
+import { PaymentMethod } from "@/lib/types";
 
 const QUICK_CATS = [
   { key: "Comida",      icon: "🍽️", label: "Comida" },
@@ -35,6 +37,8 @@ export function AddExpenseSheet({
   const [amount, setAmount] = useState<number | "">("");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<QuickCat>(null);
+  const [payMethod, setPayMethod] = useState<PaymentMethod | null>(null);
+  const [payAccount, setPayAccount] = useState("");
   const [recurrence, setRecurrence] = useState<"" | "mensual">("");
   const [currency, setCurrency] = useState<Currency>(primaryCurrency);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
@@ -45,6 +49,8 @@ export function AddExpenseSheet({
     setAmount("");
     setTitle("");
     setCategory(null);
+    setPayMethod(null);
+    setPayAccount("");
     setRecurrence("");
     setCurrency(primaryCurrency);
     setShowCurrencyPicker(false);
@@ -64,6 +70,7 @@ export function AddExpenseSheet({
       date: date.toISOString(),
       ...(recurrence ? { recurrence } : {}),
       ...(category ? { category } : {}),
+      ...(payMethod ? { payment_method: payMethod, payment_account: payAccount } : {}),
     });
     onClose();
   }
@@ -197,6 +204,13 @@ export function AddExpenseSheet({
               </p>
             )}
           </div>
+
+          {/* Pagado con — opcional y plegado: no frena el registro rápido */}
+          <PaymentMethodPicker
+            method={payMethod}
+            account={payAccount}
+            onChange={(m, a) => { setPayMethod(m); setPayAccount(a); }}
+          />
 
           {/* Concepto */}
           <div>
