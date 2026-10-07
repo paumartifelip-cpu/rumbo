@@ -1,3 +1,4 @@
+import { categoriaPorPalabras } from "./categorias";
 import { Goal, Task } from "./types";
 
 const ENDPOINT =
@@ -166,9 +167,8 @@ No incluyas texto adicional fuera del JSON.`;
  */
 // IMPORTANT: only the 9 fixed categories may ever be produced:
 // Comida · Transporte · Alojamiento · Trabajo · Compras · Educación · Salud ·
-// Caridad · Otros.
-// "Trabajo" is assigned manually by the user; the heuristic detects the rest
-// and returns null (→ caller defaults to "Otros") when nothing matches.
+// Caridad · Otros. Las palabras de cada una están en lib/categorias.ts; si ninguna
+// coincide devuelve null (→ el llamador pone "Otros").
 export const EXPENSE_CATEGORIES = [
   "Comida",
   "Transporte",
@@ -181,86 +181,8 @@ export const EXPENSE_CATEGORIES = [
   "Otros",
 ] as const;
 
-/**
- * Vocabulario muy habitual en México y Latinoamérica que las reglas pensadas para
- * España no reconocían (un usuario real tuvo 10 de 14 gastos en "Otros"). Va PRIMERO y
- * solo contiene palabras poco ambiguas; el orden importa: "mercado libre" es Compras
- * aunque "mercado" a secas sea Comida.
- * Recibe el texto ya en minúsculas y sin tildes.
- */
-function latamCategorize(t: string): string | null {
-  if (/(mercado ?libre|mercadolibre|liverpool|coppel|elektra|\btemu\b)/.test(t)) return "Compras";
-
-  // Alojamiento: cuota de mantenimiento del edificio, predial y servicios del hogar.
-  if (
-    /(\bmantto\b|cuota de mantenimiento|mantenimiento (de |del )?(edificio|casa|depa|departamento|condominio|fraccionamiento)|predial|\bcfe\b|telmex|totalplay|izzi|megacable|infonavit)/.test(t)
-  )
-    return "Alojamiento";
-
-  if (/(pemex|\bcaseta\b|\bcamion\b|metrobus|\bdidi\b|\bcombi\b|\btransporte\b|estacionamiento)/.test(t))
-    return "Transporte";
-
-  // "mercado" a secas es de comida, salvo Mercado Libre (compras) y Mercado Pago (pagos).
-  if (
-    /(\bsuper\b|tianguis|\bmercado\b(?! ?(libre|pago))|oxxo|walmart|soriana|chedraui|\bheb\b|bodega aurrera|costco|sams club|la comer|tortiller|abarrotes|taqueria|antojitos|\bcomida\b|\bcomer\b)/.test(t)
-  )
-    return "Comida";
-
-  return null;
-}
-
 export function heuristicCategorize(title: string): string | null {
-  const t = title
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
-
-  const latam = latamCategorize(t);
-  if (latam) return latam;
-
-  // Caridad (donaciones)
-  if (
-    /(donacion|donativo|caridad|\bong\b|cruz roja|caritas|unicef|oxfam|medicos sin fronteras|greenpeace|manos unidas|diezmo|ofrenda|limosna|crowdfunding solidario|charity|donation|donate)/.test(t)
-  )
-    return "Caridad";
-
-  // Salud
-  if (
-    /(farmacia|medico|doctor|dentista|ortodoncia|hospital|clinica|urgencias|fisio|psicolog|terapia|oculista|optica|gafas|lentillas|dermatolog|podolog|nutricionista|analitica|vacuna|medicamento|ibuprofeno|paracetamol|sanitas|adeslas|asisa|dkv|seguro medico|health|pharmacy|dentist)/.test(t)
-  )
-    return "Salud";
-
-  // Educación
-  if (
-    /(curso|universidad|matricula|colegio|escuela|academia|clases|\bmaster\b|grado|oposicion|udemy|coursera|domestika|skillshare|duolingo|idiomas|guarderia|libros de texto|tutoria|formacion|bootcamp|tuition|school|university)/.test(t)
-  )
-    return "Educación";
-
-  // Alojamiento (vivienda, suministros, hoteles y viajes)
-  if (
-    /(alquiler|hipoteca|comunidad|ibi|derrama|portero|ascensor|piso|casa|apartamento|habitacion|studio|flat|rent|mortgage|electricity|electric|luz|agua|calefaccion|caldera|gas natural|wifi|internet|fibra|router|modem|vodafone|movistar|orange|digi|yoigo|euskaltel|hotel|hostal|pension|airbnb|booking|trivago|edreams|lastminute|resort|camping|glamping|balneario)/.test(t)
-  )
-    return "Alojamiento";
-
-  // Comida (supermercados, alimentación, restaurantes y bares)
-  if (
-    /(mercadona|carrefour|lidl|aldi|dia |eroski|consum|alcampo|hipercor|bonpreu|condis|coviran|spar|froiz|supercor|supermercado|fruteria|verduleria|carniceria|pescaderia|panaderia|pasteleria|charcuteria|colmado|ultramarinos|alimentacion|grocery|supermarket|glovo|just eat|deliveroo|uber eats|rappi|getir|gorillas|restaurante|restaurant|bar |cafeteria|cafe |coffee|starbucks|mcdonalds|mcdonald|burger king|kfc|dominos|telepizza|pizza hut|subway|five guys|popeyes|foster|taco bell|tapas|bocadillo|bocata|menu del dia|cena|almuerzo|desayuno|brunch|sushi|ramen|kebab|hamburgues|poke)/.test(t)
-  )
-    return "Comida";
-
-  // Transporte
-  if (
-    /(uber|cabify|bolt|taxi|blablacar|gasolina|gasolinera|repsol|bp |cepsa|shell|esso|carburante|fuel|metro|bus |autobus|renfe|ave |cercanias|fgc|emt |tmb|tram|bicing|nextbike|voi |lime |tier |peaje|autopista|parking|aparcamiento|garaje|itv|seguro.*coche|coche|moto|ciclomotor|patinete|bicicleta|vueling|iberia|ryanair|easyjet|wizz|air europa|level|transavia|ferry|barco|crucero|aerolinea|flight|avion)/.test(t)
-  )
-    return "Transporte";
-
-  // Compras (moda, electrónica, hogar y comercio)
-  if (
-    /(amazon|ebay|aliexpress|shein|zara|h&m|mango|bershka|stradivarius|pull.*bear|massimo dutti|el corte ingles|primark|lefties|calzedonia|intimissimi|decathlon|nike|adidas|puma|new balance|vans|converse|timberland|zalando|asos|farfetch|vinted|wallapop|fnac|media markt|pc componentes|phone house|apple store|ikea|leroy merlin|aki |bricomart|bauhaus|worten|ropa|zapatillas|zapatos|vestido|pantalon|camisa|chaqueta|abrigo|complementos|bolso|cartera|reloj|joya|mueble|sofa|cama|colchon|electrodomestico|nevera|lavadora|secadora|microondas|television|movil|ordenador|portatil|tablet|auriculares|altavoz|camara)/.test(t)
-  )
-    return "Compras";
-
-  return null; // sin coincidencia → el llamador asigna "Otros"
+  return categoriaPorPalabras(title); // las palabras viven en lib/categorias.ts
 }
 
 /**
