@@ -69,23 +69,6 @@ export default function LandingPage() {
         </Link>
       </header>
 
-      {/* ── VISTA PREVIA DE LA APP ───────────────────────────────────────── */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="px-4 md:px-12 pt-2 relative z-10"
-      >
-        <Image
-          src="/rumbo-app.jpg"
-          priority
-          width={1672}
-          height={941}
-          alt="Pantalla de Gastos de Rumbo: añadir gasto, categorías, ingresos, gastos, ahorro y progreso"
-          className="w-full max-w-5xl mx-auto h-auto rounded-3xl shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)]"
-        />
-      </motion.div>
-
       {/* ── HERO (estilo original intacto) ───────────────────────────────── */}
       <section className="relative min-h-[88vh] flex items-center justify-center px-6 pt-6 pb-20">
         {FLOATERS.map((f) => (
@@ -206,6 +189,24 @@ export default function LandingPage() {
             </motion.div>
           ))}
         </div>
+      </Section>
+
+      {/* ── VISTA PREVIA DE LA APP (tras "Así de fácil") ─────────────────── */}
+      <Section>
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.5 }}
+        >
+          <Image
+            src="/rumbo-app.jpg"
+            width={1672}
+            height={941}
+            alt="Pantalla de Gastos de Rumbo: añadir gasto, categorías, ingresos, gastos, ahorro y progreso"
+            className="w-full h-auto rounded-3xl shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)]"
+          />
+        </motion.div>
       </Section>
 
       {/* ── PRIVACIDAD / CONFIANZA ───────────────────────────────────────── */}
