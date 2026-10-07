@@ -35,8 +35,14 @@ Stripe → Developers → Webhooks → **Add endpoint**:
 
 Haz primero todo esto en **modo de pruebas** de Stripe; el modo real después.
 
-### 4. Guardar el secreto en Supabase
-Supabase → Edge Functions → Secrets → `STRIPE_WEBHOOK_SECRET` = el `whsec_...`.
+### 4. Guardar los secretos en Supabase
+Supabase → Edge Functions → Secrets:
+- `STRIPE_WEBHOOK_SECRET` = el `whsec_...` del paso 3.
+- `STRIPE_RUMBO_PRICE_IDS` = el/los precio(s) de Rumbo, separados por comas
+  (`price_...`; en Stripe → Catálogo de productos → el producto de Rumbo → el precio → su ID).
+  **Imprescindible:** esa cuenta de Stripe la comparten otros negocios, y sin esta lista
+  la función NO anota nada (así no se mezclan clientes ajenos). Si algún día añades un plan
+  anual, añade su `price_...` a la lista.
 (`STRIPE_SECRET_KEY` ya existe: la usa `verify-payment`.)
 
 ### 5. Publicar la función

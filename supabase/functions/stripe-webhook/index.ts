@@ -7,12 +7,16 @@
 // Secretos necesarios (Supabase → Edge Functions → Secrets):
 //   STRIPE_SECRET_KEY      clave secreta de Stripe (la misma de verify-payment)
 //   STRIPE_WEBHOOK_SECRET  "Signing secret" (whsec_...) del endpoint creado en Stripe
+//   STRIPE_RUMBO_PRICE_IDS precios de Rumbo separados por comas (price_...). La cuenta de
+//                          Stripe tiene también otros negocios: sin esto NO se anota nada.
 
 import Stripe from 'https://esm.sh/stripe@14.21.0?target=denonext';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import {
   isHandledEvent,
+  isRumboSubscription,
   normalizeEmail,
+  parsePriceIds,
   rowFromSubscription,
   shouldApplyEvent,
 } from './subscription.ts';
@@ -22,6 +26,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
   httpClient: Stripe.createFetchHttpClient(),
 });
 const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? '';
+const rumboPriceIds = parsePriceIds(Deno.env.get('STRIPE_RUMBO_PRICE_IDS'));
 const supa = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -90,6 +95,9 @@ async function handleEvent(event: Stripe.Event) {
   } else {
     sub = event.data.object as Stripe.Subscription;
   }
+
+  // La cuenta de Stripe es compartida con otros negocios: solo suscripciones de Rumbo.
+  if (!isRumboSubscription(sub, rumboPriceIds)) return;
 
   if (!email) {
     const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;

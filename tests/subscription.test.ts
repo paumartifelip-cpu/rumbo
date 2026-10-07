@@ -3,6 +3,8 @@ import {
   GRACE_DAYS,
   hasAccess,
   isHandledEvent,
+  isRumboSubscription,
+  parsePriceIds,
   rowFromSubscription,
   shouldApplyEvent,
   type AccessRow,
@@ -114,5 +116,42 @@ describe("isHandledEvent", () => {
     expect(isHandledEvent("checkout.session.completed")).toBe(true);
     expect(isHandledEvent("invoice.paid")).toBe(false);
     expect(isHandledEvent("charge.succeeded")).toBe(false);
+  });
+});
+
+describe("solo suscripciones de Rumbo (la cuenta de Stripe es compartida)", () => {
+  const sub = (priceIds: string[]) => ({
+    id: "sub_1",
+    status: "active",
+    customer: "cus_1",
+    items: { data: priceIds.map((id) => ({ price: { id } })) },
+  });
+
+  it("acepta una suscripción con un precio de Rumbo", () => {
+    expect(isRumboSubscription(sub(["price_rumbo_mensual"]), ["price_rumbo_mensual", "price_rumbo_anual"])).toBe(true);
+    expect(isRumboSubscription(sub(["price_rumbo_anual"]), ["price_rumbo_mensual", "price_rumbo_anual"])).toBe(true);
+  });
+
+  it("rechaza la de otro negocio de la misma cuenta", () => {
+    expect(isRumboSubscription(sub(["price_otro_negocio"]), ["price_rumbo_mensual"])).toBe(false);
+  });
+
+  it("acepta si UNO de varios precios es de Rumbo", () => {
+    expect(isRumboSubscription(sub(["price_otro", "price_rumbo_mensual"]), ["price_rumbo_mensual"])).toBe(true);
+  });
+
+  it("falla cerrado: sin lista configurada no acepta nada", () => {
+    expect(isRumboSubscription(sub(["price_rumbo_mensual"]), [])).toBe(false);
+    expect(isRumboSubscription(sub(["price_rumbo_mensual"]), parsePriceIds(undefined))).toBe(false);
+    expect(isRumboSubscription(sub(["price_rumbo_mensual"]), parsePriceIds(""))).toBe(false);
+  });
+
+  it("rechaza suscripciones sin precios", () => {
+    expect(isRumboSubscription({ id: "s", status: "active", customer: "c" }, ["price_x"])).toBe(false);
+    expect(isRumboSubscription(sub([]), ["price_x"])).toBe(false);
+  });
+
+  it("parsePriceIds limpia espacios y descarta lo que no es un precio", () => {
+    expect(parsePriceIds(" price_a , price_b,prod_xyz,, ")).toEqual(["price_a", "price_b"]);
   });
 });

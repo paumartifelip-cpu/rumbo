@@ -42,6 +42,7 @@ export interface StripeSubscriptionLike {
   id: string;
   status: string;
   customer: string | { id: string };
+  items?: { data: Array<{ price?: { id?: string | null } | null }> } | null;
   current_period_end?: number | null; // segundos Unix
   cancel_at_period_end?: boolean | null;
   trial_end?: number | null;
@@ -58,6 +59,25 @@ export interface SubscriptionRow {
   trial_end: string | null;
   last_event_at: string;
   updated_at: string;
+}
+
+/**
+ * La cuenta de Stripe también la usan OTROS negocios (otros productos y clientes).
+ * Solo se anotan las suscripciones de Rumbo: las que tienen alguno de estos
+ * precios (price_...). Si la lista está vacía NO se acepta nada ("falla cerrado"):
+ * es mejor no anotar que mezclar clientes de otro negocio.
+ */
+export function parsePriceIds(raw?: string | null): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter((x) => x.startsWith("price_"));
+}
+
+export function isRumboSubscription(sub: StripeSubscriptionLike, allowedPriceIds: string[]): boolean {
+  if (allowedPriceIds.length === 0) return false;
+  const prices = (sub.items?.data ?? []).map((i) => i.price?.id).filter((x): x is string => Boolean(x));
+  return prices.some((p) => allowedPriceIds.includes(p));
 }
 
 const iso = (seconds?: number | null) =>
