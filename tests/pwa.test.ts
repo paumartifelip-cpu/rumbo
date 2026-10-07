@@ -85,6 +85,13 @@ describe("la web enlaza todo lo anterior", () => {
     expect(layout).toContain("capable: true");
   });
 
+  it("el color de la barra del móvil es el mismo en la página y en el manifiesto (el crema de Rumbo)", () => {
+    const m = layout.match(/themeColor: "(#[0-9A-Fa-f]{6})"/);
+    expect(m, "falta themeColor en el layout").not.toBeNull();
+    expect(m![1].toLowerCase()).toBe(manifest.theme_color.toLowerCase());
+    expect(m![1].toLowerCase()).toBe(manifest.background_color.toLowerCase());
+  });
+
   it("el programa de fondo se registra desde el layout", () => {
     expect(layout).toContain("<RegistrarSW />");
     expect(leer("components/RegistrarSW.tsx")).toContain('register("/sw.js"');
