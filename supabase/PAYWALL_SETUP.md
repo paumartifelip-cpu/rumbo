@@ -7,7 +7,7 @@ Todo usuario nuevo paga ANTES de crear su cuenta. Las cuentas que ya existían
 
 1. En `/login` (o desde la landing), "Crear cuenta" muestra el precio y un
    botón **"Pagar y crear mi cuenta →"** que abre el Payment Link de Stripe
-   (`https://buy.stripe.com/eVqcN74R81YFd9q7xz5Ne0t`, 3,99 €/mes).
+   (el link está en `lib/payment.ts`, bloque `PLAN`; hoy 3,99 €/mes).
 2. Al completar el pago, Stripe redirige a
    `https://usarumbo.com/activar?session_id={CHECKOUT_SESSION_ID}`.
 3. `/activar` llama a la Edge Function **`verify-payment`** con ese
@@ -50,6 +50,38 @@ Ya configurada por API: tras el pago, el link redirige a
 `https://usarumbo.com/activar?session_id={CHECKOUT_SESSION_ID}`.
 Si algún día cambias de dominio, actualízala en
 https://dashboard.stripe.com/payment-links.
+
+## Cambiar el link de pago (guía sencilla)
+
+Para poner otro link de Stripe (otro precio, plan anual, prueba gratis…):
+
+**1. En Stripe, crea el nuevo link de pago** y, ANTES de guardarlo, ve a
+"Después del pago" → "No mostrar página de confirmación" → "Redirigir a tu sitio
+web" y pega EXACTAMENTE esta dirección (con las llaves, tal cual):
+
+    https://usarumbo.com/activar?session_id={CHECKOUT_SESSION_ID}
+
+⚠️ Es lo más importante. Si falta, la persona paga, no vuelve a Rumbo y se queda
+sin cuenta. Después de crearlo, haz un pago de prueba (modo test) para comprobarlo.
+
+**2. Pon el link nuevo en la app.** Dos formas, elige una:
+
+- *Sin tocar código (recomendada):* en Cloudflare Pages → proyecto `rumbo` →
+  Settings → Environment variables, cambia `NEXT_PUBLIC_STRIPE_PAYMENT_URL` por el
+  link nuevo y vuelve a desplegar. Si pegas algo que no es un link de Stripe, la app
+  lo ignora y usa el anterior (no deja el botón roto).
+- *En el código:* edita `paymentUrl` dentro del bloque `PLAN` de `lib/payment.ts`.
+
+**3. Si cambia el precio, edita en ese mismo bloque `PLAN`:** `price` (número grande),
+`period` ("al mes", "al año"), `priceNote` (frase bajo el precio; vacía = ninguna),
+`summary` (lo que se ve en Ajustes → Mi plan) y `guaranteeDays` (0 = sin garantía).
+Las pantallas de registro y de Ajustes se actualizan solas.
+
+**4. Debe ser de la MISMA cuenta de Stripe.** La clave `STRIPE_SECRET_KEY` de Supabase
+pertenece a una cuenta concreta; un link de otra cuenta no se podría verificar.
+
+**Qué NO hace falta tocar:** la función `verify-payment` ni la base de datos. Aceptan
+cualquier pago completado de esa cuenta, sea cual sea el link o el precio.
 
 ## Probar el flujo
 

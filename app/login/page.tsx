@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { getSupabase } from "@/lib/supabase";
 import { signInEmail, sendPasswordReset } from "@/lib/auth";
-import { STRIPE_PAYMENT_URL, buildSupportWhatsAppUrl } from "@/lib/payment";
+import { PLAN, STRIPE_PAYMENT_URL, buildSupportWhatsAppUrl } from "@/lib/payment";
 import { CONTACT_EMAIL, INSTAGRAM_URL } from "@/lib/contact";
 
 // El link de reset de Supabase aterriza con el marcador en el hash de la URL.
@@ -162,12 +162,12 @@ function LoginInner() {
             <div className="space-y-3">
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black tracking-tight">3,99 €</span>
-                  <span className="text-sm text-rumbo-muted">al mes</span>
+                  <span className="text-3xl font-black tracking-tight">{PLAN.price}</span>
+                  <span className="text-sm text-rumbo-muted">{PLAN.period}</span>
                 </div>
-                <p className="text-xs font-semibold text-emerald-700 mt-1">
-                  Unos 13 céntimos al día · menos que un café a la semana
-                </p>
+                {PLAN.priceNote && (
+                  <p className="text-xs font-semibold text-emerald-700 mt-1">{PLAN.priceNote}</p>
+                )}
                 <ul className="mt-4 space-y-1.5 text-sm text-rumbo-ink/80">
                   <li>✓ Sabes cuánto dinero tienes de verdad, sin sustos</li>
                   <li>✓ Ves a dónde se va cada euro y dejas de perderlo</li>
@@ -177,11 +177,12 @@ function LoginInner() {
               </div>
 
               {/* Garantía prominente: elimina el miedo justo antes de pagar */}
+              {PLAN.guaranteeDays > 0 && (
               <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 flex items-center gap-3.5">
                 <span className="text-4xl shrink-0" aria-hidden>🛡️</span>
                 <div>
                   <div className="font-black text-emerald-800 text-lg leading-tight tracking-tight">
-                    Garantía de 30 días
+                    Garantía de {PLAN.guaranteeDays} días
                   </div>
                   <p className="text-[13px] text-emerald-700/90 mt-0.5 leading-snug">
                     Si no te convence, te devolvemos el dinero.{" "}
@@ -189,6 +190,7 @@ function LoginInner() {
                   </p>
                 </div>
               </div>
+              )}
 
               <a
                 href={STRIPE_PAYMENT_URL}

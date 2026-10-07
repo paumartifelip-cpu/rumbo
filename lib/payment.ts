@@ -7,12 +7,69 @@ import { getSupabase } from "./supabase";
 //   `verify-payment` comprueba el pago contra Stripe → formulario de cuenta.
 // Cada pago solo puede crear una cuenta (columna `used` en paid_codes).
 
-export const STRIPE_PAYMENT_URL =
-  process.env.NEXT_PUBLIC_STRIPE_PAYMENT_URL ||
-  "https://buy.stripe.com/eVqcN74R81YFd9q7xz5Ne0t";
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  PLAN DE PAGO — TODO LO QUE SE CAMBIA AL PONER OTRO LINK DE STRIPE ESTÁ AQUÍ  ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+// Si cambias de link de pago o de precio, edita SOLO este bloque (o la variable
+// NEXT_PUBLIC_STRIPE_PAYMENT_URL en Cloudflare, para el link). Las pantallas de
+// registro y de Ajustes leen de aquí. Ver supabase/PAYWALL_SETUP.md, sección
+// "Cambiar el link de pago", antes de cambiarlo: el nuevo link de Stripe DEBE
+// redirigir a  https://usarumbo.com/activar?session_id={CHECKOUT_SESSION_ID}
 
-export const PLAN_NAME = "Rumbo Premium";
-export const PLAN_PRICE_LABEL = "3,99 €/mes";
+const DEFAULT_PAYMENT_URL = "https://buy.stripe.com/eVqcN74R81YFd9q7xz5Ne0t";
+
+export const PLAN = {
+  name: "Rumbo Premium",
+  /** Número grande de la pantalla de registro. */
+  price: "3,99 €",
+  /** Lo que va junto al precio ("al mes", "al año"…). */
+  period: "al mes",
+  /** Frase corta bajo el precio. Déjala vacía ("") si no quieres ninguna. */
+  priceNote: "Unos 13 céntimos al día · menos que un café a la semana",
+  /** Resumen de una línea, para Ajustes → Mi plan. */
+  summary: "3,99 €/mes",
+  /** Días de garantía de devolución. Pon 0 para ocultar el aviso de garantía. */
+  guaranteeDays: 30,
+  /** Link de pago de Stripe. Se puede sobrescribir con NEXT_PUBLIC_STRIPE_PAYMENT_URL. */
+  paymentUrl: DEFAULT_PAYMENT_URL,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Un link de pago válido es una dirección https de Stripe; cualquier otra cosa se rechaza. */
+export function isStripePaymentUrl(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    const u = new URL(value.trim());
+    return (
+      u.protocol === "https:" &&
+      (u.hostname === "buy.stripe.com" || u.hostname === "checkout.stripe.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Link de pago efectivo: el de la variable de entorno si es válido; si alguien
+ * pone algo roto (una errata), cae al de PLAN en vez de dejar el botón muerto.
+ */
+export function resolvePaymentUrl(envValue: string | undefined, fallback: string): string {
+  if (isStripePaymentUrl(envValue)) return envValue.trim();
+  if (envValue) {
+    console.warn("NEXT_PUBLIC_STRIPE_PAYMENT_URL no es un link de Stripe válido; se usa el de PLAN.");
+  }
+  return fallback;
+}
+
+export const STRIPE_PAYMENT_URL = resolvePaymentUrl(
+  process.env.NEXT_PUBLIC_STRIPE_PAYMENT_URL,
+  PLAN.paymentUrl
+);
+
+// Alias antiguos: Ajustes los usa.
+export const PLAN_NAME = PLAN.name;
+export const PLAN_PRICE_LABEL = PLAN.summary;
 
 // ── Baja por WhatsApp ─────────────────────────────────────────────────────────
 
