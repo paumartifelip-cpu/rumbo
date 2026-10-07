@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CLAVE_BETA, HORAS, HORA_POR_DEFECTO, ZONAS_COMUNES, aplicarParametroAvisos, avisosBetaActivo,
-  esHora, esZonaHoraria, filaParaGuardar, normalizarPrefs, zonaDelDispositivo,
+  esHora, esZonaHoraria, filaParaGuardar, hayCambios, normalizarPrefs, zonaDelDispositivo,
 } from "@/lib/avisos";
 
 describe("horas", () => {
@@ -121,5 +121,32 @@ describe("candado de pruebas de los avisos", () => {
     const roto = { getItem: () => { throw new Error("bloqueado"); }, setItem: () => { throw new Error("bloqueado"); }, removeItem: () => { throw new Error("bloqueado"); } };
     expect(() => aplicarParametroAvisos(roto, "?avisos=1")).not.toThrow();
     expect(avisosBetaActivo(roto)).toBe(false);
+  });
+});
+
+describe("hayCambios (activa el botón Guardar)", () => {
+  const base = { reminder_enabled: true, reminder_time: "21:00", timezone: "Europe/Madrid", skip_if_logged: true };
+
+  it("sin tocar nada no hay cambios: el botón queda apagado", () => {
+    expect(hayCambios(base, { ...base })).toBe(false);
+  });
+
+  it("cualquier campo distinto cuenta como cambio", () => {
+    expect(hayCambios(base, { ...base, reminder_enabled: false })).toBe(true);
+    expect(hayCambios(base, { ...base, reminder_time: "22:00" })).toBe(true);
+    expect(hayCambios(base, { ...base, timezone: "America/Bogota" })).toBe(true);
+    expect(hayCambios(base, { ...base, skip_if_logged: false })).toBe(true);
+  });
+
+  it("volver al valor original deja de ser un cambio", () => {
+    const tocado = { ...base, reminder_time: "22:00" };
+    expect(hayCambios(base, tocado)).toBe(true);
+    expect(hayCambios(base, { ...tocado, reminder_time: "21:00" })).toBe(false);
+  });
+
+  it("mientras no se han cargado las preferencias no hay nada que guardar", () => {
+    expect(hayCambios(null, base)).toBe(false);
+    expect(hayCambios(base, null)).toBe(false);
+    expect(hayCambios(null, null)).toBe(false);
   });
 });

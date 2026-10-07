@@ -6,6 +6,7 @@ import {
   PrefsAvisos,
   ZONAS_COMUNES,
   filaParaGuardar,
+  hayCambios,
   normalizarPrefs,
   zonaDelDispositivo,
 } from "@/lib/avisos";
@@ -17,11 +18,16 @@ type Guardado = "nada" | "guardando" | "ok" | "error";
 // Preferencias del recordatorio diario. De momento NO envía nada (paso 1): solo guarda
 // qué quiere cada persona. Se lee y se escribe directamente en la tabla, sin pasar por la
 // sincronización de datos de la app, para no tocar lo delicado.
+//
+// Los cambios son un BORRADOR hasta pulsar «Guardar cambios». Para que nadie se olvide:
+// el botón solo se activa si hay algo que guardar, se avisa de que hay cambios sin guardar
+// y el navegador pregunta si se intenta salir de la página con cambios pendientes.
 export function AvisosSettings({ userId }: { userId: string }) {
   // Sin conexión con Supabase no hay nada que cargar: se sabe ya al empezar.
   const [estado, setEstado] = useState<Estado>(() => (getSupabase() ? "cargando" : "error_carga"));
   const [guardado, setGuardado] = useState<Guardado>("nada");
-  const [prefs, setPrefs] = useState<PrefsAvisos | null>(null);
+  const [prefs, setPrefs] = useState<PrefsAvisos | null>(null); // lo que se ve (borrador)
+  const [guardadas, setGuardadas] = useState<PrefsAvisos | null>(null); // lo que hay en la base de datos
   const zonaDispositivo = useRef(zonaDelDispositivo());
   const turno = useRef(0); // para que un guardado viejo no pise el estado de uno nuevo
 
@@ -37,25 +43,52 @@ export function AvisosSettings({ userId }: { userId: string }) {
       .then(({ data, error }) => {
         if (!vivo) return;
         if (error) { console.warn("notification_prefs: no se pudo leer", error); setEstado("error_carga"); return; }
-        setPrefs(normalizarPrefs(data, zonaDispositivo.current));
+        const cargadas = normalizarPrefs(data, zonaDispositivo.current);
+        setPrefs(cargadas);
+        setGuardadas(cargadas);
         setEstado("listo");
       });
     return () => { vivo = false; };
   }, [userId]);
 
-  async function cambiar(parcial: Partial<PrefsAvisos>) {
+  const pendiente = hayCambios(guardadas, prefs);
+
+  // Avisa al navegador si se intenta cerrar o recargar la página con cambios sin guardar.
+  useEffect(() => {
+    if (!pendiente) return;
+    const avisar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [pendiente]);
+
+  // Tocar un campo solo cambia el borrador; no se guarda nada todavía.
+  function cambiar(parcial: Partial<PrefsAvisos>) {
     if (!prefs) return;
-    const siguiente = { ...prefs, ...parcial };
-    setPrefs(siguiente);
-    const fila = filaParaGuardar(userId, siguiente);
+    setPrefs({ ...prefs, ...parcial });
+    setGuardado("nada");
+  }
+
+  function descartar() {
+    if (guardadas) setPrefs(guardadas);
+    setGuardado("nada");
+  }
+
+  async function guardar() {
+    if (!prefs || !pendiente || guardado === "guardando") return;
+    const fila = filaParaGuardar(userId, prefs);
     const supa = getSupabase();
     if (!fila || !supa) { setGuardado("error"); return; }
     const mio = ++turno.current;
     setGuardado("guardando");
     const { error } = await supa.from("notification_prefs").upsert(fila, { onConflict: "user_id" });
     if (mio !== turno.current) return;
-    if (error) console.warn("notification_prefs: no se pudo guardar", error);
-    setGuardado(error ? "error" : "ok");
+    if (error) {
+      console.warn("notification_prefs: no se pudo guardar", error);
+      setGuardado("error"); // el borrador se conserva: no se pierde lo que escribió
+      return;
+    }
+    setGuardadas(prefs);
+    setGuardado("ok");
   }
 
   if (estado === "cargando") return <p className="text-sm text-rumbo-muted">Cargando tus preferencias…</p>;
@@ -141,10 +174,29 @@ export function AvisosSettings({ userId }: { userId: string }) {
         llevan importes: se ven en la pantalla bloqueada.
       </p>
 
-      <div aria-live="polite" className="text-xs h-4">
-        {guardado === "guardando" && <span className="text-rumbo-muted">Guardando…</span>}
-        {guardado === "ok" && <span className="text-emerald-700 font-medium">Guardado ✓</span>}
-        {guardado === "error" && <span className="text-rose-700 font-medium">No se pudo guardar. Inténtalo otra vez.</span>}
+      <div className="flex flex-wrap items-center gap-3 pt-1">
+        <button
+          type="button"
+          onClick={guardar}
+          disabled={!pendiente || guardado === "guardando"}
+          className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {guardado === "guardando" ? "Guardando…" : "Guardar cambios"}
+        </button>
+        {pendiente && guardado !== "guardando" && (
+          <button type="button" onClick={descartar} className="text-sm text-rumbo-muted hover:text-rumbo-ink underline underline-offset-2">
+            Descartar
+          </button>
+        )}
+        <div aria-live="polite" className="text-xs">
+          {pendiente && guardado !== "guardando" && guardado !== "error" && (
+            <span className="text-amber-700 font-medium">Tienes cambios sin guardar</span>
+          )}
+          {!pendiente && guardado === "ok" && <span className="text-emerald-700 font-medium">Guardado ✓</span>}
+          {guardado === "error" && (
+            <span className="text-rose-700 font-medium">No se pudo guardar. Tus cambios siguen aquí: inténtalo otra vez.</span>
+          )}
+        </div>
       </div>
     </div>
   );

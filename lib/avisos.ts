@@ -76,6 +76,17 @@ export function normalizarPrefs(fila: unknown, zonaDispositivo: string): PrefsAv
   };
 }
 
+/** ¿Se ha tocado algo respecto a lo que está guardado? */
+export function hayCambios(guardadas: PrefsAvisos | null, actuales: PrefsAvisos | null): boolean {
+  if (!guardadas || !actuales) return false;
+  return (
+    guardadas.reminder_enabled !== actuales.reminder_enabled ||
+    guardadas.reminder_time !== actuales.reminder_time ||
+    guardadas.timezone !== actuales.timezone ||
+    guardadas.skip_if_logged !== actuales.skip_if_logged
+  );
+}
+
 /** Fila lista para guardar. Devuelve null si algo no es válido (no se guarda basura). */
 export function filaParaGuardar(userId: string, p: PrefsAvisos, ahora: Date = new Date()) {
   if (!userId || !esHora(p.reminder_time) || !esZonaHoraria(p.timezone)) return null;
