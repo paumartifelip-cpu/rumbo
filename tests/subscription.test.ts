@@ -5,6 +5,7 @@ import {
   isHandledEvent,
   isRumboSubscription,
   parsePriceIds,
+  periodEnd,
   rowFromSubscription,
   shouldApplyEvent,
   type AccessRow,
@@ -153,5 +154,32 @@ describe("solo suscripciones de Rumbo (la cuenta de Stripe es compartida)", () =
 
   it("parsePriceIds limpia espacios y descarta lo que no es un precio", () => {
     expect(parsePriceIds(" price_a , price_b,prod_xyz,, ")).toEqual(["price_a", "price_b"]);
+  });
+});
+
+describe("fin del periodo según la versión de la API de Stripe", () => {
+  it("lee el campo antiguo de la suscripción", () => {
+    expect(periodEnd({ id: "s", status: "active", customer: "c", current_period_end: 1_790_000_000 })).toBe(1_790_000_000);
+  });
+
+  it("lee el campo nuevo, dentro de los items, si el antiguo no existe", () => {
+    const sub = { id: "s", status: "active", customer: "c", items: { data: [{ current_period_end: 1_790_000_000 }] } };
+    expect(periodEnd(sub)).toBe(1_790_000_000);
+    expect(rowFromSubscription(sub, "a@b.c", 1_789_000_000, NOW).current_period_end).toBe(new Date(1_790_000_000 * 1000).toISOString());
+  });
+
+  it("con varios items usa el más tardío; sin datos devuelve null", () => {
+    const sub = { id: "s", status: "active", customer: "c", items: { data: [{ current_period_end: 100 }, { current_period_end: 300 }] } };
+    expect(periodEnd(sub)).toBe(300);
+    expect(periodEnd({ id: "s", status: "active", customer: "c" })).toBeNull();
+  });
+
+  it("un cobro fallido sigue dando cortesía aunque la fecha venga en los items (API nueva)", () => {
+    const end = Math.floor(NOW.getTime() / 1000) - 2 * 24 * 60 * 60; // venció hace 2 días
+    const row = rowFromSubscription(
+      { id: "s", status: "past_due", customer: "c", items: { data: [{ current_period_end: end }] } },
+      "a@b.c", 1_789_000_000, NOW
+    );
+    expect(hasAccess([{ plan_kind: "paid", status: row.status, current_period_end: row.current_period_end }], NOW)).toBe(true);
   });
 });

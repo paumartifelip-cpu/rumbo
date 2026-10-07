@@ -42,7 +42,13 @@ export interface StripeSubscriptionLike {
   id: string;
   status: string;
   customer: string | { id: string };
-  items?: { data: Array<{ price?: { id?: string | null } | null }> } | null;
+  items?: {
+    data: Array<{
+      price?: { id?: string | null } | null;
+      // Las versiones nuevas de la API de Stripe mueven el fin del periodo a cada "item".
+      current_period_end?: number | null;
+    }>;
+  } | null;
   current_period_end?: number | null; // segundos Unix
   cancel_at_period_end?: boolean | null;
   trial_end?: number | null;
@@ -80,6 +86,18 @@ export function isRumboSubscription(sub: StripeSubscriptionLike, allowedPriceIds
   return prices.some((p) => allowedPriceIds.includes(p));
 }
 
+/**
+ * Fin del periodo pagado. Según la versión de la API de Stripe del aviso, está en la
+ * suscripción (antigua) o en sus items (nueva); se acepta cualquiera de las dos.
+ */
+export function periodEnd(sub: StripeSubscriptionLike): number | null {
+  if (typeof sub.current_period_end === "number") return sub.current_period_end;
+  const ends = (sub.items?.data ?? [])
+    .map((i) => i.current_period_end)
+    .filter((x): x is number => typeof x === "number");
+  return ends.length > 0 ? Math.max(...ends) : null;
+}
+
 const iso = (seconds?: number | null) =>
   typeof seconds === "number" && Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : null;
 
@@ -97,7 +115,7 @@ export function rowFromSubscription(
     status: sub.status,
     stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer.id,
     stripe_subscription_id: sub.id,
-    current_period_end: iso(sub.current_period_end),
+    current_period_end: iso(periodEnd(sub)),
     cancel_at_period_end: Boolean(sub.cancel_at_period_end),
     trial_end: iso(sub.trial_end),
     last_event_at: iso(eventCreated)!,
