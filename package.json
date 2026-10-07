@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -14,7 +14,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "framer-motion": "^11.11.9",
-    "next": "14.2.15",
+    "next": "16.4.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.13.0"
@@ -24,8 +24,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.15",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.4.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
     "typescript": "^5",
