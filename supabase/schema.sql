@@ -153,6 +153,19 @@ create table if not exists public.notification_prefs (
   updated_at timestamptz not null default now()
 );
 
+-- Dispositivos que pueden recibir avisos (uno por navegador/móvil). La Edge Function que
+-- envía los avisos los lee con la service role.
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  endpoint text not null unique,            -- "dirección de entrega" única de cada dispositivo
+  p256dh text not null,                     -- claves del dispositivo para cifrar el aviso
+  auth text not null,
+  user_agent text,                          -- qué navegador/móvil es (solo para reconocerlo)
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+
 -- Pagos: cada compra verificada por la Edge Function verify-payment
 -- (code = id de la sesión de Stripe; `used` = ya se creó una cuenta con ese pago).
 create table if not exists public.paid_codes (
@@ -236,6 +249,7 @@ create index if not exists tasks_user_id_idx on public.tasks (user_id);
 create index if not exists financial_entries_user_id_idx on public.financial_entries (user_id);
 create index if not exists money_snapshots_user_id_idx on public.money_snapshots (user_id);
 create index if not exists budgets_user_id_idx on public.budgets (user_id);
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions (user_id);
 create index if not exists user_tools_favorite_idx on public.user_tools (user_id, is_favorite);
 create index if not exists user_tools_order_idx on public.user_tools (user_id, order_index);
 create index if not exists paid_codes_session_idx on public.paid_codes (stripe_session_id);
@@ -281,6 +295,7 @@ alter table public.money_snapshots enable row level security;
 alter table public.user_tools enable row level security;
 alter table public.budgets enable row level security;
 alter table public.notification_prefs enable row level security;
+alter table public.push_subscriptions enable row level security;
 alter table public.paid_codes enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.stripe_events enable row level security;
@@ -303,6 +318,7 @@ drop policy if exists "own_money_snapshots" on public.money_snapshots;
 drop policy if exists "own_user_tools" on public.user_tools;
 drop policy if exists "own_budgets" on public.budgets;
 drop policy if exists "own_notification_prefs" on public.notification_prefs;
+drop policy if exists "own_push_subscriptions" on public.push_subscriptions;
 drop policy if exists "read_own_paid_code" on public.paid_codes;
 drop policy if exists "read_own_subscription" on public.subscriptions;
 
@@ -314,6 +330,7 @@ create policy "own_money_snapshots" on public.money_snapshots for all using (aut
 create policy "own_user_tools" on public.user_tools for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own_budgets" on public.budgets for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own_notification_prefs" on public.notification_prefs for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own_push_subscriptions" on public.push_subscriptions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- paid_codes y subscriptions: las Edge Functions (service role) escriben saltándose RLS.
 -- Desde el cliente solo se permite LEER la fila propia; nada de escrituras.

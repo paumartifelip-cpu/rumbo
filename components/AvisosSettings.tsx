@@ -10,13 +10,33 @@ import {
   normalizarPrefs,
   zonaDelDispositivo,
 } from "@/lib/avisos";
+import {
+  DiagnosticoPush,
+  MotivoFallo,
+  datosDelDispositivo,
+  diagnosticarPush,
+  dispositivoSuscrito,
+  entornoReal,
+  quitarDispositivo,
+  registrarDispositivo,
+  textoDiagnostico,
+} from "@/lib/push";
 import { getSupabase } from "@/lib/supabase";
 
 type Estado = "cargando" | "listo" | "error_carga";
 type Guardado = "nada" | "guardando" | "ok" | "error";
 
-// Preferencias del recordatorio diario. De momento NO envía nada (paso 1): solo guarda
-// qué quiere cada persona. Se lee y se escribe directamente en la tabla, sin pasar por la
+const MENSAJES_FALLO: Record<MotivoFallo, string> = {
+  no_soportado: "Este navegador no admite avisos.",
+  iphone_sin_instalar: "Instala Rumbo en la pantalla de inicio para poder recibir avisos.",
+  denegado: "No diste permiso para las notificaciones, así que este dispositivo no recibirá avisos.",
+  error_suscripcion: "No se pudo preparar este dispositivo para los avisos. Inténtalo otra vez.",
+  error_guardado: "No se pudo registrar este dispositivo. Inténtalo otra vez.",
+};
+
+// Preferencias del recordatorio diario y registro de ESTE dispositivo para recibir avisos.
+// De momento NO se envía nada (paso 3): se guarda qué quiere cada persona y a qué aparatos
+// se puede avisar. Se lee y se escribe directamente en las tablas, sin pasar por la
 // sincronización de datos de la app, para no tocar lo delicado.
 //
 // Los cambios son un BORRADOR hasta pulsar «Guardar cambios». Para que nadie se olvide:
@@ -30,6 +50,23 @@ export function AvisosSettings({ userId }: { userId: string }) {
   const [guardadas, setGuardadas] = useState<PrefsAvisos | null>(null); // lo que hay en la base de datos
   const zonaDispositivo = useRef(zonaDelDispositivo());
   const turno = useRef(0); // para que un guardado viejo no pise el estado de uno nuevo
+
+  // Situación de ESTE dispositivo respecto a los avisos.
+  const [diag, setDiag] = useState<DiagnosticoPush>(() => diagnosticarPush(datosDelDispositivo()));
+  const [suscrito, setSuscrito] = useState(false);
+  const [avisoDispositivo, setAvisoDispositivo] = useState<string | null>(null);
+  const [activando, setActivando] = useState(false);
+
+  async function refrescarDispositivo() {
+    setDiag(diagnosticarPush(datosDelDispositivo()));
+    setSuscrito(await dispositivoSuscrito());
+  }
+
+  useEffect(() => {
+    let vivo = true;
+    dispositivoSuscrito().then((s) => { if (vivo) setSuscrito(s); });
+    return () => { vivo = false; };
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -78,10 +115,20 @@ export function AvisosSettings({ userId }: { userId: string }) {
     const fila = filaParaGuardar(userId, prefs);
     const supa = getSupabase();
     if (!fila || !supa) { setGuardado("error"); return; }
+
+    // El permiso del móvil se pide AQUÍ, lo primero y sin esperar a nada: Safari exige que
+    // la pregunta salga justo al tocar el botón. El guardado de las preferencias va en paralelo.
+    const registro = prefs.reminder_enabled ? registrarDispositivo(userId, entornoReal()) : null;
+
     const mio = ++turno.current;
     setGuardado("guardando");
+    setAvisoDispositivo(null);
     const { error } = await supa.from("notification_prefs").upsert(fila, { onConflict: "user_id" });
+    const resultado = registro ? await registro : null;
+    // Si apaga el recordatorio, este dispositivo se da de baja de los avisos.
+    const baja = prefs.reminder_enabled ? null : await quitarDispositivo();
     if (mio !== turno.current) return;
+
     if (error) {
       console.warn("notification_prefs: no se pudo guardar", error);
       setGuardado("error"); // el borrador se conserva: no se pierde lo que escribió
@@ -89,6 +136,21 @@ export function AvisosSettings({ userId }: { userId: string }) {
     }
     setGuardadas(prefs);
     setGuardado("ok");
+    if (resultado && !resultado.ok) setAvisoDispositivo(MENSAJES_FALLO[resultado.motivo]);
+    if (baja && !baja.ok) setAvisoDispositivo("No se pudo quitar este dispositivo de los avisos. Inténtalo otra vez.");
+    await refrescarDispositivo();
+  }
+
+  // Botón «Activar en este dispositivo»: para cuando las preferencias ya están guardadas
+  // pero este aparato aún no está registrado (p. ej. se rechazó el permiso y luego se cambió de idea).
+  async function activarDispositivo() {
+    if (activando) return;
+    setActivando(true);
+    setAvisoDispositivo(null);
+    const r = await registrarDispositivo(userId, entornoReal());
+    setActivando(false);
+    if (!r.ok) setAvisoDispositivo(MENSAJES_FALLO[r.motivo]);
+    await refrescarDispositivo();
   }
 
   if (estado === "cargando") return <p className="text-sm text-rumbo-muted">Cargando tus preferencias…</p>;
@@ -104,10 +166,18 @@ export function AvisosSettings({ userId }: { userId: string }) {
     ? ZONAS_COMUNES
     : [{ id: prefs.timezone, nombre: prefs.timezone.replace(/_/g, " ") }, ...ZONAS_COMUNES];
 
+  const quiereAvisos = prefs.reminder_enabled || Boolean(guardadas?.reminder_enabled);
+  const puedeActivar = Boolean(guardadas?.reminder_enabled) && !pendiente && (diag === "pendiente" || diag === "concedido");
+  // «Permiso concedido» sin estar registrado no es «todo listo»: falta el último paso.
+  const textoEstado =
+    diag === "concedido"
+      ? { titulo: "Falta un último paso", detalle: "Tienes el permiso, pero este dispositivo todavía no está registrado. Pulsa «Activar avisos en este dispositivo»." }
+      : textoDiagnostico(diag);
+
   return (
     <div className="flex flex-col gap-5">
       <div className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-        🧪 Función en pruebas: tus preferencias se guardan, pero los avisos todavía no se envían.
+        🧪 Función en pruebas: ya puedes activar los avisos en este dispositivo, pero todavía no se envían.
       </div>
 
       <div className="flex items-center justify-between gap-4">
@@ -169,9 +239,28 @@ export function AvisosSettings({ userId }: { userId: string }) {
         </span>
       </label>
 
+      {quiereAvisos && (
+        <div className="rounded-xl border border-rumbo-line bg-slate-50/70 px-3.5 py-3">
+          {suscrito ? (
+            <p className="text-sm font-medium text-emerald-800">✅ Avisos activados en este dispositivo</p>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-rumbo-ink">{textoEstado.titulo}</p>
+              <p className="text-xs text-rumbo-muted mt-1 leading-relaxed">{textoEstado.detalle}</p>
+              {puedeActivar && (
+                <button type="button" onClick={activarDispositivo} disabled={activando} className="btn-soft mt-3 disabled:opacity-50">
+                  {activando ? "Activando…" : "Activar avisos en este dispositivo"}
+                </button>
+              )}
+            </>
+          )}
+          {avisoDispositivo && <p className="text-xs font-medium text-rose-700 mt-2">{avisoDispositivo}</p>}
+        </div>
+      )}
+
       <p className="text-xs text-rumbo-muted leading-relaxed">
-        📱 En iPhone, para recibir avisos hace falta tener Rumbo añadido a la pantalla de inicio. Los avisos nunca
-        llevan importes: se ven en la pantalla bloqueada.
+        Cada dispositivo (móvil, ordenador) se activa por separado. Los avisos nunca llevan importes: se ven en la
+        pantalla bloqueada.
       </p>
 
       <div className="flex flex-wrap items-center gap-3 pt-1">

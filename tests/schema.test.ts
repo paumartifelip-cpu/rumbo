@@ -75,6 +75,11 @@ const REAL: Record<string, Col[]> = {
     ["reminder_time", "text", "NO", "'21:00'::text"], ["timezone", "text", "NO", "'UTC'::text"],
     ["skip_if_logged", "boolean", "NO", "true"], ["updated_at", TS, "NO", "now()"],
   ],
+  push_subscriptions: [
+    ["id", "uuid", "NO", "gen_random_uuid()"], ["user_id", "uuid", "NO", null], ["endpoint", "text", "NO", null],
+    ["p256dh", "text", "NO", null], ["auth", "text", "NO", null], ["user_agent", "text", "YES", null],
+    ["created_at", TS, "NO", "now()"], ["last_seen_at", TS, "NO", "now()"],
+  ],
   paid_codes: [
     ["code", "text", "NO", null], ["name", "text", "YES", null], ["paid_at", TS, "YES", "now()"],
     ["stripe_session_id", "text", "YES", null], ["used", "boolean", "YES", "false"], ["created_at", TS, "YES", "now()"],
@@ -102,7 +107,7 @@ const INDICES = [
 const POLITICAS: Record<string, string> = {
   profiles: "own_profiles", goals: "own_goals", tasks: "own_tasks", financial_entries: "own_financial_entries",
   money_snapshots: "own_money_snapshots", user_tools: "own_user_tools", budgets: "own_budgets",
-  notification_prefs: "own_notification_prefs",
+  notification_prefs: "own_notification_prefs", push_subscriptions: "own_push_subscriptions",
   paid_codes: "read_own_paid_code", subscriptions: "read_own_subscription",
 };
 
@@ -193,6 +198,16 @@ describe("schema.sql reconstruye la base de datos real", () => {
     const r = await db.query<{ reminder_enabled: boolean; skip_if_logged: boolean; timezone: string }>(
       `select reminder_enabled, skip_if_logged, timezone from public.notification_prefs where user_id=$1`, [uid]);
     expect(r.rows[0]).toEqual({ reminder_enabled: false, skip_if_logged: true, timezone: "UTC" }); // por defecto: apagado
+  });
+
+  it("un dispositivo (endpoint) solo puede registrarse una vez: una cuenta por aparato", async () => {
+    const u1 = "55555555-5555-5555-5555-555555555555";
+    const u2 = "66666666-6666-6666-6666-666666666666";
+    await db.query(`insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ($1, 'https://push.x/1', 'P', 'A')`, [u1]);
+    await expect(
+      db.query(`insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ($1, 'https://push.x/1', 'P', 'A')`, [u2])
+    ).rejects.toThrow();
+    await expect(db.query(`insert into public.push_subscriptions (user_id, endpoint, p256dh) values ($1, 'https://push.x/2', 'P')`, [u1])).rejects.toThrow(); // falta la clave auth
   });
 
   it("el disparador de herramientas actualiza updated_at en cada cambio", async () => {
