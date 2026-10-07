@@ -16,10 +16,12 @@ import {
   datosDelDispositivo,
   diagnosticarPush,
   dispositivoSuscrito,
+  enviarAvisoDePrueba,
   entornoReal,
   quitarDispositivo,
   registrarDispositivo,
   textoDiagnostico,
+  type TextoPrueba,
 } from "@/lib/push";
 import { getSupabase } from "@/lib/supabase";
 
@@ -56,6 +58,8 @@ export function AvisosSettings({ userId }: { userId: string }) {
   const [suscrito, setSuscrito] = useState(false);
   const [avisoDispositivo, setAvisoDispositivo] = useState<string | null>(null);
   const [activando, setActivando] = useState(false);
+  const [enviandoPrueba, setEnviandoPrueba] = useState(false);
+  const [resultadoPrueba, setResultadoPrueba] = useState<TextoPrueba | null>(null);
 
   async function refrescarDispositivo() {
     setDiag(diagnosticarPush(datosDelDispositivo()));
@@ -153,6 +157,15 @@ export function AvisosSettings({ userId }: { userId: string }) {
     await refrescarDispositivo();
   }
 
+  // Botón «Enviar aviso de prueba»: el servidor manda un aviso real a tus dispositivos.
+  async function probarAviso() {
+    if (enviandoPrueba) return;
+    setEnviandoPrueba(true);
+    setResultadoPrueba(null);
+    setResultadoPrueba(await enviarAvisoDePrueba());
+    setEnviandoPrueba(false);
+  }
+
   if (estado === "cargando") return <p className="text-sm text-rumbo-muted">Cargando tus preferencias…</p>;
   if (estado === "error_carga" || !prefs) {
     return (
@@ -242,7 +255,22 @@ export function AvisosSettings({ userId }: { userId: string }) {
       {quiereAvisos && (
         <div className="rounded-xl border border-rumbo-line bg-slate-50/70 px-3.5 py-3">
           {suscrito ? (
-            <p className="text-sm font-medium text-emerald-800">✅ Avisos activados en este dispositivo</p>
+            <>
+              <p className="text-sm font-medium text-emerald-800">✅ Avisos activados en este dispositivo</p>
+              <button type="button" onClick={probarAviso} disabled={enviandoPrueba} className="btn-soft mt-3 disabled:opacity-50">
+                {enviandoPrueba ? "Enviando…" : "Enviar aviso de prueba"}
+              </button>
+              {resultadoPrueba && (
+                <p
+                  role="status"
+                  className={`text-xs font-medium mt-2 ${
+                    resultadoPrueba.tipo === "ok" ? "text-emerald-700" : resultadoPrueba.tipo === "aviso" ? "text-amber-700" : "text-rose-700"
+                  }`}
+                >
+                  {resultadoPrueba.texto}
+                </p>
+              )}
+            </>
           ) : (
             <>
               <p className="text-sm font-medium text-rumbo-ink">{textoEstado.titulo}</p>

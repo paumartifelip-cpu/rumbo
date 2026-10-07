@@ -235,3 +235,65 @@ export async function quitarDispositivo(): Promise<{ ok: boolean }> {
     return { ok: false };
   }
 }
+
+// ── Aviso de prueba ──────────────────────────────────────────────────────────
+
+/** Lo que devuelve la función del servidor (solo cantidades, nunca direcciones). */
+export interface RespuestaPrueba {
+  ok: boolean;
+  motivo?: string;
+  dispositivos?: number;
+  enviados?: number;
+  caducados?: number;
+  config?: number;
+  temporales?: number;
+  otros?: number;
+}
+
+export interface TextoPrueba {
+  tipo: "ok" | "aviso" | "error";
+  texto: string;
+}
+
+/** Traduce la respuesta del servidor a una frase clara para el usuario. Pura. */
+export function textoResultadoPrueba(r: RespuestaPrueba | null): TextoPrueba {
+  if (!r) return { tipo: "error", texto: "No se pudo contactar con el servidor. Inténtalo otra vez." };
+  if (!r.ok) {
+    if (r.motivo === "no_autenticado") return { tipo: "error", texto: "Tu sesión ha caducado. Vuelve a entrar y repite la prueba." };
+    return { tipo: "error", texto: "No se pudo enviar el aviso de prueba. Inténtalo otra vez en un momento." };
+  }
+  const total = r.dispositivos ?? 0;
+  const enviados = r.enviados ?? 0;
+  if (total === 0) {
+    return { tipo: "aviso", texto: "No hay ningún dispositivo registrado. Activa los avisos en este dispositivo primero." };
+  }
+  if ((r.config ?? 0) > 0 && enviados === 0) {
+    return { tipo: "error", texto: "Apple o Google han rechazado el aviso: hay un problema de configuración nuestro. Cuéntanoslo." };
+  }
+  if (enviados === 0 && (r.temporales ?? 0) > 0) {
+    return { tipo: "aviso", texto: "El servicio de notificaciones está ocupado. Prueba otra vez en un minuto." };
+  }
+  if (enviados === 0 && (r.caducados ?? 0) > 0) {
+    return { tipo: "aviso", texto: "Ese dispositivo ya no existe y se ha quitado de la lista. Vuelve a activar los avisos." };
+  }
+  if (enviados === 0) return { tipo: "error", texto: "No se pudo entregar el aviso. Inténtalo otra vez." };
+  const parcial = enviados < total ? ` (a ${enviados} de ${total} dispositivos)` : "";
+  return { tipo: "ok", texto: `Aviso enviado${parcial}. Debería llegarte en unos segundos.` };
+}
+
+/** Pide al servidor que mande un aviso de prueba a los dispositivos de ESTA cuenta. */
+export async function enviarAvisoDePrueba(): Promise<TextoPrueba> {
+  try {
+    const supa = getSupabase();
+    if (!supa) return textoResultadoPrueba(null);
+    const { data, error } = await supa.functions.invoke("send-test-push", { method: "POST" });
+    if (error) {
+      // La función responde 401 si la sesión no vale; cualquier otro fallo es genérico.
+      const status = (error as { context?: { status?: number } }).context?.status;
+      return textoResultadoPrueba(status === 401 ? { ok: false, motivo: "no_autenticado" } : null);
+    }
+    return textoResultadoPrueba(data as RespuestaPrueba);
+  } catch {
+    return textoResultadoPrueba(null);
+  }
+}
