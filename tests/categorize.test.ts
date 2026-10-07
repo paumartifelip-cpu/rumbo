@@ -106,3 +106,20 @@ describe("si el concepto es el nombre de la categoría (o un sinónimo claro), s
     expect(h("Súper")).toBe("Comida");
   });
 });
+
+describe("Bolt: se clasifica solo", () => {
+  it("Bolt es transporte, con o sin mayúsculas, solo o con más texto", () => {
+    for (const t of ["Bolt", "bolt", "BOLT", "Bolt 15", "Pago Bolt", "Viaje en Bolt"]) {
+      expect(h(t), t).toBe("Transporte");
+    }
+  });
+
+  it("Bolt Food es comida (reparto), no transporte", () => {
+    expect(h("Bolt Food")).toBe("Comida");
+    expect(h("bolt food cena")).toBe("Comida");
+  });
+
+  it("no se activa dentro de otras palabras", () => {
+    expect(h("Boltaire")).toBeNull();
+  });
+});

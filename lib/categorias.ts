@@ -246,6 +246,7 @@ export const REGLAS: ReglaCategoria[] = [
       "just eat",
       "deliveroo",
       "uber eats",
+      "bolt food",
       "rappi",
       "getir",
       "gorillas",
@@ -288,7 +289,7 @@ export const REGLAS: ReglaCategoria[] = [
     palabras: [
       "uber",
       "cabify",
-      "bolt",
+      "\\bbolt\\b",
       "taxi",
       "blablacar",
       "gasolina",
