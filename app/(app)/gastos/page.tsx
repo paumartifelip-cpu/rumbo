@@ -8,7 +8,8 @@ import { SpendingTrend } from "@/components/SpendingTrend";
 import { Reveal } from "@/components/Reveal";
 import { BudgetsCard } from "@/components/BudgetsCard";
 import { PaymentMethodPicker } from "@/components/PaymentMethodPicker";
-import { paymentLabel } from "@/lib/paymentMethods";
+import { PaymentBreakdownCard } from "@/components/PaymentBreakdown";
+import { matchesPayFilter, paymentLabel, PAYMENT_METHODS, type PayFilter } from "@/lib/paymentMethods";
 import type { PaymentMethod } from "@/lib/types";
 import { AddExpenseSheet } from "@/components/AddExpenseSheet";
 import { useFormatMoney, useRumbo } from "@/lib/store";
@@ -429,6 +430,7 @@ export default function GastosPage() {
   const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([]);
   const [openCats, setOpenCats] = useState<string[]>([]);
   const [view, setView] = useState<"categoria" | "dia">("categoria");
+  const [payFilter, setPayFilter] = useState<PayFilter>(null);
   useEffect(() => {
     try {
       if (localStorage.getItem("rumbo_gastos_view") === "dia") setView("dia");
@@ -473,6 +475,14 @@ export default function GastosPage() {
     [finances, currentKey]
   );
 
+  // La lista de movimientos admite filtro por forma de pago; los totales y el
+  // presupuesto siguen usando TODOS los gastos del mes (thisMonth).
+  const listItems = useMemo(
+    () => thisMonth.filter((f) => matchesPayFilter(f, payFilter)),
+    [thisMonth, payFilter]
+  );
+  const anyPayment = useMemo(() => thisMonth.some((f) => f.payment_method), [thisMonth]);
+
   const expensesByCategory = useMemo(() => {
     const map = new Map<string, number>();
     thisMonth.forEach((f) => {
@@ -485,8 +495,8 @@ export default function GastosPage() {
   // Movements grouped into collapsible categories, each sorted by date (newest first).
   // Any category outside the 6 fixed ones is bucketed into "Otros".
   const expenseGroups = useMemo(() => {
-    const map = new Map<string, typeof thisMonth>();
-    thisMonth.forEach((f) => {
+    const map = new Map<string, typeof listItems>();
+    listItems.forEach((f) => {
       const k = f.category && CAT_ICONS[f.category] ? f.category : "Otros";
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(f);
@@ -499,12 +509,12 @@ export default function GastosPage() {
         count: items.length,
       }))
       .sort((a, b) => b.total - a.total);
-  }, [thisMonth, amountInPrimary]);
+  }, [listItems, amountInPrimary]);
 
   // Gastos agrupados por día (más reciente primero), con el total de cada día.
   const dayGroups = useMemo(() => {
-    const map = new Map<string, { key: string; date: Date; items: typeof thisMonth; total: number }>();
-    thisMonth.forEach((f) => {
+    const map = new Map<string, { key: string; date: Date; items: typeof listItems; total: number }>();
+    listItems.forEach((f) => {
       const d = new Date(f.date);
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
       if (!map.has(key)) map.set(key, { key, date: d, items: [], total: 0 });
@@ -513,7 +523,7 @@ export default function GastosPage() {
       g.total += amountInPrimary(f);
     });
     return Array.from(map.values()).sort((a, b) => +b.date - +a.date);
-  }, [thisMonth, amountInPrimary]);
+  }, [listItems, amountInPrimary]);
 
   const dayLabel = (d: Date) => {
     const sameDay = (a: Date, b: Date) =>
@@ -904,13 +914,22 @@ export default function GastosPage() {
         </Reveal>
       </div>
 
+      {anyPayment && (
+        <Reveal delay={0.12}>
+          <div className="mb-6">
+            <PaymentBreakdownCard items={thisMonth} filter={payFilter} onFilter={setPayFilter} />
+          </div>
+        </Reveal>
+      )}
+
       {/* Expense list */}
       <Reveal delay={0.18}>
         <Card className="card-hover">
+          <div id="movimientos" className="scroll-mt-4" />
           <div className="flex justify-between items-center mb-2">
             <SectionTitle
               title="Movimientos del mes"
-              hint={`${thisMonth.length} gastos en ${selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`}
+              hint={`${payFilter ? `${listItems.length} de ${thisMonth.length}` : thisMonth.length} gastos en ${selectedDate.toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`}
             />
             <div role="group" aria-label="Cómo ver los gastos" className="flex rounded-xl bg-slate-100 p-0.5 text-xs font-semibold shrink-0">
               {([["categoria", "Por categoría"], ["dia", "Por día"]] as const).map(([k, label]) => (
@@ -935,8 +954,48 @@ export default function GastosPage() {
               </button>
             )}
           </div>
+          {anyPayment && (
+            <div className="flex flex-wrap gap-1.5 mb-3" role="group" aria-label="Filtrar por forma de pago">
+              {([
+                { label: "Todos", f: null as PayFilter },
+                ...PAYMENT_METHODS.map((m) => ({ label: `${m.icon} ${m.label}`, f: { method: m.key } as PayFilter })),
+                { label: "Sin indicar", f: { method: "none" } as PayFilter },
+              ]).map(({ label, f }) => {
+                const active = f === null ? payFilter === null : payFilter?.method === f.method;
+                return (
+                  <button
+                    key={label}
+                    onClick={() => setPayFilter(f)}
+                    aria-pressed={active}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all active:scale-95 ${
+                      active
+                        ? "bg-rumbo-ink text-white border-rumbo-ink"
+                        : "bg-white text-rumbo-muted border-rumbo-line hover:border-rumbo-ink hover:text-rumbo-ink"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+              {payFilter?.account && (
+                <button
+                  onClick={() => setPayFilter({ method: payFilter.method })}
+                  className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                >
+                  {payFilter.account} ✕
+                </button>
+              )}
+            </div>
+          )}
           {thisMonth.length === 0 ? (
             <EmptyState icon="🧾" title="Sin gastos este mes" description="Apunta el primero arriba." />
+          ) : listItems.length === 0 ? (
+            <p className="text-sm text-rumbo-muted py-6 text-center">
+              Ningún gasto de este mes coincide con ese filtro.{" "}
+              <button onClick={() => setPayFilter(null)} className="font-semibold text-emerald-700 hover:underline">
+                Quitar filtro
+              </button>
+            </p>
           ) : (
             view === "dia" ? (
               <div className="mt-2 flex flex-col gap-2.5">
