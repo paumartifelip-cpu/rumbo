@@ -40,6 +40,8 @@ import {
 } from "./types";
 import { uid } from "./utils";
 import { sanitizePayment } from "./paymentMethods";
+import { generateRecurring } from "./recurring";
+import { listSignature, mergeRowsById, mergeRowsByUpdated } from "./merge";
 import { BudgetAlert, budgetAlertForNewExpense, budgetId } from "./budgets";
 
 interface RumboState {
@@ -72,34 +74,6 @@ const addTombstones = (existing: string[] | undefined, ...ids: string[]): string
   const merged = [...(existing ?? []), ...ids];
   return merged.length > TOMBSTONE_CAP ? merged.slice(merged.length - TOMBSTONE_CAP) : merged;
 };
-
-// Order-independent content signature of a list. Used to detect when a remote
-// pull carries the exact same data we already have, so we can skip replacing
-// state entirely. This is what prevents the UI from flickering / reordering
-// every time the 30s poll or a realtime echo fires with unchanged data.
-//
-// IMPORTANT: every USER-EDITABLE field must be listed here. A field missing
-// from the signature makes remote edits to it invisible ("unchanged") — the
-// stale device keeps its old copy and overwrites the edit on its next push.
-// Deliberately excluded: ai_priority_score / ai_reason / amount_in_primary,
-// which are recomputed locally and would cause endless pull/push churn.
-function listSignature(arr: Array<Record<string, any>>): string {
-  return arr
-    .map((x) =>
-      [
-        x.id, x.title, x.amount, x.currency, x.category, x.date, x.type,
-        x.recurrence, x.last_generated_date, x.status, x.progress,
-        x.current_amount, x.target_amount, x.deadline, x.importance,
-        x.total, x.note, x.name, x.cost, x.rating, x.icon, x.is_favorite,
-        x.highlight, x.order_index, x.updated_at,
-        x.description, x.timeframe, x.unit, x.due_date, x.goal_id,
-        x.manual_order_index, x.estimated_minutes, x.energy_level,
-        x.difficulty, x.urgency, x.money_impact, x.url, x.month, x.payment_method, x.payment_account,
-      ].join("")
-    )
-    .sort()
-    .join("");
-}
 
 const onboardingSignature = (o?: OnboardingData): string =>
   o
@@ -411,28 +385,8 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     // yet on the server are preserved (so a device with offline-only history
     // doesn't get wiped the first time it syncs). Edits to the same id keep
     // the remote version; pure-local items survive.
-    const mergeById = <T extends { id: string; created_at?: string }>(local: T[], rem: T[]): T[] => {
-      const map = new Map<string, T>();
-      // Remote is authoritative for IDs it knows about — except tombstoned ones.
-      for (const r of rem) {
-        if (tombstoned.has(r.id)) continue;
-        map.set(r.id, r);
-      }
-      // Preserve local items not yet on the server:
-      // - if we've never synced (no lastSyncAt), keep all local items
-      // - if we have synced, keep local items created AFTER the last sync
-      for (const l of local) {
-        if (!map.has(l.id)) {
-          const createdAfterSync = !cur.lastSyncAt ||
-            !l.created_at ||
-            l.created_at >= cur.lastSyncAt;
-          if (createdAfterSync) {
-            map.set(l.id, l);
-          }
-        }
-      }
-      return Array.from(map.values());
-    };
+    const mergeById = <T extends { id: string; created_at?: string }>(local: T[], rem: T[]): T[] =>
+      mergeRowsById(local, rem, tombstoned, cur.lastSyncAt);
 
     const mergedGoals = mergeById(cur.goals, remote.goals);
     const mergedTasks = mergeById(cur.tasks, remote.tasks);
@@ -440,30 +394,10 @@ export function RumboProvider({ children }: { children: ReactNode }) {
     const mergedSnapshots = mergeById(cur.snapshots, remote.snapshots);
     const mergedOnboarding = remote.onboarding ?? cur.onboarding;
 
-    // Tools merge: same union as mergeById but for IDs in BOTH, take the row
-    // whose updated_at is newer. Local mutations bump updated_at to now() so
-    // a heart-toggle that hasn't been pushed yet still wins over a stale
-    // remote pull. Falls back to created_at if no updated_at exists.
-    const mergeToolsByUpdated = <T extends { id: string; created_at?: string; updated_at?: string }>(local: T[], rem: T[]): T[] => {
-      const map = new Map<string, T>();
-      const ts = (t: T) => t.updated_at || t.created_at || "";
-      for (const r of rem) {
-        if (tombstoned.has(r.id)) continue;
-        map.set(r.id, r);
-      }
-      for (const l of local) {
-        const r = map.get(l.id);
-        if (!r) {
-          const createdAfterSync = !cur.lastSyncAt ||
-            !l.created_at ||
-            l.created_at >= cur.lastSyncAt;
-          if (createdAfterSync) map.set(l.id, l);
-        } else if (ts(l) > ts(r)) {
-          map.set(l.id, l);
-        }
-      }
-      return Array.from(map.values());
-    };
+    // Tools/budgets merge: same union as mergeById but for ids in BOTH, the row
+    // with the newer updated_at wins (a not-yet-pushed local edit beats a stale pull).
+    const mergeToolsByUpdated = <T extends { id: string; created_at?: string; updated_at?: string }>(local: T[], rem: T[]): T[] =>
+      mergeRowsByUpdated(local, rem, tombstoned, cur.lastSyncAt);
 
     const mergedBudgets = mergeToolsByUpdated(cur.budgets || [], remote.budgets || []);
     let mergedUserTools = mergeToolsByUpdated(cur.userTools || [], remote.userTools || []).sort((a, b) => {
@@ -611,190 +545,7 @@ export function RumboProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated) return;
 
-    setState((s) => {
-      const newTasks = [...s.tasks];
-      const newFinances = [...s.finances];
-      let hasNew = false;
-      const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);
-      const thisMonthStr = todayStr.slice(0, 7);
-
-      // Deterministic id for a generated recurring finance instance. Using a
-      // stable key (parent id + period) instead of a random uid makes
-      // regeneration idempotent: running the generator twice — or on two
-      // devices — produces the SAME id, so an upsert overwrites instead of
-      // creating a duplicate. This is what prevents the double/triple counting.
-      const tombstoned = new Set(s.deletedIds ?? []);
-      const existingFinanceIds = new Set(newFinances.map((f) => f.id));
-      // Month-level logical signature: a recurring instance must appear AT MOST
-      // ONCE per month. This guards against duplicating a row that already
-      // exists for the same month under a different (legacy random) id or on a
-      // slightly different day — the real cause of the recurring duplication.
-      const financeSig = (f: { type: string; title: string; amount: number; date: string }) =>
-        `${f.type}|${f.title.trim().toLowerCase()}|${f.amount}|${f.date.slice(0, 7)}`;
-      const existingFinanceSigs = new Set(newFinances.map(financeSig));
-      const recurringChildId = (parentId: string, period: string) =>
-        `${parentId}__rec__${period}`;
-      const pushFinanceInstance = (instance: FinancialEntry) => {
-        // Never recreate something the user deleted, and never duplicate an
-        // instance that already exists — by id OR by logical signature.
-        if (
-          tombstoned.has(instance.id) ||
-          existingFinanceIds.has(instance.id) ||
-          existingFinanceSigs.has(financeSig(instance))
-        ) {
-          return;
-        }
-        existingFinanceIds.add(instance.id);
-        existingFinanceSigs.add(financeSig(instance));
-        newFinances.push(instance);
-        hasNew = true;
-      };
-
-      s.tasks.forEach((t) => {
-        if (!t.recurrence) return;
-        const lastGen = t.last_generated_date ? t.last_generated_date.slice(0, 10) : t.created_at.slice(0, 10);
-        let shouldGenerate = false;
-        
-        if (t.recurrence === "diaria" && lastGen < todayStr) {
-          shouldGenerate = true;
-        } else if (t.recurrence === "semanal") {
-           const diff = now.getTime() - new Date(t.last_generated_date || t.created_at).getTime();
-           if (diff >= 7 * 24 * 60 * 60 * 1000) shouldGenerate = true;
-        } else if (t.recurrence === "mensual" && lastGen.slice(0, 7) < thisMonthStr) {
-          shouldGenerate = true;
-        }
-
-        if (shouldGenerate) {
-          // Guard: don't duplicate if a pending copy already exists
-          const alreadyHasPending = newTasks.some(
-            (x) => x.id !== t.id && x.title === t.title && x.status === "pendiente"
-          );
-          if (alreadyHasPending) return;
-
-          const idx = newTasks.findIndex(x => x.id === t.id);
-          if (idx >= 0) {
-            newTasks[idx] = { ...newTasks[idx], last_generated_date: now.toISOString() };
-          }
-          const { recurrence, last_generated_date, ...taskWithoutRecurrence } = t;
-          newTasks.push({
-            ...taskWithoutRecurrence,
-            id: uid(),
-            created_at: now.toISOString(),
-            status: "pendiente",
-          });
-          hasNew = true;
-        }
-      });
-
-      const getMissedMonths = (lastGenStr: string, currentMonthStr: string): string[] => {
-        const result: string[] = [];
-        let [year, month] = lastGenStr.split("-").map(Number);
-        const [curYear, curMonth] = currentMonthStr.split("-").map(Number);
-        while (true) {
-          month++;
-          if (month > 12) {
-            month = 1;
-            year++;
-          }
-          if (year > curYear || (year === curYear && month > curMonth)) {
-            break;
-          }
-          result.push(`${year}-${String(month).padStart(2, "0")}`);
-        }
-        return result;
-      };
-
-      const getMissedYears = (lastGenStr: string, currentYearStr: string): string[] => {
-        const result: string[] = [];
-        let year = Number(lastGenStr);
-        const curYear = Number(currentYearStr);
-        while (true) {
-          year++;
-          if (year > curYear) {
-            break;
-          }
-          result.push(String(year));
-        }
-        return result;
-      };
-
-      s.finances.forEach((f) => {
-        if (!f.recurrence) return;
-        
-        // Fallback to f.date instead of f.created_at so backdated recurring finances generate correctly
-        const lastGen = f.last_generated_date ? f.last_generated_date.slice(0, 7) : f.date.slice(0, 7);
-        const entryCurrency = f.currency ?? s.primaryCurrency;
-        const currentPrimaryAmt = convertAmount(f.amount, entryCurrency, s.primaryCurrency);
-        const { recurrence, last_generated_date, ...financeWithoutRecurrence } = f;
-
-        if (f.recurrence === "mensual" && lastGen < thisMonthStr) {
-          const missedMonths = getMissedMonths(lastGen, thisMonthStr);
-          if (missedMonths.length > 0) {
-            const idx = newFinances.findIndex(x => x.id === f.id);
-            if (idx >= 0) {
-              newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
-              hasNew = true;
-            }
-            missedMonths.forEach((monthStr) => {
-              const origDate = new Date(f.date);
-              const origDay = origDate.getDate();
-              const [genYear, genMonth] = monthStr.split("-").map(Number);
-              const genDate = new Date(origDate);
-              genDate.setFullYear(genYear);
-              genDate.setMonth(genMonth - 1, 1);
-              const lastDay = new Date(genYear, genMonth, 0).getDate();
-              genDate.setDate(Math.min(origDay, lastDay));
-
-              pushFinanceInstance({
-                ...financeWithoutRecurrence,
-                id: recurringChildId(f.id, monthStr),
-                date: genDate.toISOString(),
-                amount_in_primary: currentPrimaryAmt,
-                created_at: now.toISOString(),
-              });
-            });
-          }
-        } else if (f.recurrence === "anual") {
-          const lastYear = f.last_generated_date ? f.last_generated_date.slice(0, 4) : f.date.slice(0, 4);
-          const curYear = todayStr.slice(0, 4);
-          if (lastYear < curYear) {
-            const missedYears = getMissedYears(lastYear, curYear);
-            if (missedYears.length > 0) {
-              const idx = newFinances.findIndex(x => x.id === f.id);
-              if (idx >= 0) {
-                newFinances[idx] = { ...newFinances[idx], last_generated_date: now.toISOString() };
-                hasNew = true;
-              }
-              missedYears.forEach((yearStr) => {
-                const origDate = new Date(f.date);
-                const origDay = origDate.getDate();
-                const origMonth = origDate.getMonth();
-                const genYear = Number(yearStr);
-                const genDate = new Date(origDate);
-                genDate.setFullYear(genYear);
-                genDate.setMonth(origMonth, 1);
-                const lastDay = new Date(genYear, origMonth + 1, 0).getDate();
-                genDate.setDate(Math.min(origDay, lastDay));
-
-                pushFinanceInstance({
-                  ...financeWithoutRecurrence,
-                  id: recurringChildId(f.id, yearStr),
-                  date: genDate.toISOString(),
-                  amount_in_primary: currentPrimaryAmt,
-                  created_at: now.toISOString(),
-                });
-              });
-            }
-          }
-        }
-      });
-
-      if (hasNew) {
-        return { ...s, tasks: newTasks, finances: newFinances };
-      }
-      return s;
-    });
+    setState((s) => generateRecurring(s, new Date(), uid));
   }, [hydrated]);
 
   // Persist state to the active profile bucket (local cache).
