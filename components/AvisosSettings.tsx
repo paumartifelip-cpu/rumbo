@@ -7,7 +7,7 @@ import {
   ZONAS_COMUNES,
   filaParaGuardar,
   hayCambios,
-  normalizarPrefs,
+  prefsIniciales,
   zonaDelDispositivo,
 } from "@/lib/avisos";
 import {
@@ -51,6 +51,7 @@ export function AvisosSettings({ userId }: { userId: string }) {
   const [prefs, setPrefs] = useState<PrefsAvisos | null>(null); // lo que se ve (borrador)
   const [guardadas, setGuardadas] = useState<PrefsAvisos | null>(null); // lo que hay en la base de datos
   const zonaDispositivo = useRef(zonaDelDispositivo());
+  const [hayFila, setHayFila] = useState(true); // ¿ya hay algo guardado en la base de datos?
   const turno = useRef(0); // para que un guardado viejo no pise el estado de uno nuevo
 
   // Situación de ESTE dispositivo respecto a los avisos.
@@ -84,9 +85,10 @@ export function AvisosSettings({ userId }: { userId: string }) {
       .then(({ data, error }) => {
         if (!vivo) return;
         if (error) { console.warn("notification_prefs: no se pudo leer", error); setEstado("error_carga"); return; }
-        const cargadas = normalizarPrefs(data, zonaDispositivo.current);
-        setPrefs(cargadas);
-        setGuardadas(cargadas);
+        const ini = prefsIniciales(data, zonaDispositivo.current);
+        setPrefs(ini.borrador);
+        setGuardadas(ini.guardadas);
+        setHayFila(ini.hayFila);
         setEstado("listo");
       });
     return () => { vivo = false; };
@@ -96,11 +98,11 @@ export function AvisosSettings({ userId }: { userId: string }) {
 
   // Avisa al navegador si se intenta cerrar o recargar la página con cambios sin guardar.
   useEffect(() => {
-    if (!pendiente) return;
+    if (!pendiente || !hayFila) return; // la propuesta inicial no es «trabajo sin guardar»
     const avisar = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", avisar);
     return () => window.removeEventListener("beforeunload", avisar);
-  }, [pendiente]);
+  }, [pendiente, hayFila]);
 
   // Tocar un campo solo cambia el borrador; no se guarda nada todavía.
   function cambiar(parcial: Partial<PrefsAvisos>) {
@@ -139,6 +141,7 @@ export function AvisosSettings({ userId }: { userId: string }) {
       return;
     }
     setGuardadas(prefs);
+    setHayFila(true);
     setGuardado("ok");
     if (resultado && !resultado.ok) setAvisoDispositivo(MENSAJES_FALLO[resultado.motivo]);
     if (baja && !baja.ok) setAvisoDispositivo("No se pudo quitar este dispositivo de los avisos. Inténtalo otra vez.");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/Card";
 import { AvisosSettings } from "@/components/AvisosSettings";
@@ -17,8 +17,6 @@ import {
   fetchIsPremium,
 } from "@/lib/payment";
 import { CONTACT_EMAIL, INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/contact";
-import { EVENTO_BETA, aplicarParametroAvisos, avisosBetaActivo, mostrarAvisos } from "@/lib/avisos";
-import { getSupabase } from "@/lib/supabase";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -35,38 +33,6 @@ export default function SettingsPage() {
 
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
-  // Candado de pruebas de los avisos: la sección solo se ve si se activó con /settings/?avisos=1.
-  const avisosBeta = useSyncExternalStore(
-    (avisar) => {
-      window.addEventListener(EVENTO_BETA, avisar);
-      window.addEventListener("storage", avisar);
-      return () => { window.removeEventListener(EVENTO_BETA, avisar); window.removeEventListener("storage", avisar); };
-    },
-    () => avisosBetaActivo(window.localStorage),
-    () => false
-  );
-  useEffect(() => {
-    if (aplicarParametroAvisos(window.localStorage, window.location.search)) {
-      window.dispatchEvent(new Event(EVENTO_BETA));
-    }
-  }, []);
-
-  // Quien ya tiene preferencias de avisos guardadas sigue viendo la sección en CUALQUIER
-  // dispositivo, aunque el candado no esté abierto allí (la app de iPhone no comparte memoria
-  // con Safari). Se pregunta a la base de datos, que es la misma para todos los aparatos.
-  const [tienePrefsAvisos, setTienePrefsAvisos] = useState(false);
-  const idUsuario = profile?.user_id;
-  useEffect(() => {
-    if (!idUsuario) return;
-    let vivo = true;
-    getSupabase()
-      ?.from("notification_prefs")
-      .select("user_id")
-      .eq("user_id", idUsuario)
-      .maybeSingle()
-      .then(({ data }) => { if (vivo && data) setTienePrefsAvisos(true); });
-    return () => { vivo = false; };
-  }, [idUsuario]);
   const [confirmReset, setConfirmReset] = useState<"idle" | "asking" | "wiping">("idle");
   const [wipeFailed, setWipeFailed] = useState(false);
 
@@ -277,12 +243,12 @@ export default function SettingsPage() {
           </div>
         </SettingsAccordion>
 
-        {mostrarAvisos(avisosBeta, tienePrefsAvisos) && profile && (
+        {profile && (
           <SettingsAccordion
             id="avisos"
             title="Avisos y recordatorios"
             icon="🔔"
-            hint="Un recordatorio al día para apuntar tus gastos (en pruebas)."
+            hint="Un recordatorio al día para apuntar tus gastos."
             activeId={activeSection}
             onToggle={toggleSection}
           >

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  CLAVE_BETA, HORAS, HORA_POR_DEFECTO, ZONAS_COMUNES, aplicarParametroAvisos, avisosBetaActivo,
-  esHora, esZonaHoraria, filaParaGuardar, hayCambios, mostrarAvisos, normalizarPrefs, zonaDelDispositivo,
+  HORAS, HORA_POR_DEFECTO, ZONAS_COMUNES,
+  esHora, esZonaHoraria, filaParaGuardar, hayCambios, normalizarPrefs, prefsIniciales, zonaDelDispositivo,
 } from "@/lib/avisos";
 
 describe("horas", () => {
@@ -83,53 +83,21 @@ describe("filaParaGuardar", () => {
   });
 });
 
-describe("candado de pruebas de los avisos", () => {
-  const almacenFalso = () => {
-    const d = new Map<string, string>();
-    return { getItem: (k: string) => d.get(k) ?? null, setItem: (k: string, v: string) => void d.set(k, v), removeItem: (k: string) => void d.delete(k) };
-  };
-
-  it("por defecto está cerrado: los usuarios no ven la sección", () => {
-    expect(avisosBetaActivo(almacenFalso())).toBe(false);
-    expect(avisosBetaActivo(null)).toBe(false);
+describe("prefsIniciales: el recordatorio viene activado por defecto", () => {
+  it("sin nada guardado: el borrador viene ACTIVADO, pero lo guardado sigue desactivado (no se activa a escondidas)", () => {
+    for (const nada of [null, undefined, {}]) {
+      const r = prefsIniciales(nada, "Europe/Madrid");
+      expect(r.hayFila).toBe(false);
+      expect(r.borrador).toEqual({ reminder_enabled: true, reminder_time: "21:00", timezone: "Europe/Madrid", skip_if_logged: true });
+      expect(r.guardadas.reminder_enabled).toBe(false);
+      expect(hayCambios(r.guardadas, r.borrador)).toBe(true); // el botón Guardar queda disponible
+    }
   });
-
-  it("?avisos=1 lo abre y se recuerda; ?avisos=0 lo cierra", () => {
-    const a = almacenFalso();
-    expect(aplicarParametroAvisos(a, "?avisos=1")).toBe(true);
-    expect(a.getItem(CLAVE_BETA)).toBe("1");
-    expect(avisosBetaActivo(a)).toBe(true);
-    expect(aplicarParametroAvisos(a, "")).toBe(false); // sin parámetro no cambia nada
-    expect(avisosBetaActivo(a)).toBe(true);
-    expect(aplicarParametroAvisos(a, "?avisos=0")).toBe(true);
-    expect(avisosBetaActivo(a)).toBe(false);
-  });
-
-  it("repetir el parámetro no avisa de cambios otra vez", () => {
-    const a = almacenFalso();
-    aplicarParametroAvisos(a, "?avisos=1");
-    expect(aplicarParametroAvisos(a, "?avisos=1")).toBe(false);
-  });
-
-  it("valores raros no lo abren", () => {
-    const a = almacenFalso();
-    for (const q of ["?avisos=2", "?avisos=true", "?otra=1", "avisos=1x"]) aplicarParametroAvisos(a, q);
-    expect(avisosBetaActivo(a)).toBe(false);
-  });
-
-  it("si el almacenamiento falla (modo privado), no rompe y queda cerrado", () => {
-    const roto = { getItem: () => { throw new Error("bloqueado"); }, setItem: () => { throw new Error("bloqueado"); }, removeItem: () => { throw new Error("bloqueado"); } };
-    expect(() => aplicarParametroAvisos(roto, "?avisos=1")).not.toThrow();
-    expect(avisosBetaActivo(roto)).toBe(false);
-  });
-});
-
-describe("mostrarAvisos: cuándo se enseña la sección en Ajustes", () => {
-  it("cerrada para todos, salvo candado abierto o cuenta que ya usa los avisos", () => {
-    expect(mostrarAvisos(false, false)).toBe(false); // un usuario normal: no la ve
-    expect(mostrarAvisos(true, false)).toBe(true); // candado abierto en este aparato
-    expect(mostrarAvisos(false, true)).toBe(true); // la app de iPhone: la memoria no se comparte con Safari
-    expect(mostrarAvisos(true, true)).toBe(true);
+  it("con preferencias ya guardadas: se respeta lo que eligió, también si lo apagó", () => {
+    const apagado = prefsIniciales({ reminder_enabled: false, reminder_time: "08:00", timezone: "UTC", skip_if_logged: true }, "Europe/Madrid");
+    expect(apagado.hayFila).toBe(true);
+    expect(apagado.borrador.reminder_enabled).toBe(false);
+    expect(hayCambios(apagado.guardadas, apagado.borrador)).toBe(false);
   });
 });
 

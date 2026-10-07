@@ -100,44 +100,14 @@ export function filaParaGuardar(userId: string, p: PrefsAvisos, ahora: Date = ne
   };
 }
 
-// ── Candado de pruebas ────────────────────────────────────────────────────────
-// Mientras los avisos no se envíen de verdad, la sección de Ajustes está OCULTA para los
-// usuarios. Se activa visitando /settings/?avisos=1 (y se quita con ?avisos=0); la
-// elección se recuerda en este dispositivo. Cuando todo funcione, se quita este candado.
-
-export const CLAVE_BETA = "rumbo_avisos_beta";
-export const EVENTO_BETA = "rumbo-avisos-beta";
-
 /**
- * ¿Se enseña la sección de avisos? Sí si el candado está abierto en este dispositivo O si la
- * cuenta ya tiene preferencias guardadas. Lo segundo es necesario porque en iPhone la app de
- * la pantalla de inicio tiene su propia memoria, separada de Safari: el candado abierto en
- * Safari no existe allí (y sin barra de direcciones no se puede escribir ?avisos=1). Las
- * preferencias, en cambio, viven en la base de datos y son las mismas en todos los aparatos.
+ * Lo que se enseña al abrir la sección de avisos. Quien aún no ha guardado nada ve el
+ * recordatorio ya ACTIVADO como propuesta (borrador): con un toque en «Guardar» queda
+ * activo y el móvil pregunta el permiso. Lo «guardado» sigue siendo lo que hay de verdad en la
+ * base de datos (nada), así que no se activa nada a escondidas.
  */
-export const mostrarAvisos = (candadoAbierto: boolean, cuentaTienePreferencias: boolean): boolean =>
-  candadoAbierto || cuentaTienePreferencias;
-
-type Almacen = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-
-/** ¿Está activado el candado de pruebas en este dispositivo? Solo lee. */
-export function avisosBetaActivo(almacen: Pick<Storage, "getItem"> | null): boolean {
-  try {
-    return almacen?.getItem(CLAVE_BETA) === "1";
-  } catch {
-    return false;
-  }
-}
-
-/** Aplica ?avisos=1 / ?avisos=0 de la dirección. Devuelve true si cambió algo. */
-export function aplicarParametroAvisos(almacen: Almacen | null, busqueda: string): boolean {
-  if (!almacen) return false;
-  try {
-    const v = new URLSearchParams(busqueda).get("avisos");
-    if (v === "1" && almacen.getItem(CLAVE_BETA) !== "1") { almacen.setItem(CLAVE_BETA, "1"); return true; }
-    if (v === "0" && almacen.getItem(CLAVE_BETA) !== null) { almacen.removeItem(CLAVE_BETA); return true; }
-  } catch {
-    /* modo privado o almacenamiento bloqueado: se queda desactivado */
-  }
-  return false;
+export function prefsIniciales(fila: unknown, zonaDispositivo: string): { guardadas: PrefsAvisos; borrador: PrefsAvisos; hayFila: boolean } {
+  const hayFila = Boolean(fila && typeof fila === "object" && Object.keys(fila as object).length > 0);
+  const guardadas = normalizarPrefs(fila, zonaDispositivo);
+  return { guardadas, borrador: hayFila ? guardadas : { ...guardadas, reminder_enabled: true }, hayFila };
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AvisosInvitacion } from "@/components/AvisosInvitacion";
 import { BudgetAlertToast } from "@/components/BudgetAlertToast";
 import { MobileHeader, MobileNav, Sidebar } from "@/components/Sidebar";
 import { useRumbo } from "@/lib/store";
@@ -57,6 +58,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
       <MobileNav />
       <BudgetAlertToast />
+      <AvisosInvitacion userId={profile.user_id} />
     </div>
   );
 }
