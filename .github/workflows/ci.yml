@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
 
 # Si llega un push nuevo mientras corre uno anterior de la misma rama, cancela el viejo.
