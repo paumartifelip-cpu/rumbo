@@ -15,6 +15,7 @@ import {
   buildCancelWhatsAppUrl,
   fetchIsPremium,
 } from "@/lib/payment";
+import { CONTACT_EMAIL, INSTAGRAM_HANDLE, INSTAGRAM_URL } from "@/lib/contact";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -331,6 +332,13 @@ export default function SettingsPage() {
           </div>
         </SettingsAccordion>
       </div>
+
+      <p className="mt-8 text-center text-xs text-rumbo-muted">
+        ¿Dudas o ideas? Escríbenos a{" "}
+        <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-rumbo-ink hover:underline transition-colors">{CONTACT_EMAIL}</a>
+        {" · "}
+        <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="hover:text-rumbo-ink hover:underline transition-colors">{INSTAGRAM_HANDLE}</a>
+      </p>
 
       {showWrapped && <RumboWrapped onClose={() => setShowWrapped(false)} />}
     </div>

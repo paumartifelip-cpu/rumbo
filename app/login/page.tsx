@@ -8,6 +8,7 @@ import { Logo } from "@/components/Logo";
 import { getSupabase } from "@/lib/supabase";
 import { signInEmail, sendPasswordReset } from "@/lib/auth";
 import { STRIPE_PAYMENT_URL, buildSupportWhatsAppUrl } from "@/lib/payment";
+import { CONTACT_EMAIL, INSTAGRAM_URL } from "@/lib/contact";
 
 // El link de reset de Supabase aterriza con el marcador en el hash de la URL.
 const urlLooksLikeRecovery = () =>
@@ -344,6 +345,11 @@ function LoginInner() {
               </div>
             )}
           </div>
+          <p className="mt-8 text-center text-[11px] text-rumbo-muted/80">
+            <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="hover:text-rumbo-ink hover:underline transition-colors">Instagram</a>
+            {" · "}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-rumbo-ink hover:underline transition-colors">{CONTACT_EMAIL}</a>
+          </p>
         </motion.div>
       </main>
     </div>

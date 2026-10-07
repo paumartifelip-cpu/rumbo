@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/Logo";
+import { CONTACT_EMAIL, INSTAGRAM_URL } from "@/lib/contact";
 
 // Floating feature icons. Each one represents something Rumbo lets you do.
 // Positions are in % so they stay roughly anchored across viewport sizes.
@@ -241,7 +242,11 @@ export default function LandingPage() {
 
       <footer className="px-6 md:px-12 py-6 text-xs text-rumbo-muted border-t border-rumbo-line/60 flex justify-between relative z-20">
         <span>© Rumbo</span>
-        <span>Hecho para gente con prisa por avanzar.</span>
+        <span className="hidden md:inline">Hecho para gente con prisa por avanzar.</span>
+        <span className="flex items-center gap-3">
+          <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="hover:text-rumbo-ink hover:underline transition-colors">Instagram</a>
+          <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-rumbo-ink hover:underline transition-colors">Contacto</a>
+        </span>
       </footer>
     </div>
   );
